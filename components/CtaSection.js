@@ -6,28 +6,50 @@ import { useState, useEffect } from "react";
 import {
   Play,
   Clock,
-  Star,
-  Smartphone,
-  ArrowRight,
-  Bell,
   Download,
   Shield,
 } from "lucide-react";
+
+const LANDING_APK_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/app-version/landing-apk`;
 
 export default function CTASection() {
   const { theme } = useTheme();
   const currentTheme = themeConfig[theme];
   const [isVisible, setIsVisible] = useState(false);
+  const [latestApk, setLatestApk] = useState(null);
+  const [apkLoading, setApkLoading] = useState(true);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 300);
     return () => clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    const fetchLatestApk = async () => {
+      try {
+        setApkLoading(true);
+        const response = await fetch(LANDING_APK_ENDPOINT, { method: "GET" });
+        const result = await response.json();
+
+        if (!response.ok || !result?.success || !result?.data?.apkKey) {
+          setLatestApk(null);
+          return;
+        }
+
+        setLatestApk(result.data);
+      } catch {
+        setLatestApk(null);
+      } finally {
+        setApkLoading(false);
+      }
+    };
+
+    fetchLatestApk();
+  }, []);
+
   const handleAPKDownload = () => {
-    // Replace with your actual APK download link
-    const apkUrl = "https://your-domain.com/Amdaani-app.apk";
-    window.open(apkUrl, "_blank");
+    if (!latestApk?.apkKey) return;
+    window.open(latestApk.apkKey, "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -52,7 +74,11 @@ export default function CTASection() {
               } ${currentTheme.accent.replace("bg-", "text-")}`}
             >
               <Clock className="w-4 h-4 mr-2" />
-              Coming Soon on Play Store
+              {apkLoading
+                ? "Loading latest APK..."
+                : latestApk?.version
+                ? `Latest APK v${latestApk.version}`
+                : "Coming Soon on Play Store"}
             </motion.div>
 
             <h2
@@ -88,14 +114,21 @@ export default function CTASection() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={handleAPKDownload}
+                disabled={apkLoading || !latestApk?.apkKey}
                 className={`px-8 py-4 rounded-xl font-semibold text-lg transition-colors shadow-lg flex items-center justify-center space-x-3 ${currentTheme.buttonPrimary}`}
               >
                 <AndroidLogo />
                 <div className="text-left">
                   <div className="text-sm font-medium opacity-90">
-                    Download Now
+                    {apkLoading
+                      ? "Loading APK"
+                      : latestApk?.version
+                      ? `Download v${latestApk.version}`
+                      : "Download Now"}
                   </div>
-                  <div className="text-xs">Direct APK Install</div>
+                  <div className="text-xs">
+                    {latestApk?.description || "Direct APK Install"}
+                  </div>
                 </div>
                 <Download className="w-5 h-5" />
               </motion.button>

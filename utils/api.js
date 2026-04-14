@@ -5,7 +5,7 @@ import Cookies from "js-cookie";
 let updateAuthState = null;
 let logoutFn = null;
 
-const BASE_URL = "https://pos-dev.amptechnology.in/api";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL
 // const BASE_URL = "https://pos-billing-backend.amptechnology.in/api";
 
 // Connect auth handlers

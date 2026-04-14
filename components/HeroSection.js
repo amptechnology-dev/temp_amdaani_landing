@@ -12,6 +12,8 @@ import {
 import { useTheme } from "../context/ThemeContext";
 import { themeConfig } from "../utils/ThemeConfig";
 
+const LANDING_APK_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/app-version/landing-apk`;
+
 const slides = [
   {
     id: 1,
@@ -56,6 +58,8 @@ const slides = [
 
 export default function HeroCarousel() {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [latestApk, setLatestApk] = useState(null);
+  const [apkLoading, setApkLoading] = useState(true);
   const { theme } = useTheme();
   const currentTheme = themeConfig[theme];
 
@@ -65,6 +69,34 @@ export default function HeroCarousel() {
     }, 6000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    const fetchLatestApk = async () => {
+      try {
+        setApkLoading(true);
+        const response = await fetch(LANDING_APK_ENDPOINT, { method: "GET" });
+        const result = await response.json();
+
+        if (!response.ok || !result?.success || !result?.data?.apkKey) {
+          setLatestApk(null);
+          return;
+        }
+
+        setLatestApk(result.data);
+      } catch {
+        setLatestApk(null);
+      } finally {
+        setApkLoading(false);
+      }
+    };
+
+    fetchLatestApk();
+  }, []);
+
+  const handleDownloadApk = () => {
+    if (!latestApk?.apkKey) return;
+    window.open(latestApk.apkKey, "_blank", "noopener,noreferrer");
+  };
 
   return (
     <div
@@ -151,7 +183,11 @@ export default function HeroCarousel() {
                         : "bg-[#1F1F1F] text-[#8AB4F8]"
                     } text-xs sm:text-sm font-semibold`}
                   >
-                    Coming Soon on Play Store
+                    {apkLoading
+                      ? "Loading latest APK..."
+                      : latestApk?.version
+                      ? `Latest APK v${latestApk.version}`
+                      : "Coming Soon on Play Store"}
                   </div>
 
                   <div className="space-y-3 sm:space-y-4">
@@ -196,6 +232,8 @@ export default function HeroCarousel() {
                   {/* CTA Buttons - Better mobile sizing and spacing */}
                   <div className="flex flex-col xs:flex-row gap-3 sm:gap-4 justify-center lg:justify-start px-2 xs:px-0">
                     <button
+                      onClick={handleDownloadApk}
+                      disabled={apkLoading || !latestApk?.apkKey}
                       className={`px-4 py-2.5 xs:px-6 xs:py-3 sm:px-8 sm:py-4 rounded-lg sm:rounded-xl font-semibold text-sm xs:text-base sm:text-lg transition-all shadow-lg hover:shadow-xl hover:scale-105 flex items-center gap-2 justify-center ${currentTheme.buttonPrimary}`}
                     >
                       <svg
@@ -205,7 +243,11 @@ export default function HeroCarousel() {
                       >
                         <path d="M17.523 15.3414c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.5511 0 .9993.4482.9993.9993.0001.5511-.4482.9997-.9993.9997m-11.046 0c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.5511 0 .9993.4482.9993.9993 0 .5511-.4482.9997-.9993.9997m11.4045-6.02l1.9973-3.4592a.416.416 0 00-.1521-.5676.416.416 0 00-.5676.1521l-2.0223 3.503C15.5902 8.2439 13.8453 7.8508 12 7.8508s-3.5902.3931-5.1699 1.0787L4.8078 5.4267a.4161.4161 0 00-.5676-.1521.4157.4157 0 00-.1521.5676l1.9973 3.4592C2.8345 11.5987 1 14.5693 1 17.9508c0 .2591.2109.47.47.47h21.06c.2591 0 .47-.2109.47-.47 0-3.3815-1.8345-6.3521-4.5665-7.6294" />
                       </svg>
-                      Download Now
+                      {apkLoading
+                        ? "Loading APK..."
+                        : latestApk?.version
+                        ? `Download v${latestApk.version}`
+                        : "Download Now"}
                     </button>
                     <button
                       className={`px-4 py-2.5 xs:px-6 xs:py-3 sm:px-8 sm:py-4 rounded-lg sm:rounded-xl font-semibold text-sm xs:text-base sm:text-lg transition-all hover:scale-105 flex items-center gap-2 justify-center ${currentTheme.buttonSecondary}`}
@@ -214,6 +256,12 @@ export default function HeroCarousel() {
                       Watch Demo
                     </button>
                   </div>
+
+                  {latestApk?.description && (
+                    <p className={`text-xs sm:text-sm ${currentTheme.textSecondary}`}>
+                      {latestApk.description}
+                    </p>
+                  )}
                 </div>
 
                 {/* Desktop Phone Mockup */}

@@ -2,115 +2,74 @@
 import { useTheme } from "../context/ThemeContext";
 import { motion } from "framer-motion";
 import { themeConfig } from "../utils/ThemeConfig";
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Check,
-  Star,
-  Zap,
-  Shield,
   Users,
   CreditCard,
-  Badge,
   Crown,
   Sparkles,
   ArrowRight,
+  RefreshCw,
 } from "lucide-react";
+
+const LANDING_PLANS_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/plan/landing-plans`;
+
+const planCardStyles = [
+  { color: "from-blue-500 to-cyan-500", icon: Users },
+  { color: "from-purple-500 to-pink-500", icon: Crown },
+  { color: "from-orange-500 to-red-500", icon: Building },
+];
 
 export default function PricingSection() {
   const { theme } = useTheme();
   const currentTheme = themeConfig[theme];
   const [isAnnual, setIsAnnual] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [plans, setPlans] = useState([]);
+  const [loadingPlans, setLoadingPlans] = useState(true);
+  const [plansError, setPlansError] = useState("");
 
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 300);
     return () => clearTimeout(timer);
   }, []);
 
-  const plans = [
-    {
-      name: "Starter",
-      description: "Perfect for small businesses & freelancers",
-      monthlyPrice: "₹0",
-      annualPrice: "₹0",
-      popular: false,
-      icon: Users,
-      features: [
-        "Up to 50 invoices/month",
-        "Basic customer management",
-        "A4 printer support",
-        "GST-compliant invoices",
-        "Email support",
-        "1GB storage",
-      ],
-      cta: "Get Started Free",
-      color: "from-blue-500 to-cyan-500",
-    },
-    {
-      name: "Professional",
-      description: "Everything you need to grow your business",
-      monthlyPrice: "₹499",
-      annualPrice: "₹4,790",
-      popular: true,
-      icon: Crown,
-      features: [
-        "Unlimited invoices",
-        "Advanced customer management",
-        "A4 & POS printer support",
-        "Product catalog management",
-        "Priority email & chat support",
-        "10GB storage",
-        "Advanced analytics",
-        "Multi-user access (3 users)",
-      ],
-      cta: "Start Free Trial",
-      color: "from-purple-500 to-pink-500",
-    },
-    {
-      name: "Enterprise",
-      description: "For growing businesses with advanced needs",
-      monthlyPrice: "₹1,299",
-      annualPrice: "₹12,990",
-      popular: false,
-      icon: Building,
-      features: [
-        "Everything in Professional",
-        "Unlimited users",
-        "Custom workflows",
-        "API access",
-        "Dedicated account manager",
-        "100GB storage",
-        "Custom reporting",
-        "White-label solutions",
-        "Onboarding assistance",
-      ],
-      cta: "Contact Sales",
-      color: "from-orange-500 to-red-500",
-    },
-  ];
+  const fetchPlans = async () => {
+    setLoadingPlans(true);
+    setPlansError("");
 
-  const features = [
-    {
-      icon: Zap,
-      title: "Lightning Fast",
-      description: "Process invoices 3x faster than traditional software",
-    },
-    {
-      icon: Shield,
-      title: "Secure & Reliable",
-      description: "Bank-grade security with 99.9% uptime guarantee",
-    },
-    {
-      icon: CreditCard,
-      title: "Flexible Payments",
-      description: "Pay monthly or annually with multiple payment options",
-    },
-    {
-      icon: Badge,
-      title: "GST Compliant",
-      description: "Automatically updated with latest tax regulations",
-    },
-  ];
+    try {
+      const response = await fetch(LANDING_PLANS_ENDPOINT, { method: "GET" });
+      const result = await response.json();
+
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.message || "Failed to load plans");
+      }
+
+      const activePlans = (Array.isArray(result?.data) ? result.data : []).filter(
+        (plan) => plan?.isActive
+      );
+
+      activePlans.sort((a, b) => {
+        if ((a?.price ?? 0) !== (b?.price ?? 0)) {
+          return (a?.price ?? 0) - (b?.price ?? 0);
+        }
+        return (a?.durationDays ?? 0) - (b?.durationDays ?? 0);
+      });
+
+      setPlans(activePlans);
+    } catch (error) {
+      setPlansError(error?.message || "Failed to load plans");
+      setPlans([]);
+    } finally {
+      setLoadingPlans(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPlans();
+  }, []);
 
   const faqs = [
     {
@@ -135,15 +94,95 @@ export default function PricingSection() {
     },
   ];
 
-  const calculateAnnualSavings = (monthlyPrice) => {
-    const monthly = parseInt(monthlyPrice.replace("₹", "").replace(",", ""));
-    const annual = parseInt(
-      plans
-        .find((p) => p.name === "Professional")
-        .annualPrice.replace("₹", "")
-        .replace(",", "")
-    );
-    return Math.round(((monthly * 12 - annual) / (monthly * 12)) * 100);
+  const formatCurrency = (amount, currency = "INR") => {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 0,
+    }).format(amount || 0);
+  };
+
+  const getDurationLabel = (durationDays = 0) => {
+    if (durationDays >= 365) return "year";
+    if (durationDays >= 30) return "month";
+    return `${durationDays} days`;
+  };
+
+  const hasAnnualPlans = useMemo(
+    () => plans.some((plan) => (plan?.durationDays ?? 0) >= 365 && (plan?.price ?? 0) > 0),
+    [plans]
+  );
+
+  const displayPlans = useMemo(() => {
+    return plans.filter((plan) => {
+      if ((plan?.price ?? 0) === 0) return true;
+      if (!hasAnnualPlans) return true;
+
+      const isYearlyPlan = (plan?.durationDays ?? 0) >= 365;
+      return isAnnual ? isYearlyPlan : !isYearlyPlan;
+    });
+  }, [hasAnnualPlans, isAnnual, plans]);
+
+  const comparisonRows = useMemo(
+    () => [
+      {
+        key: "price",
+        label: "Price",
+        value: (plan) => formatCurrency(plan?.price ?? 0, plan?.currency || "INR"),
+      },
+      {
+        key: "billing",
+        label: "Billing cycle",
+        value: (plan) => `Per ${getDurationLabel(plan?.durationDays ?? 0)}`,
+      },
+      {
+        key: "invoice",
+        label: "Invoice limit",
+        value: (plan) =>
+          plan?.usageLimits?.unlimited
+            ? "Unlimited"
+            : plan?.usageLimits?.invoices != null
+            ? `${plan.usageLimits.invoices}`
+            : "N/A",
+      },
+      {
+        key: "features",
+        label: "Features",
+        value: (plan) => `${Array.isArray(plan?.features) ? plan.features.length : 0} included`,
+      },
+    ],
+    []
+  );
+
+  const getFeatureLines = (plan) => {
+    const parsed = (Array.isArray(plan?.features) ? plan.features : [])
+      .map((feature, index) => {
+        if (typeof feature === "string") return feature;
+        if (feature?.name) return feature.name;
+        if (feature?.title) return feature.title;
+        if (feature?.label) return feature.label;
+        if (feature?.description) return feature.description;
+        return `Feature ${index + 1}`;
+      })
+      .slice(0, 6);
+
+    const invoiceLine = plan?.usageLimits?.unlimited
+      ? "Unlimited invoices"
+      : plan?.usageLimits?.invoices != null
+      ? `Up to ${plan.usageLimits.invoices} invoices`
+      : null;
+
+    const durationLine = plan?.durationDays
+      ? `Validity: ${plan.durationDays} days`
+      : null;
+
+    return [invoiceLine, durationLine, ...parsed].filter(Boolean);
+  };
+
+  const getIsPopular = (plan) => {
+    const name = (plan?.name || "").toLowerCase();
+    if (name.includes("premium") || name.includes("pro")) return true;
+    return false;
   };
 
   return (
@@ -194,36 +233,36 @@ export default function PricingSection() {
           </p>
 
           {/* Billing Toggle */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={isVisible ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="flex items-center justify-center space-x-4 mb-12"
-          >
-            <span
-              className={`font-medium ${currentTheme.text} ${
-                !isAnnual ? "opacity-100" : "opacity-60"
-              }`}
-            >
-              Monthly
-            </span>
-            <button
-              onClick={() => setIsAnnual(!isAnnual)}
-              className={`relative w-14 h-7 rounded-full transition-colors duration-300 focus:outline-none ${
-                isAnnual
-                  ? currentTheme.accent
-                  : theme === "light"
-                  ? "bg-gray-300"
-                  : "bg-gray-600"
-              }`}
+          {hasAnnualPlans && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={isVisible ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.6, delay: 0.3 }}
+              className="flex items-center justify-center space-x-4 mb-12"
             >
               <span
-                className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-transform duration-300 ${
-                  isAnnual ? "transform translate-x-7" : ""
+                className={`font-medium ${currentTheme.text} ${
+                  !isAnnual ? "opacity-100" : "opacity-60"
                 }`}
-              />
-            </button>
-            <div className="flex items-center space-x-2">
+              >
+                Monthly
+              </span>
+              <button
+                onClick={() => setIsAnnual(!isAnnual)}
+                className={`relative w-14 h-7 rounded-full transition-colors duration-300 focus:outline-none ${
+                  isAnnual
+                    ? currentTheme.accent
+                    : theme === "light"
+                    ? "bg-gray-300"
+                    : "bg-gray-600"
+                }`}
+              >
+                <span
+                  className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-transform duration-300 ${
+                    isAnnual ? "transform translate-x-7" : ""
+                  }`}
+                />
+              </button>
               <span
                 className={`font-medium ${currentTheme.text} ${
                   isAnnual ? "opacity-100" : "opacity-60"
@@ -231,15 +270,21 @@ export default function PricingSection() {
               >
                 Annual
               </span>
-              {isAnnual && (
-                <span
-                  className={`px-2 py-1 rounded-full text-xs font-bold ${currentTheme.success} bg-green-50 dark:bg-green-900/20`}
-                >
-                  Save 20%
-                </span>
-              )}
+            </motion.div>
+          )}
+
+          {plansError && (
+            <div className="mb-12 flex flex-col items-center gap-3">
+              <p className={`text-sm ${currentTheme.error}`}>{plansError}</p>
+              <button
+                onClick={fetchPlans}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl ${currentTheme.buttonSecondary}`}
+              >
+                <RefreshCw className="h-4 w-4" />
+                Retry Plans
+              </button>
             </div>
-          </motion.div>
+          )}
         </motion.div>
 
         {/* Pricing Cards */}
@@ -249,127 +294,137 @@ export default function PricingSection() {
           transition={{ duration: 0.6, delay: 0.4 }}
           className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20"
         >
-          {plans.map((plan, index) => {
-            const IconComponent = plan.icon;
-            const price = isAnnual ? plan.annualPrice : plan.monthlyPrice;
-            const isFree = price === "₹0";
-
-            return (
-              <motion.div
-                key={plan.name}
-                initial={{ opacity: 0, y: 30 }}
-                animate={isVisible ? { opacity: 1, y: 0 } : {}}
-                transition={{ duration: 0.5, delay: 0.5 + index * 0.1 }}
-                className={`relative rounded-2xl border-2 transition-all duration-300 hover:scale-105 hover:shadow-xl ${
-                  plan.popular
-                    ? `${
-                        theme === "light"
-                          ? "border-[#1A73E8] shadow-2xl"
-                          : "border-[#8AB4F8] shadow-2xl"
-                      } transform scale-105`
-                    : `${currentTheme.outline} ${currentTheme.surface}`
-                } ${currentTheme.surface}`}
-              >
-                {/* Popular Badge */}
-                {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <div
-                      className={`px-4 py-2 rounded-full text-sm font-bold text-white bg-gradient-to-r ${plan.color} flex items-center space-x-1`}
-                    >
-                      <Sparkles className="w-4 h-4" />
-                      <span>MOST POPULAR</span>
-                    </div>
+          {loadingPlans
+            ? [0, 1, 2].map((idx) => (
+                <div
+                  key={`skeleton-${idx}`}
+                  className={`rounded-2xl border-2 p-8 animate-pulse ${currentTheme.outline} ${currentTheme.surface}`}
+                >
+                  <div className="h-12 w-12 rounded-xl bg-gray-300/40 mx-auto mb-4" />
+                  <div className="h-6 w-32 bg-gray-300/40 rounded mx-auto mb-3" />
+                  <div className="h-4 w-44 bg-gray-300/40 rounded mx-auto mb-8" />
+                  <div className="h-10 w-28 bg-gray-300/40 rounded mx-auto mb-8" />
+                  <div className="space-y-3 mb-8">
+                    <div className="h-4 w-full bg-gray-300/40 rounded" />
+                    <div className="h-4 w-full bg-gray-300/40 rounded" />
+                    <div className="h-4 w-4/5 bg-gray-300/40 rounded" />
                   </div>
-                )}
+                  <div className="h-11 w-full bg-gray-300/40 rounded-xl" />
+                </div>
+              ))
+            : displayPlans.map((plan, index) => {
+                const style = planCardStyles[index % planCardStyles.length];
+                const IconComponent = style.icon;
+                const isFree = (plan?.price ?? 0) === 0;
+                const isPopular = getIsPopular(plan);
+                const planFeatures = getFeatureLines(plan);
 
-                <div className="p-8">
-                  {/* Plan Header */}
-                  <div className="text-center mb-6">
-                    <div
-                      className={`w-12 h-12 rounded-xl bg-gradient-to-r ${plan.color} flex items-center justify-center mx-auto mb-4`}
-                    >
-                      <IconComponent className="w-6 h-6 text-white" />
-                    </div>
-                    <h3
-                      className={`text-2xl font-bold mb-2 ${currentTheme.text}`}
-                    >
-                      {plan.name}
-                    </h3>
-                    <p className={`text-sm ${currentTheme.textSecondary}`}>
-                      {plan.description}
-                    </p>
-                  </div>
-
-                  {/* Price */}
-                  <div className="text-center mb-6">
-                    <div className="flex items-baseline justify-center space-x-1">
-                      <span
-                        className={`text-4xl font-bold ${currentTheme.text}`}
-                      >
-                        {isAnnual && !isFree ? `${plan.annualPrice}` : price}
-                      </span>
-                      {!isFree && (
-                        <span
-                          className={`text-lg ${currentTheme.textTertiary}`}
+                return (
+                  <motion.div
+                    key={plan._id || plan.name}
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={isVisible ? { opacity: 1, y: 0 } : {}}
+                    transition={{ duration: 0.5, delay: 0.5 + index * 0.1 }}
+                    className={`relative rounded-2xl border-2 transition-all duration-300 hover:scale-105 hover:shadow-xl ${
+                      isPopular
+                        ? `${
+                            theme === "light"
+                              ? "border-[#1A73E8] shadow-2xl"
+                              : "border-[#8AB4F8] shadow-2xl"
+                          } transform scale-105`
+                        : `${currentTheme.outline} ${currentTheme.surface}`
+                    } ${currentTheme.surface}`}
+                  >
+                    {isPopular && (
+                      <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                        <div
+                          className={`px-4 py-2 rounded-full text-sm font-bold text-white bg-gradient-to-r ${style.color} flex items-center space-x-1`}
                         >
-                          {isAnnual ? "/year" : "/month"}
-                        </span>
-                      )}
-                    </div>
-                    {isAnnual && !isFree && (
-                      <div
-                        className={`text-sm ${currentTheme.textSecondary} mt-2`}
-                      >
-                        <s>
-                          ₹{parseInt(plan.monthlyPrice.replace("₹", "")) * 12}
-                        </s>
-                        <span
-                          className={`ml-2 ${currentTheme.success} font-semibold`}
-                        >
-                          Save {calculateAnnualSavings(plan.monthlyPrice)}%
-                        </span>
+                          <Sparkles className="w-4 h-4" />
+                          <span>MOST POPULAR</span>
+                        </div>
                       </div>
                     )}
-                  </div>
 
-                  {/* Features */}
-                  <div className="space-y-3 mb-8">
-                    {plan.features.map((feature, featureIndex) => (
-                      <motion.div
-                        key={feature}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={isVisible ? { opacity: 1, x: 0 } : {}}
-                        transition={{
-                          duration: 0.4,
-                          delay: 0.7 + featureIndex * 0.05,
-                        }}
-                        className="flex items-center space-x-3"
+                    <div className="p-8">
+                      <div className="text-center mb-6">
+                        <div
+                          className={`w-12 h-12 rounded-xl bg-gradient-to-r ${style.color} flex items-center justify-center mx-auto mb-4`}
+                        >
+                          <IconComponent className="w-6 h-6 text-white" />
+                        </div>
+                        <h3
+                          className={`text-2xl font-bold mb-2 ${currentTheme.text}`}
+                        >
+                          {plan.name}
+                        </h3>
+                        <p className={`text-sm ${currentTheme.textSecondary}`}>
+                          {plan.description}
+                        </p>
+                      </div>
+
+                      <div className="text-center mb-6">
+                        <div className="flex items-baseline justify-center space-x-1">
+                          <span
+                            className={`text-4xl font-bold ${currentTheme.text}`}
+                          >
+                            {formatCurrency(plan?.price ?? 0, plan?.currency || "INR")}
+                          </span>
+                          {!isFree && (
+                            <span
+                              className={`text-lg ${currentTheme.textTertiary}`}
+                            >
+                              /{getDurationLabel(plan?.durationDays ?? 0)}
+                            </span>
+                          )}
+                        </div>
+                        <div className={`text-sm ${currentTheme.textSecondary} mt-2`}>
+                          {plan?.durationDays ?? 0} days validity
+                        </div>
+                      </div>
+
+                      <div className="space-y-3 mb-8">
+                        {planFeatures.map((feature, featureIndex) => (
+                          <motion.div
+                            key={`${plan._id || plan.name}-${featureIndex}`}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={isVisible ? { opacity: 1, x: 0 } : {}}
+                            transition={{
+                              duration: 0.4,
+                              delay: 0.7 + featureIndex * 0.05,
+                            }}
+                            className="flex items-center space-x-3"
+                          >
+                            <Check className={`w-5 h-5 ${currentTheme.success}`} />
+                            <span className={`text-sm ${currentTheme.text}`}>
+                              {feature}
+                            </span>
+                          </motion.div>
+                        ))}
+                      </div>
+
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className={`w-full py-3 rounded-xl font-semibold transition-all duration-200 ${
+                          isPopular
+                            ? `${currentTheme.buttonPrimary} shadow-lg`
+                            : `${currentTheme.buttonSecondary}`
+                        }`}
                       >
-                        <Check className={`w-5 h-5 ${currentTheme.success}`} />
-                        <span className={`text-sm ${currentTheme.text}`}>
-                          {feature}
-                        </span>
-                      </motion.div>
-                    ))}
-                  </div>
+                        {isFree ? "Get Started Free" : "Choose Plan"}
+                        <ArrowRight className="w-4 h-4 ml-2 inline" />
+                      </motion.button>
+                    </div>
+                  </motion.div>
+                );
+              })}
 
-                  {/* CTA Button */}
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className={`w-full py-3 rounded-xl font-semibold transition-all duration-200 ${
-                      plan.popular
-                        ? `${currentTheme.buttonPrimary} shadow-lg`
-                        : `${currentTheme.buttonSecondary}`
-                    }`}
-                  >
-                    {plan.cta}
-                    <ArrowRight className="w-4 h-4 ml-2 inline" />
-                  </motion.button>
-                </div>
-              </motion.div>
-            );
-          })}
+          {!loadingPlans && !displayPlans.length && !plansError && (
+            <div className={`md:col-span-3 text-center ${currentTheme.textSecondary}`}>
+              No active plans available right now.
+            </div>
+          )}
         </motion.div>
 
         {/* Feature Comparison */}
@@ -393,9 +448,9 @@ export default function PricingSection() {
                   <th className={`p-6 text-left ${currentTheme.text}`}>
                     Features
                   </th>
-                  {plans.map((plan) => (
+                  {displayPlans.map((plan) => (
                     <th
-                      key={plan.name}
+                      key={`head-${plan._id || plan.name}`}
                       className={`p-6 text-center ${currentTheme.text}`}
                     >
                       {plan.name}
@@ -404,33 +459,37 @@ export default function PricingSection() {
                 </tr>
               </thead>
               <tbody>
-                {[
-                  "Invoices per month",
-                  "Customer management",
-                  "Printer support",
-                  "Storage",
-                  "Users",
-                  "Support",
-                  "Analytics",
-                ].map((feature, index) => (
-                  <tr
-                    key={feature}
-                    className={`border-b ${currentTheme.outline} ${
-                      index % 2 === 0 ? currentTheme.surfaceVariant : ""
-                    }`}
-                  >
-                    <td className={`p-4 font-medium ${currentTheme.text}`}>
-                      {feature}
+                {loadingPlans ? (
+                  <tr>
+                    <td
+                      colSpan={Math.max(displayPlans.length + 1, 2)}
+                      className={`p-6 text-center ${currentTheme.textSecondary}`}
+                    >
+                      Loading plan comparison...
                     </td>
-                    {plans.map((plan) => (
-                      <td key={plan.name} className="p-4 text-center">
-                        <Check
-                          className={`w-5 h-5 mx-auto ${currentTheme.success}`}
-                        />
-                      </td>
-                    ))}
                   </tr>
-                ))}
+                ) : (
+                  comparisonRows.map((row, index) => (
+                    <tr
+                      key={row.key}
+                      className={`border-b ${currentTheme.outline} ${
+                        index % 2 === 0 ? currentTheme.surfaceVariant : ""
+                      }`}
+                    >
+                      <td className={`p-4 font-medium ${currentTheme.text}`}>
+                        {row.label}
+                      </td>
+                      {displayPlans.map((plan) => (
+                        <td
+                          key={`${row.key}-${plan._id || plan.name}`}
+                          className={`p-4 text-center ${currentTheme.textSecondary}`}
+                        >
+                          {row.value(plan)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
