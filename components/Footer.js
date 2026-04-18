@@ -3,7 +3,6 @@ import { useTheme } from "../context/ThemeContext";
 import { themeConfig } from "../utils/ThemeConfig";
 import { motion } from "framer-motion";
 import {
-  Smartphone,
   Mail,
   Phone,
   MapPin,
@@ -13,18 +12,86 @@ import {
   Instagram,
   Youtube,
   ArrowUp,
-  Play,
-  Download,
-  Shield,
-  Globe,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+
+const HELPLINE_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/helpline`;
+
+const DEFAULT_HELPLINE = {
+  phone: "+1 (555) 123-4567",
+  email: "hello@amdaani.com",
+  location: "Kolkata, India",
+  socialLinks: {
+    facebook: "#",
+    instagram: "#",
+    youtube: "#",
+    linkedin: "#",
+  },
+};
+
+const SOCIAL_BASE_URLS = {
+  facebook: "https://facebook.com",
+  instagram: "https://instagram.com",
+  youtube: "https://youtube.com",
+  linkedin: "https://linkedin.com",
+};
+
+const buildSocialUrl = (platform, rawUrl) => {
+  if (!rawUrl || typeof rawUrl !== "string") {
+    return "#";
+  }
+
+  const value = rawUrl.trim();
+  if (!value) {
+    return "#";
+  }
+
+  if (/^https?:\/\//i.test(value)) {
+    return value;
+  }
+
+  if (/^https?:/i.test(value)) {
+    const protocolFixed = value.replace(/^https?:/i, (match) => `${match}//`);
+    if (/^https?:\/\//i.test(protocolFixed)) {
+      try {
+        const parsed = new URL(protocolFixed);
+        if (parsed.hostname.includes(".")) {
+          return protocolFixed;
+        }
+      } catch {
+        // Continue to platform-specific normalization.
+      }
+    }
+  }
+
+  const compact = value
+    .toLowerCase()
+    .replace(/^https?:/i, "")
+    .replace(/[^a-z0-9]/g, "");
+
+  const baseUrl = SOCIAL_BASE_URLS[platform] || "#";
+  const marker = `${platform}com`;
+
+  if (compact.includes(marker)) {
+    let suffix = compact.split(marker)[1] || "";
+
+    if (platform === "linkedin" && suffix.startsWith("company")) {
+      suffix = suffix.replace(/^company/, "");
+      return suffix ? `${baseUrl}/company/${suffix}` : `${baseUrl}/company`;
+    }
+
+    return suffix ? `${baseUrl}/${suffix}` : baseUrl;
+  }
+
+  return baseUrl;
+};
 
 export default function Footer() {
   const { theme } = useTheme();
   const currentTheme = themeConfig[theme];
   const [isVisible, setIsVisible] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [helpline, setHelpline] = useState(DEFAULT_HELPLINE);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 300);
@@ -39,6 +106,45 @@ export default function Footer() {
       window.removeEventListener("scroll", handleScroll);
     };
   }, []);
+
+  useEffect(() => {
+    const fetchHelpline = async () => {
+      try {
+        const response = await fetch(HELPLINE_ENDPOINT, { method: "GET" });
+        const result = await response.json();
+
+        if (!response.ok || !result?.success || !result?.data) {
+          return;
+        }
+
+        setHelpline({
+          phone: result?.data?.phone || DEFAULT_HELPLINE.phone,
+          email: result?.data?.email || DEFAULT_HELPLINE.email,
+          location: result?.data?.location || DEFAULT_HELPLINE.location,
+          socialLinks: {
+            facebook:
+              result?.data?.socialLinks?.facebook ||
+              DEFAULT_HELPLINE.socialLinks.facebook,
+            instagram:
+              result?.data?.socialLinks?.instagram ||
+              DEFAULT_HELPLINE.socialLinks.instagram,
+            youtube:
+              result?.data?.socialLinks?.youtube ||
+              DEFAULT_HELPLINE.socialLinks.youtube,
+            linkedin:
+              result?.data?.socialLinks?.linkedin ||
+              DEFAULT_HELPLINE.socialLinks.linkedin,
+          },
+        });
+      } catch {
+        setHelpline(DEFAULT_HELPLINE);
+      }
+    };
+
+    fetchHelpline();
+  }, []);
+
+  const normalizedPhone = (helpline?.phone || "").replace(/[^\d+]/g, "");
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -91,23 +197,27 @@ export default function Footer() {
     {
       name: "Facebook",
       icon: Facebook,
-      href: "#",
+      href: buildSocialUrl("facebook", helpline?.socialLinks?.facebook),
       color: "hover:text-blue-600",
-    },
-    { name: "Twitter", icon: Twitter, href: "#", color: "hover:text-blue-400" },
-    {
-      name: "LinkedIn",
-      icon: Linkedin,
-      href: "#",
-      color: "hover:text-blue-700",
     },
     {
       name: "Instagram",
       icon: Instagram,
-      href: "#",
+      href: buildSocialUrl("instagram", helpline?.socialLinks?.instagram),
       color: "hover:text-pink-600",
     },
-    { name: "YouTube", icon: Youtube, href: "#", color: "hover:text-red-600" },
+    {
+      name: "YouTube",
+      icon: Youtube,
+      href: buildSocialUrl("youtube", helpline?.socialLinks?.youtube),
+      color: "hover:text-red-600",
+    },
+    {
+      name: "LinkedIn",
+      icon: Linkedin,
+      href: buildSocialUrl("linkedin", helpline?.socialLinks?.linkedin),
+      color: "hover:text-blue-700",
+    },
   ];
 
   return (
@@ -122,11 +232,10 @@ export default function Footer() {
           scale: showScrollTop ? 1 : 0,
         }}
         onClick={scrollToTop}
-        className={`fixed bottom-8 right-8 z-50 w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 ${
-          theme === "light"
+        className={`fixed bottom-8 right-8 z-50 w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 ${theme === "light"
             ? "bg-white text-gray-700 hover:bg-gray-50 border border-gray-200"
             : "bg-[#1C1C1E] text-gray-300 hover:bg-[#2C2C2E] border border-gray-700"
-        }`}
+          }`}
       >
         <ArrowUp className="w-5 h-5" />
       </motion.button>
@@ -170,15 +279,19 @@ export default function Footer() {
             <div className="space-y-3 mb-6">
               <div className="flex items-center space-x-3">
                 <Phone className={`w-4 h-4 ${currentTheme.textTertiary}`} />
-                <span className={currentTheme.text}>+1 (555) 123-4567</span>
+                <a href={`tel:${normalizedPhone}`} className={currentTheme.text}>
+                  {helpline.phone}
+                </a>
               </div>
               <div className="flex items-center space-x-3">
                 <Mail className={`w-4 h-4 ${currentTheme.textTertiary}`} />
-                <span className={currentTheme.text}>hello@Amdaani.com</span>
+                <a href={`mailto:${helpline.email}`} className={currentTheme.text}>
+                  {helpline.email}
+                </a>
               </div>
               <div className="flex items-center space-x-3">
                 <MapPin className={`w-4 h-4 ${currentTheme.textTertiary}`} />
-                <span className={currentTheme.text}>Mumbai, India</span>
+                <span className={currentTheme.text}>{helpline.location}</span>
               </div>
             </div>
 
@@ -190,6 +303,8 @@ export default function Footer() {
                   <motion.a
                     key={social.name}
                     href={social.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
                     className={`w-10 h-10 rounded-lg ${currentTheme.surfaceVariant} flex items-center justify-center transition-colors duration-200 ${currentTheme.textTertiary} ${social.color}`}

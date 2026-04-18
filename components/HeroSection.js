@@ -13,8 +13,18 @@ import { useTheme } from "../context/ThemeContext";
 import { themeConfig } from "../utils/ThemeConfig";
 
 const LANDING_APK_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/app-version/landing-apk`;
+const HERO_SECTIONS_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/hero/list-hero-sections`;
 
-const slides = [
+const ICON_MAP = {
+  Zap,
+  Users,
+  Package,
+  Printer,
+  TrendingUp,
+  Shield,
+};
+
+const FALLBACK_SLIDES = [
   {
     id: 1,
     title: "India's Fastest",
@@ -56,18 +66,77 @@ const slides = [
   },
 ];
 
+const mapFeatures = (features = []) => {
+  if (!Array.isArray(features) || features.length === 0) return [];
+
+  return features.map((feature) => ({
+    icon: ICON_MAP[feature?.icon] || Zap,
+    text: feature?.text || "Feature",
+  }));
+};
+
+const normalizeSlides = (items = []) => {
+  if (!Array.isArray(items) || items.length === 0) return [];
+
+  const sortedItems = [...items].sort((a, b) => {
+    const aPriority = Number.isFinite(a?.priority) ? a.priority : Number.MAX_SAFE_INTEGER;
+    const bPriority = Number.isFinite(b?.priority) ? b.priority : Number.MAX_SAFE_INTEGER;
+    return aPriority - bPriority;
+  });
+
+  return sortedItems.map((item, index) => ({
+    id: item?._id || `${item?.title || "slide"}-${index}`,
+    title: item?.title || "Amdaani",
+    subtitle: item?.subtitle || "Billing Solution",
+    description: item?.description || "Manage your business faster with smart billing.",
+    gradient: item?.gradient || "from-blue-600 via-purple-600 to-pink-600",
+    features: mapFeatures(item?.features),
+    phoneImage: item?.phoneImage || "/images/dashboard.jpg",
+  }));
+};
+
 export default function HeroCarousel() {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [slides, setSlides] = useState(FALLBACK_SLIDES);
   const [latestApk, setLatestApk] = useState(null);
   const [apkLoading, setApkLoading] = useState(true);
   const { theme } = useTheme();
   const currentTheme = themeConfig[theme];
 
   useEffect(() => {
+    if (slides.length <= 1) return;
+
     const timer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % slides.length);
     }, 6000);
+
     return () => clearInterval(timer);
+  }, [slides.length]);
+
+  useEffect(() => {
+    setCurrentSlide((prev) => (prev >= slides.length ? 0 : prev));
+  }, [slides.length]);
+
+  useEffect(() => {
+    const fetchHeroSections = async () => {
+      try {
+        const response = await fetch(HERO_SECTIONS_ENDPOINT, { method: "GET" });
+        const result = await response.json();
+
+        if (!response.ok || !result?.success || !Array.isArray(result?.data)) {
+          return;
+        }
+
+        const mappedSlides = normalizeSlides(result.data);
+        if (mappedSlides.length > 0) {
+          setSlides(mappedSlides);
+        }
+      } catch {
+        // Keep fallback slides when API is unavailable.
+      }
+    };
+
+    fetchHeroSections();
   }, []);
 
   useEffect(() => {

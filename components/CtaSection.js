@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 
 const LANDING_APK_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/app-version/landing-apk`;
+const PLAY_STORE_FALLBACK_URL =
+  process.env.NEXT_PUBLIC_PLAY_STORE_URL || "https://play.google.com/store/apps";
 
 export default function CTASection() {
   const { theme } = useTheme();
@@ -52,6 +54,11 @@ export default function CTASection() {
     window.open(latestApk.apkKey, "_blank", "noopener,noreferrer");
   };
 
+  const handlePlayStoreOpen = () => {
+    const playStoreUrl = latestApk?.playStoreUrl || PLAY_STORE_FALLBACK_URL;
+    window.open(playStoreUrl, "_blank", "noopener,noreferrer");
+  };
+
   return (
     <section
       className={`py-20 px-4 sm:px-6 lg:px-8 ${currentTheme.background}`}
@@ -78,7 +85,7 @@ export default function CTASection() {
                 ? "Loading latest APK..."
                 : latestApk?.version
                 ? `Latest APK v${latestApk.version}`
-                : "Coming Soon on Play Store"}
+                : "Now Available on Play Store"}
             </motion.div>
 
             <h2
@@ -133,21 +140,19 @@ export default function CTASection() {
                 <Download className="w-5 h-5" />
               </motion.button>
 
-              {/* Play Store Coming Soon */}
+              {/* Play Store Button */}
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className={`px-8 py-4 rounded-xl font-semibold text-lg transition-colors border-2 flex items-center justify-center space-x-3 ${currentTheme.buttonSecondary} opacity-80 cursor-not-allowed`}
-                disabled
+                onClick={handlePlayStoreOpen}
+                className={`px-8 py-4 rounded-xl font-semibold text-lg transition-colors border-2 flex items-center justify-center space-x-3 ${currentTheme.buttonSecondary}`}
               >
                 <div className="w-8 h-8 bg-green-500 rounded flex items-center justify-center">
                   <Play className="w-4 h-4 text-white" />
                 </div>
                 <div className="text-left">
-                  <div className="text-sm font-medium opacity-90">
-                    Coming Soon
-                  </div>
-                  <div className="text-xs">On Play Store</div>
+                  <div className="text-sm font-medium opacity-90">Get it on</div>
+                  <div className="text-xs">Google Play</div>
                 </div>
               </motion.button>
             </motion.div>
@@ -321,13 +326,13 @@ export default function CTASection() {
                         </div>
                       </div>
 
-                      {/* Play Store Coming Soon */}
+                      {/* Play Store */}
                       <div
                         className={`p-4 rounded-2xl border ${
                           theme === "light"
                             ? "border-gray-600"
                             : "border-gray-300"
-                        } opacity-60`}
+                        }`}
                       >
                         <div className="flex items-center space-x-3">
                           <div className="w-10 h-10 bg-green-500 rounded flex items-center justify-center">
@@ -341,7 +346,7 @@ export default function CTASection() {
                                   : "text-gray-600"
                               }`}
                             >
-                              COMING SOON
+                              AVAILABLE NOW
                             </p>
                             <p
                               className={`font-bold ${

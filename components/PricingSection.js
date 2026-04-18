@@ -14,6 +14,30 @@ import {
 } from "lucide-react";
 
 const LANDING_PLANS_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/plan/landing-plans`;
+const FAQ_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/faq`;
+
+const FALLBACK_FAQS = [
+  {
+    question: "Can I change plans anytime?",
+    answer:
+      "Yes, you can upgrade or downgrade your plan at any time. Changes take effect immediately.",
+  },
+  {
+    question: "Is there a setup fee?",
+    answer:
+      "No, there are no setup fees or hidden charges. You only pay the monthly or annual subscription fee.",
+  },
+  {
+    question: "Do you offer discounts for startups?",
+    answer:
+      "Yes, we offer special discounts for registered startups and small businesses. Contact our sales team for details.",
+  },
+  {
+    question: "What payment methods do you accept?",
+    answer:
+      "We accept all major credit cards, UPI, net banking, and offer EMI options for annual plans.",
+  },
+];
 
 const planCardStyles = [
   { color: "from-blue-500 to-cyan-500", icon: Users },
@@ -29,6 +53,9 @@ export default function PricingSection() {
   const [plans, setPlans] = useState([]);
   const [loadingPlans, setLoadingPlans] = useState(true);
   const [plansError, setPlansError] = useState("");
+  const [faqs, setFaqs] = useState(FALLBACK_FAQS);
+  const [loadingFaqs, setLoadingFaqs] = useState(true);
+  const [faqError, setFaqError] = useState("");
 
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 300);
@@ -71,28 +98,37 @@ export default function PricingSection() {
     fetchPlans();
   }, []);
 
-  const faqs = [
-    {
-      question: "Can I change plans anytime?",
-      answer:
-        "Yes, you can upgrade or downgrade your plan at any time. Changes take effect immediately.",
-    },
-    {
-      question: "Is there a setup fee?",
-      answer:
-        "No, there are no setup fees or hidden charges. You only pay the monthly or annual subscription fee.",
-    },
-    {
-      question: "Do you offer discounts for startups?",
-      answer:
-        "Yes, we offer special discounts for registered startups and small businesses. Contact our sales team for details.",
-    },
-    {
-      question: "What payment methods do you accept?",
-      answer:
-        "We accept all major credit cards, UPI, net banking, and offer EMI options for annual plans.",
-    },
-  ];
+  const fetchFaqs = async () => {
+    setLoadingFaqs(true);
+    setFaqError("");
+
+    try {
+      const response = await fetch(FAQ_ENDPOINT, { method: "GET" });
+      const result = await response.json();
+
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.message || "Failed to load FAQs");
+      }
+
+      const apiFaqs = (Array.isArray(result?.data) ? result.data : [])
+        .map((item) => ({
+          question: item?.question || "",
+          answer: item?.answer || "",
+        }))
+        .filter((item) => item.question && item.answer);
+
+      setFaqs(apiFaqs.length ? apiFaqs : FALLBACK_FAQS);
+    } catch (error) {
+      setFaqError(error?.message || "Failed to load FAQs");
+      setFaqs(FALLBACK_FAQS);
+    } finally {
+      setLoadingFaqs(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchFaqs();
+  }, []);
 
   const formatCurrency = (amount, currency = "INR") => {
     return new Intl.NumberFormat("en-IN", {
@@ -506,10 +542,35 @@ export default function PricingSection() {
           >
             Frequently Asked Questions
           </h3>
+
+          {faqError && (
+            <div className="mb-8 flex flex-col items-center gap-3">
+              <p className={`text-sm ${currentTheme.error}`}>{faqError}</p>
+              <button
+                onClick={fetchFaqs}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl ${currentTheme.buttonSecondary}`}
+              >
+                <RefreshCw className="h-4 w-4" />
+                Retry FAQs
+              </button>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {faqs.map((faq, index) => (
+            {loadingFaqs
+              ? [0, 1].map((idx) => (
+                  <div
+                    key={`faq-skeleton-${idx}`}
+                    className={`p-6 rounded-2xl border animate-pulse ${currentTheme.surface} ${currentTheme.outline}`}
+                  >
+                    <div className="h-5 w-3/4 bg-gray-300/40 rounded mb-4" />
+                    <div className="h-4 w-full bg-gray-300/40 rounded mb-2" />
+                    <div className="h-4 w-5/6 bg-gray-300/40 rounded" />
+                  </div>
+                ))
+              : faqs.map((faq, index) => (
               <motion.div
-                key={faq.question}
+                key={`${faq.question}-${index}`}
                 initial={{ opacity: 0, x: index % 2 === 0 ? -20 : 20 }}
                 animate={isVisible ? { opacity: 1, x: 0 } : {}}
                 transition={{ duration: 0.5, delay: 1.1 + index * 0.1 }}

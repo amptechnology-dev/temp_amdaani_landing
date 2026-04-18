@@ -15,76 +15,149 @@ import {
   Play,
   Star,
 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
-export default function AboutSection() {
-  const { theme } = useTheme();
-  const currentTheme = themeConfig[theme];
-  const [ref, inView] = useInView({
-    triggerOnce: true,
-    threshold: 0.1,
-  });
+const ABOUT_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/about/public-about`;
 
-  const stats = [
-    { number: "10K+", label: "Businesses Served", icon: Users },
-    { number: "50M+", label: "Invoices Generated", icon: TrendingUp },
-    { number: "99.9%", label: "Uptime Reliability", icon: Shield },
-    { number: "15+", label: "Cities Across India", icon: Globe },
-  ];
+const ICON_MAP = {
+  Target,
+  Zap,
+  Shield,
+  Users,
+  TrendingUp,
+  Globe,
+  Award,
+  IndianRupee,
+};
 
-  const values = [
+const FALLBACK_ABOUT = {
+  badgeTitle: "About Amdaani",
+  heading: "Revolutionizing Business Management",
+  highlightText: "Made in India",
+  description:
+    "Amdaani is the fastest and most affordable billing solution built specifically for Indian businesses. We empower entrepreneurs with smart tools to grow their business efficiently.",
+  stats: [
+    { number: "10K+", label: "Businesses Served", icon: "Users" },
+    { number: "50M+", label: "Invoices Generated", icon: "TrendingUp" },
+    { number: "99.9%", label: "Uptime Reliability", icon: "Shield" },
+    { number: "15+", label: "Cities Across India", icon: "Globe" },
+  ],
+  missionTitle: "Our Mission",
+  missionDescription:
+    "To democratize business management tools for every Indian entrepreneur, making professional billing and customer management accessible and affordable.",
+  missionPoints: [
+    "Built specifically for Indian business needs",
+    "Instant Billing",
+    "Support for all printer types (A4, POS, Thermal)",
+    "GST-compliant invoices and reports",
+  ],
+  values: [
     {
-      icon: Zap,
+      icon: "Zap",
       title: "Lightning Fast",
       description:
         "Process invoices 3x faster than traditional software with our optimized workflow and intuitive interface.",
       color: "from-blue-500 to-cyan-500",
     },
     {
-      icon: IndianRupee,
+      icon: "IndianRupee",
       title: "Cost Effective",
       description:
         "Save up to 70% on billing software costs with our affordable pricing and no hidden charges.",
       color: "from-green-500 to-emerald-500",
     },
     {
-      icon: Shield,
+      icon: "Shield",
       title: "Secure & Reliable",
       description:
         "Bank-grade security with automatic backups and 99.9% uptime guarantee for your business.",
       color: "from-purple-500 to-pink-500",
     },
     {
-      icon: Users,
+      icon: "Users",
       title: "Customer First",
       description:
         "Dedicated support and continuous improvements based on real user feedback from Indian businesses.",
       color: "from-orange-500 to-red-500",
     },
-  ];
+  ],
+};
 
-  const team = [
-    {
-      name: "Aarav Sharma",
-      role: "Founder & CEO",
-      image: "/images/team-aarav.jpg",
-      description:
-        "Former product lead at leading fintech company with 8+ years experience.",
-    },
-    {
-      name: "Priya Patel",
-      role: "CTO",
-      image: "/images/team-priya.jpg",
-      description:
-        "Expert in scalable architecture and cloud technologies with 10+ years experience.",
-    },
-    {
-      name: "Rohan Kumar",
-      role: "Head of Product",
-      image: "/images/team-rohan.jpg",
-      description:
-        "Product management specialist focused on user experience and business growth.",
-    },
-  ];
+const getIconComponent = (iconName, fallback = Zap) => {
+  return ICON_MAP[iconName] || fallback;
+};
+
+export default function AboutSection() {
+  const { theme } = useTheme();
+  const currentTheme = themeConfig[theme];
+  const [aboutData, setAboutData] = useState(FALLBACK_ABOUT);
+  const [ref, inView] = useInView({
+    triggerOnce: true,
+    threshold: 0.1,
+  });
+
+  useEffect(() => {
+    const fetchAbout = async () => {
+      try {
+        const response = await fetch(ABOUT_ENDPOINT, { method: "GET" });
+        const result = await response.json();
+
+        if (!response.ok || !result?.success || !Array.isArray(result?.data)) {
+          return;
+        }
+
+        const activeItem = result.data.find((item) => item?.isActive) || result.data[0];
+        if (!activeItem) return;
+
+        setAboutData({
+          badgeTitle: activeItem?.badgeTitle || FALLBACK_ABOUT.badgeTitle,
+          heading: activeItem?.heading || FALLBACK_ABOUT.heading,
+          highlightText: activeItem?.highlightText || FALLBACK_ABOUT.highlightText,
+          description: activeItem?.description || FALLBACK_ABOUT.description,
+          stats:
+            Array.isArray(activeItem?.stats) && activeItem.stats.length
+              ? activeItem.stats
+              : FALLBACK_ABOUT.stats,
+          missionTitle: activeItem?.missionTitle || FALLBACK_ABOUT.missionTitle,
+          missionDescription:
+            activeItem?.missionDescription || FALLBACK_ABOUT.missionDescription,
+          missionPoints:
+            Array.isArray(activeItem?.missionPoints) && activeItem.missionPoints.length
+              ? activeItem.missionPoints
+              : FALLBACK_ABOUT.missionPoints,
+          values:
+            Array.isArray(activeItem?.values) && activeItem.values.length
+              ? activeItem.values
+              : FALLBACK_ABOUT.values,
+        });
+      } catch {
+        setAboutData(FALLBACK_ABOUT);
+      }
+    };
+
+    fetchAbout();
+  }, []);
+
+  const stats = useMemo(
+    () =>
+      (Array.isArray(aboutData?.stats) ? aboutData.stats : []).map((stat) => ({
+        number: stat?.number || "0",
+        label: stat?.label || "Metric",
+        icon: getIconComponent(stat?.icon, Users),
+      })),
+    [aboutData?.stats]
+  );
+
+  const values = useMemo(
+    () =>
+      (Array.isArray(aboutData?.values) ? aboutData.values : []).map((value) => ({
+        icon: getIconComponent(value?.icon, Zap),
+        title: value?.title || "Value",
+        description: value?.description || "",
+        color: value?.color || "from-blue-500 to-cyan-500",
+      })),
+    [aboutData?.values]
+  );
 
   return (
     <section
@@ -109,13 +182,13 @@ export default function AboutSection() {
             } ${currentTheme.accent.replace("bg-", "text-")}`}
           >
             <Target className="w-4 h-4 mr-2" />
-            About Amdaani
+            {aboutData?.badgeTitle || FALLBACK_ABOUT.badgeTitle}
           </motion.div>
 
           <h2
             className={`text-4xl md:text-5xl font-bold mb-6 ${currentTheme.text}`}
           >
-            Revolutionizing Business Management
+            {aboutData?.heading || FALLBACK_ABOUT.heading}
             <span
               className={`block bg-gradient-to-r ${
                 theme === "light"
@@ -123,16 +196,14 @@ export default function AboutSection() {
                   : "from-[#8AB4F8] to-[#66FFF9]"
               } bg-clip-text text-transparent`}
             >
-              Made in India
+                {aboutData?.highlightText || FALLBACK_ABOUT.highlightText}
             </span>
           </h2>
 
           <p
             className={`text-xl max-w-3xl mx-auto ${currentTheme.textSecondary}`}
           >
-            Amdaani is the fastest and most affordable billing solution built
-            specifically for Indian businesses. We empower entrepreneurs with
-            smart tools to grow their business efficiently.
+            {aboutData?.description || FALLBACK_ABOUT.description}
           </p>
         </motion.div>
 
@@ -185,22 +256,16 @@ export default function AboutSection() {
             animate={inView ? { opacity: 1, x: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.5 }}
           >
-            <h3 className={`text-3xl font-bold mb-6 ${currentTheme.text}`}>
-              Our Mission
-            </h3>
+            <h3 className={`text-3xl font-bold mb-6 ${currentTheme.text}`}>{aboutData?.missionTitle || FALLBACK_ABOUT.missionTitle}</h3>
             <p className={`text-lg mb-6 ${currentTheme.textSecondary}`}>
-              To democratize business management tools for every Indian
-              entrepreneur, making professional billing and customer management
-              accessible and affordable.
+              {aboutData?.missionDescription || FALLBACK_ABOUT.missionDescription}
             </p>
 
             <div className="space-y-4">
-              {[
-                "Built specifically for Indian business needs",
-                "Instant Billing",
-                "Support for all printer types (A4, POS, Thermal)",
-                "GST-compliant invoices and reports",
-              ].map((feature, index) => (
+              {(Array.isArray(aboutData?.missionPoints)
+                ? aboutData.missionPoints
+                : FALLBACK_ABOUT.missionPoints
+              ).map((feature, index) => (
                 <motion.div
                   key={feature}
                   initial={{ opacity: 0, x: -20 }}

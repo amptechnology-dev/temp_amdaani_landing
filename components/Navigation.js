@@ -18,8 +18,78 @@ import {
   Rocket,
   Briefcase,
 } from "lucide-react";
-import { useState, useRef, useEffect, use } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+
+const HELPLINE_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/helpline`;
+
+const DEFAULT_HELPLINE = {
+  phone: "+1 (555) 123-4567",
+  email: "hello@amdaani.com",
+  socialLinks: {
+    facebook: "#",
+    twitter: "#",
+    linkedin: "#",
+  },
+};
+
+const SOCIAL_BASE_URLS = {
+  facebook: "https://facebook.com",
+  instagram: "https://instagram.com",
+  youtube: "https://youtube.com",
+  twitter: "https://twitter.com",
+  linkedin: "https://linkedin.com",
+};
+
+const buildSocialUrl = (platform, rawUrl) => {
+  if (!rawUrl || typeof rawUrl !== "string") {
+    return "#";
+  }
+
+  const value = rawUrl.trim();
+  if (!value) {
+    return "#";
+  }
+
+  if (/^https?:\/\//i.test(value)) {
+    return value;
+  }
+
+  if (/^https?:/i.test(value)) {
+    const protocolFixed = value.replace(/^https?:/i, (match) => `${match}//`);
+    if (/^https?:\/\//i.test(protocolFixed)) {
+      try {
+        const parsed = new URL(protocolFixed);
+        if (parsed.hostname.includes(".")) {
+          return protocolFixed;
+        }
+      } catch {
+        // Continue to platform-specific normalization.
+      }
+    }
+  }
+
+  const compact = value
+    .toLowerCase()
+    .replace(/^https?:/i, "")
+    .replace(/[^a-z0-9]/g, "");
+
+  const baseUrl = SOCIAL_BASE_URLS[platform] || "#";
+  const marker = `${platform}com`;
+
+  if (compact.includes(marker)) {
+    let suffix = compact.split(marker)[1] || "";
+
+    if (platform === "linkedin" && suffix.startsWith("company")) {
+      suffix = suffix.replace(/^company/, "");
+      return suffix ? `${baseUrl}/company/${suffix}` : `${baseUrl}/company`;
+    }
+
+    return suffix ? `${baseUrl}/${suffix}` : baseUrl;
+  }
+
+  return baseUrl;
+};
 
 export default function Navigation({
   featuresRef,
@@ -34,6 +104,7 @@ export default function Navigation({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSolutionsOpen, setIsSolutionsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [helpline, setHelpline] = useState(DEFAULT_HELPLINE);
   const dropdownRef = useRef(null);
   const currentTheme = themeConfig[theme];
 
@@ -42,6 +113,39 @@ export default function Navigation({
   const handleGetStartClick = () => {
     router.push("/auth");
   };
+
+  useEffect(() => {
+    const fetchHelpline = async () => {
+      try {
+        const response = await fetch(HELPLINE_ENDPOINT, { method: "GET" });
+        const result = await response.json();
+
+        if (!response.ok || !result?.success || !result?.data) {
+          return;
+        }
+
+        setHelpline({
+          phone: result?.data?.phone || DEFAULT_HELPLINE.phone,
+          email: result?.data?.email || DEFAULT_HELPLINE.email,
+          socialLinks: {
+            facebook:
+              result?.data?.socialLinks?.facebook ||
+              DEFAULT_HELPLINE.socialLinks.facebook,
+            twitter:
+              result?.data?.socialLinks?.twitter ||
+              DEFAULT_HELPLINE.socialLinks.twitter,
+            linkedin:
+              result?.data?.socialLinks?.linkedin ||
+              DEFAULT_HELPLINE.socialLinks.linkedin,
+          },
+        });
+      } catch {
+        setHelpline(DEFAULT_HELPLINE);
+      }
+    };
+
+    fetchHelpline();
+  }, []);
 
   const navigationItems = [
     {
@@ -122,30 +226,40 @@ export default function Navigation({
             <div className="flex items-center space-x-4 lg:space-x-6 text-xs lg:text-sm">
               <div className="flex items-center space-x-1 lg:space-x-2">
                 <Phone className="w-3 h-3" />
-                <span className="whitespace-nowrap">+1 (555) 123-4567</span>
+                <a href={`tel:${(helpline?.phone || "").replace(/[^\d+]/g, "")}`} className="whitespace-nowrap">
+                  {helpline.phone}
+                </a>
               </div>
               <div className="flex items-center space-x-1 lg:space-x-2">
                 <Mail className="w-3 h-3" />
-                <span className="whitespace-nowrap">hello@Amdaani.com</span>
+                <a href={`mailto:${helpline.email}`} className="whitespace-nowrap">
+                  {helpline.email}
+                </a>
               </div>
             </div>
 
             {/* Social Media Links */}
             <div className="flex items-center space-x-3 lg:space-x-4">
               <a
-                href="#"
+                href={buildSocialUrl("facebook", helpline?.socialLinks?.facebook)}
+                target="_blank"
+                rel="noopener noreferrer"
                 className={`transition-colors duration-200 hover:${currentTheme.text}`}
               >
                 <Facebook className="w-3 h-3 lg:w-4 lg:h-4" />
               </a>
               <a
-                href="#"
+                href={buildSocialUrl("twitter", helpline?.socialLinks?.twitter)}
+                target="_blank"
+                rel="noopener noreferrer"
                 className={`transition-colors duration-200 hover:${currentTheme.text}`}
               >
                 <Twitter className="w-3 h-3 lg:w-4 lg:h-4" />
               </a>
               <a
-                href="#"
+                href={buildSocialUrl("linkedin", helpline?.socialLinks?.linkedin)}
+                target="_blank"
+                rel="noopener noreferrer"
                 className={`transition-colors duration-200 hover:${currentTheme.text}`}
               >
                 <Linkedin className="w-3 h-3 lg:w-4 lg:h-4" />
@@ -319,14 +433,14 @@ export default function Navigation({
               </button>
 
               {/* Hide Get Started when noLanding */}
-              {!noLanding && (
+              {/* {!noLanding && (
                 <button
                   className={`px-6 py-3 rounded-lg font-semibold transition-all duration-200 ${currentTheme.buttonPrimary} shadow-sm hover:shadow-md`}
                   onClick={handleGetStartClick}
                 >
                   Get Started
                 </button>
-              )}
+              )} */}
             </div>
 
             {/* Mobile Menu Button */}
