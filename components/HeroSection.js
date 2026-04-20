@@ -7,6 +7,15 @@ import {
   Printer,
   TrendingUp,
   Shield,
+  Bell,
+  Clock3,
+  Rocket,
+  Star,
+  Sparkles,
+  CheckCircle2,
+  Lock,
+  Heart,
+  Globe,
   PlayCircle,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
@@ -22,6 +31,15 @@ const ICON_MAP = {
   Printer,
   TrendingUp,
   Shield,
+  Bell,
+  Clock3,
+  Rocket,
+  Star,
+  Sparkles,
+  CheckCircle2,
+  Lock,
+  Heart,
+  Globe,
 };
 
 const FALLBACK_SLIDES = [

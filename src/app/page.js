@@ -11,6 +11,7 @@ import PricingSection from "../../components/PricingSection";
 import CTASection from "../../components/CtaSection";
 import Footer from "../../components/Footer";
 import AboutSection from "../../components/About";
+import TestimonialSection from "../../components/Testimonial";
 
 export default function Home() {
   const { theme } = useTheme();
@@ -39,6 +40,8 @@ export default function Home() {
       />
 
       <AboutSection />
+
+      <TestimonialSection />
 
       <PricingSection pricingRef={pricingRef} />
 

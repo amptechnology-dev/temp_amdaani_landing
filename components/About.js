@@ -12,8 +12,11 @@ import {
   Globe,
   Award,
   CheckCircle,
+  CheckCircle2,
   Play,
   Star,
+  Rocket,
+  Sparkles,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -27,8 +30,24 @@ const ICON_MAP = {
   TrendingUp,
   Globe,
   Award,
+  Rocket,
+  Star,
+  Sparkles,
+  CheckCircle2,
   IndianRupee,
 };
+
+const normalizeIconKey = (value) =>
+  String(value || "")
+    .trim()
+    .replace(/icon$/i, "")
+    .replace(/[\s_-]+/g, "")
+    .toLowerCase();
+
+const NORMALIZED_ICON_MAP = Object.entries(ICON_MAP).reduce((acc, [key, Icon]) => {
+  acc[normalizeIconKey(key)] = Icon;
+  return acc;
+}, {});
 
 const FALLBACK_ABOUT = {
   badgeTitle: "About Amdaani",
@@ -84,7 +103,49 @@ const FALLBACK_ABOUT = {
 };
 
 const getIconComponent = (iconName, fallback = Zap) => {
-  return ICON_MAP[iconName] || fallback;
+  if (!iconName) return fallback;
+
+  const rawIconName =
+    typeof iconName === "string"
+      ? iconName
+      : typeof iconName === "object" && iconName !== null
+      ? iconName.name || iconName.icon || ""
+      : "";
+
+  if (!rawIconName) return fallback;
+
+  const normalizedIconName = normalizeIconKey(rawIconName);
+
+  // Handle legacy/alias keys from older payloads.
+  const ICON_ALIASES = {
+    checkcircle: "checkcircle2",
+    checkcircleicon: "checkcircle2",
+    sparkle: "sparkles",
+  };
+
+  const finalKey = ICON_ALIASES[normalizedIconName] || normalizedIconName;
+  return NORMALIZED_ICON_MAP[finalKey] || fallback;
+};
+
+const normalizeStats = (statsInput) => {
+  if (!Array.isArray(statsInput)) return [];
+
+  return statsInput
+    .map((stat) => {
+      const number = String(stat?.number ?? "").trim();
+      const label = String(stat?.label ?? "").trim();
+      const icon = stat?.icon;
+
+      return { number, label, icon };
+    })
+    .filter((stat) => {
+      if (!stat.number || !stat.label) return false;
+
+      const numericPart = stat.number.replace(/[^0-9.]/g, "");
+      const isZeroValue = numericPart !== "" && Number(numericPart) === 0;
+
+      return !isZeroValue;
+    });
 };
 
 export default function AboutSection() {
@@ -114,10 +175,7 @@ export default function AboutSection() {
           heading: activeItem?.heading || FALLBACK_ABOUT.heading,
           highlightText: activeItem?.highlightText || FALLBACK_ABOUT.highlightText,
           description: activeItem?.description || FALLBACK_ABOUT.description,
-          stats:
-            Array.isArray(activeItem?.stats) && activeItem.stats.length
-              ? activeItem.stats
-              : FALLBACK_ABOUT.stats,
+          stats: normalizeStats(activeItem?.stats),
           missionTitle: activeItem?.missionTitle || FALLBACK_ABOUT.missionTitle,
           missionDescription:
             activeItem?.missionDescription || FALLBACK_ABOUT.missionDescription,
@@ -140,7 +198,7 @@ export default function AboutSection() {
 
   const stats = useMemo(
     () =>
-      (Array.isArray(aboutData?.stats) ? aboutData.stats : []).map((stat) => ({
+      normalizeStats(aboutData?.stats).map((stat) => ({
         number: stat?.number || "0",
         label: stat?.label || "Metric",
         icon: getIconComponent(stat?.icon, Users),
@@ -208,46 +266,48 @@ export default function AboutSection() {
         </motion.div>
 
         {/* Stats Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6, delay: 0.3 }}
-          className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-20"
-        >
-          {stats.map((stat, index) => {
-            const IconComponent = stat.icon;
-            return (
-              <motion.div
-                key={stat.label}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={inView ? { opacity: 1, scale: 1 } : {}}
-                transition={{ duration: 0.5, delay: 0.4 + index * 0.1 }}
-                className={`p-6 rounded-2xl text-center backdrop-blur-sm border ${currentTheme.surface} ${currentTheme.outline}`}
-              >
-                <div
-                  className={`w-12 h-12 rounded-lg ${currentTheme.accentLight} flex items-center justify-center mx-auto mb-4`}
+        {stats.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={inView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.6, delay: 0.3 }}
+            className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-20"
+          >
+            {stats.map((stat, index) => {
+              const IconComponent = stat.icon;
+              return (
+                <motion.div
+                  key={stat.label}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={inView ? { opacity: 1, scale: 1 } : {}}
+                  transition={{ duration: 0.5, delay: 0.4 + index * 0.1 }}
+                  className={`p-6 rounded-2xl text-center backdrop-blur-sm border ${currentTheme.surface} ${currentTheme.outline}`}
                 >
-                  <IconComponent
-                    className={`w-6 h-6 ${currentTheme.accent.replace(
-                      "bg-",
-                      "text-"
-                    )}`}
-                  />
-                </div>
-                <div
-                  className={`text-2xl md:text-3xl font-bold mb-2 ${currentTheme.text}`}
-                >
-                  {stat.number}
-                </div>
-                <div
-                  className={`text-sm font-medium ${currentTheme.textTertiary}`}
-                >
-                  {stat.label}
-                </div>
-              </motion.div>
-            );
-          })}
-        </motion.div>
+                  <div
+                    className={`w-12 h-12 rounded-lg ${currentTheme.accentLight} flex items-center justify-center mx-auto mb-4`}
+                  >
+                    <IconComponent
+                      className={`w-6 h-6 ${currentTheme.accent.replace(
+                        "bg-",
+                        "text-"
+                      )}`}
+                    />
+                  </div>
+                  <div
+                    className={`text-2xl md:text-3xl font-bold mb-2 ${currentTheme.text}`}
+                  >
+                    {stat.number}
+                  </div>
+                  <div
+                    className={`text-sm font-medium ${currentTheme.textTertiary}`}
+                  >
+                    {stat.label}
+                  </div>
+                </motion.div>
+              );
+            })}
+          </motion.div>
+        )}
 
         {/* Mission & Values */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-20">

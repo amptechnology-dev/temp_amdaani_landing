@@ -1,8 +1,8 @@
 "use client";
 import { useTheme } from "../context/ThemeContext";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion, useInView } from "framer-motion";
 import { themeConfig } from "../utils/ThemeConfig";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
   Users,
@@ -11,6 +11,8 @@ import {
   Sparkles,
   ArrowRight,
   RefreshCw,
+  ChevronDown,
+  MessageCircleQuestion,
 } from "lucide-react";
 
 const LANDING_PLANS_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/plan/landing-plans`;
@@ -56,6 +58,9 @@ export default function PricingSection() {
   const [faqs, setFaqs] = useState(FALLBACK_FAQS);
   const [loadingFaqs, setLoadingFaqs] = useState(true);
   const [faqError, setFaqError] = useState("");
+  const [openFaqIndex, setOpenFaqIndex] = useState(0);
+  const faqSectionRef = useRef(null);
+  const isFaqInView = useInView(faqSectionRef, { amount: 0.45, once: false });
 
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 300);
@@ -129,6 +134,28 @@ export default function PricingSection() {
   useEffect(() => {
     fetchFaqs();
   }, []);
+
+  useEffect(() => {
+    if (!faqs.length) {
+      setOpenFaqIndex(-1);
+      return;
+    }
+
+    setOpenFaqIndex((prev) => {
+      if (prev < 0 || prev >= faqs.length) return 0;
+      return prev;
+    });
+  }, [faqs]);
+
+  useEffect(() => {
+    if (loadingFaqs || faqs.length <= 1 || !isFaqInView) return;
+
+    const interval = setInterval(() => {
+      setOpenFaqIndex((prev) => (prev + 1) % faqs.length);
+    }, 7000);
+
+    return () => clearInterval(interval);
+  }, [faqs.length, loadingFaqs, isFaqInView]);
 
   const formatCurrency = (amount, currency = "INR") => {
     return new Intl.NumberFormat("en-IN", {
@@ -533,15 +560,28 @@ export default function PricingSection() {
 
         {/* FAQ Section */}
         <motion.div
+          ref={faqSectionRef}
           initial={{ opacity: 0, y: 40 }}
           animate={isVisible ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, delay: 1.0 }}
         >
-          <h3
-            className={`text-3xl font-bold text-center mb-12 ${currentTheme.text}`}
-          >
-            Frequently Asked Questions
-          </h3>
+          <div className="text-center mb-10">
+            <div
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium mb-5 ${
+                currentTheme.accentLight
+              } ${currentTheme.accent.replace("bg-", "text-")}`}
+            >
+              <MessageCircleQuestion className="h-4 w-4" />
+              FAQs
+            </div>
+            <h3 className={`text-3xl md:text-4xl font-bold mb-3 ${currentTheme.text}`}>
+              Frequently Asked Questions
+            </h3>
+            <p className={`max-w-2xl mx-auto text-base ${currentTheme.textSecondary}`}>
+              Answers update automatically from your admin panel. Expand any
+              question to learn more.
+            </p>
+          </div>
 
           {faqError && (
             <div className="mb-8 flex flex-col items-center gap-3">
@@ -556,9 +596,10 @@ export default function PricingSection() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {loadingFaqs
-              ? [0, 1].map((idx) => (
+          <div className="max-w-4xl mx-auto">
+            {loadingFaqs ? (
+              <div className="space-y-4">
+                {[0, 1, 2, 3].map((idx) => (
                   <div
                     key={`faq-skeleton-${idx}`}
                     className={`p-6 rounded-2xl border animate-pulse ${currentTheme.surface} ${currentTheme.outline}`}
@@ -567,23 +608,57 @@ export default function PricingSection() {
                     <div className="h-4 w-full bg-gray-300/40 rounded mb-2" />
                     <div className="h-4 w-5/6 bg-gray-300/40 rounded" />
                   </div>
-                ))
-              : faqs.map((faq, index) => (
-              <motion.div
-                key={`${faq.question}-${index}`}
-                initial={{ opacity: 0, x: index % 2 === 0 ? -20 : 20 }}
-                animate={isVisible ? { opacity: 1, x: 0 } : {}}
-                transition={{ duration: 0.5, delay: 1.1 + index * 0.1 }}
-                className={`p-6 rounded-2xl border ${currentTheme.surface} ${currentTheme.outline}`}
+                ))}
+              </div>
+            ) : !faqs.length ? (
+              <div
+                className={`rounded-2xl border p-8 text-center ${currentTheme.surface} ${currentTheme.outline} ${currentTheme.textSecondary}`}
               >
-                <h4 className={`text-lg font-bold mb-3 ${currentTheme.text}`}>
-                  {faq.question}
-                </h4>
-                <p className={`text-sm ${currentTheme.textSecondary}`}>
-                  {faq.answer}
-                </p>
-              </motion.div>
-            ))}
+                No FAQs available right now.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={`faq-active-${openFaqIndex}`}
+                    initial={{ opacity: 0, y: 22, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -16, scale: 0.98 }}
+                    transition={{ duration: 0.35, ease: "easeOut" }}
+                    className={`rounded-2xl border overflow-hidden ${currentTheme.surface} ${currentTheme.outline}`}
+                  >
+                    <div className={`px-5 py-4 border-b ${currentTheme.outline} ${currentTheme.surfaceVariant}`}>
+                      <div className="flex items-center justify-between gap-4">
+                        <span className={`text-base md:text-lg font-semibold ${currentTheme.text}`}>
+                          {faqs[openFaqIndex]?.question}
+                        </span>
+                        <ChevronDown className={`h-5 w-5 shrink-0 rotate-180 ${currentTheme.textSecondary}`} />
+                      </div>
+                    </div>
+
+                    <div className="px-5 py-5">
+                      <p className={`text-sm md:text-base leading-relaxed ${currentTheme.textSecondary}`}>
+                        {faqs[openFaqIndex]?.answer}
+                      </p>
+                    </div>
+                  </motion.div>
+                </AnimatePresence>
+
+                <div className="flex items-center justify-center gap-2">
+                  {faqs.map((faq, index) => (
+                    <button
+                      key={`faq-dot-${faq.question}-${index}`}
+                      type="button"
+                      onClick={() => setOpenFaqIndex(index)}
+                      className={`transition-all rounded-full ${
+                        index === openFaqIndex ? "w-6 h-2.5 bg-blue-600" : "w-2.5 h-2.5 bg-gray-300"
+                      }`}
+                      aria-label={`Show FAQ ${index + 1}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </motion.div>
       </div>
