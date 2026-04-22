@@ -1,8 +1,8 @@
 "use client";
 import { useTheme } from "../context/ThemeContext";
-import { AnimatePresence, motion, useInView } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { themeConfig } from "../utils/ThemeConfig";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Check,
   Users,
@@ -59,8 +59,6 @@ export default function PricingSection() {
   const [loadingFaqs, setLoadingFaqs] = useState(true);
   const [faqError, setFaqError] = useState("");
   const [openFaqIndex, setOpenFaqIndex] = useState(0);
-  const faqSectionRef = useRef(null);
-  const isFaqInView = useInView(faqSectionRef, { amount: 0.45, once: false });
 
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 300);
@@ -147,15 +145,7 @@ export default function PricingSection() {
     });
   }, [faqs]);
 
-  useEffect(() => {
-    if (loadingFaqs || faqs.length <= 1 || !isFaqInView) return;
-
-    const interval = setInterval(() => {
-      setOpenFaqIndex((prev) => (prev + 1) % faqs.length);
-    }, 7000);
-
-    return () => clearInterval(interval);
-  }, [faqs.length, loadingFaqs, isFaqInView]);
+  const visibleFaqs = useMemo(() => faqs.slice(0, 6), [faqs]);
 
   const formatCurrency = (amount, currency = "INR") => {
     return new Intl.NumberFormat("en-IN", {
@@ -560,7 +550,6 @@ export default function PricingSection() {
 
         {/* FAQ Section */}
         <motion.div
-          ref={faqSectionRef}
           initial={{ opacity: 0, y: 40 }}
           animate={isVisible ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, delay: 1.0 }}
@@ -618,45 +607,55 @@ export default function PricingSection() {
               </div>
             ) : (
               <div className="space-y-4">
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={`faq-active-${openFaqIndex}`}
-                    initial={{ opacity: 0, y: 22, scale: 0.98 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -16, scale: 0.98 }}
-                    transition={{ duration: 0.35, ease: "easeOut" }}
-                    className={`rounded-2xl border overflow-hidden ${currentTheme.surface} ${currentTheme.outline}`}
-                  >
-                    <div className={`px-5 py-4 border-b ${currentTheme.outline} ${currentTheme.surfaceVariant}`}>
-                      <div className="flex items-center justify-between gap-4">
+                {visibleFaqs.map((faq, index) => {
+                  const isOpen = index === openFaqIndex;
+
+                  return (
+                    <div
+                      key={`faq-row-${faq.question}-${index}`}
+                      className={`rounded-2xl border overflow-hidden ${currentTheme.surface} ${currentTheme.outline}`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOpenFaqIndex((prev) => (prev === index ? -1 : index))
+                        }
+                        className={`w-full px-5 py-4 flex items-center justify-between gap-4 text-left ${
+                          isOpen ? currentTheme.surfaceVariant : ""
+                        }`}
+                        aria-expanded={isOpen}
+                      >
                         <span className={`text-base md:text-lg font-semibold ${currentTheme.text}`}>
-                          {faqs[openFaqIndex]?.question}
+                          {faq.question}
                         </span>
-                        <ChevronDown className={`h-5 w-5 shrink-0 rotate-180 ${currentTheme.textSecondary}`} />
-                      </div>
-                    </div>
+                        <ChevronDown
+                          className={`h-5 w-5 shrink-0 transition-transform ${
+                            isOpen ? "rotate-180" : "rotate-0"
+                          } ${currentTheme.textSecondary}`}
+                        />
+                      </button>
 
-                    <div className="px-5 py-5">
-                      <p className={`text-sm md:text-base leading-relaxed ${currentTheme.textSecondary}`}>
-                        {faqs[openFaqIndex]?.answer}
-                      </p>
+                      <AnimatePresence initial={false}>
+                        {isOpen && (
+                          <motion.div
+                            key={`faq-answer-${index}`}
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.25, ease: "easeOut" }}
+                            className="overflow-hidden"
+                          >
+                            <div className={`px-5 pb-5 border-t ${currentTheme.outline}`}>
+                              <p className={`pt-4 text-sm md:text-base leading-relaxed ${currentTheme.textSecondary}`}>
+                                {faq.answer}
+                              </p>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
-                  </motion.div>
-                </AnimatePresence>
-
-                <div className="flex items-center justify-center gap-2">
-                  {faqs.map((faq, index) => (
-                    <button
-                      key={`faq-dot-${faq.question}-${index}`}
-                      type="button"
-                      onClick={() => setOpenFaqIndex(index)}
-                      className={`transition-all rounded-full ${
-                        index === openFaqIndex ? "w-6 h-2.5 bg-blue-600" : "w-2.5 h-2.5 bg-gray-300"
-                      }`}
-                      aria-label={`Show FAQ ${index + 1}`}
-                    />
-                  ))}
-                </div>
+                  );
+                })}
               </div>
             )}
           </div>

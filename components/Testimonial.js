@@ -186,28 +186,47 @@ export default function TestimonialSection() {
 	};
 
 	return (
-		<section id="testimonials" className={`py-20 px-4 sm:px-6 lg:px-8 ${currentTheme.background}`}>
-			<div className="max-w-7xl mx-auto">
+		<section
+			id="testimonials"
+			className={`relative overflow-hidden py-24 px-4 sm:px-6 lg:px-8 ${currentTheme.background}`}
+		>
+			<div className="pointer-events-none absolute inset-0 overflow-hidden">
+				<div className="absolute -left-24 top-10 h-80 w-80 rounded-full bg-cyan-400/10 blur-3xl" />
+				<div className="absolute right-0 top-24 h-96 w-96 rounded-full bg-blue-500/10 blur-3xl" />
+				<div className="absolute bottom-0 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-indigo-500/10 blur-3xl" />
+			</div>
+
+			<div className="relative mx-auto max-w-7xl">
 				<motion.div
 					initial={{ opacity: 0, y: 20 }}
 					whileInView={{ opacity: 1, y: 0 }}
 					viewport={{ once: true, amount: 0.2 }}
 					transition={{ duration: 0.5 }}
-					className="text-center mb-12"
+					className="mx-auto mb-14 max-w-4xl text-center"
 				>
-					<h2 className={`text-4xl md:text-5xl font-bold mb-4 ${currentTheme.text}`}>
-						What Customers Say
+					<div
+						className={`mb-6 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold ${currentTheme.accentLight} ${currentTheme.accent.replace("bg-", "text-")}`}
+					>
+						<Quote className="h-4 w-4" />
+						Customer Stories
+					</div>
+
+					<h2 className={`text-4xl font-black tracking-tight sm:text-5xl md:text-6xl mb-5 ${currentTheme.text}`}>
+						Trusted by businesses
+						<span className="block bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 bg-clip-text text-transparent">
+							that want speed and clarity.
+						</span>
 					</h2>
-					<p className={`text-lg md:text-xl ${currentTheme.textSecondary} max-w-3xl mx-auto`}>
-						Real stories from businesses growing faster with Amdaani.
+					<p className={`mx-auto max-w-3xl text-lg leading-8 ${currentTheme.textSecondary}`}>
+						Real feedback from teams using Amdaani to keep billing simple, professional, and fast.
 					</p>
 
 					{error && (
-						<div className="mt-5 flex items-center justify-center gap-3">
-							<p className={`text-sm ${currentTheme.error}`}>{error}</p>
+						<div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+							<p className={`text-sm font-medium ${currentTheme.error}`}>{error}</p>
 							<button
 								onClick={fetchTestimonials}
-								className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl ${currentTheme.buttonSecondary}`}
+								className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 font-semibold shadow-sm transition-all duration-200 hover:-translate-y-0.5 ${currentTheme.buttonSecondary}`}
 							>
 								<RefreshCw className="h-4 w-4" />
 								Retry
@@ -217,26 +236,30 @@ export default function TestimonialSection() {
 				</motion.div>
 
 				{loading ? (
-					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+					<div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
 						{[1, 2, 3].map((item) => (
 							<div
 								key={item}
-								className={`rounded-2xl border overflow-hidden animate-pulse ${currentTheme.surface} ${currentTheme.outline}`}
+								className={`overflow-hidden rounded-[1.75rem] border animate-pulse ${currentTheme.surface} ${currentTheme.outline}`}
 							>
-								<div className="h-44 bg-gray-300/30" />
-								<div className="p-5 space-y-3">
-									<div className="h-4 bg-gray-300/30 rounded" />
-									<div className="h-4 bg-gray-300/20 rounded w-2/3" />
-									<div className="h-10 bg-gray-300/20 rounded" />
+								<div className="h-52 bg-gray-300/30" />
+								<div className="space-y-3 p-6">
+									<div className="h-4 rounded bg-gray-300/30" />
+									<div className="h-4 w-2/3 rounded bg-gray-300/20" />
+									<div className="h-10 rounded bg-gray-300/20" />
 								</div>
 							</div>
 						))}
 					</div>
 				) : (
-					<div className="space-y-5">
-						<div className="relative overflow-hidden">
-							<motion.div
-								className="flex gap-6"
+					<div className="space-y-6">
+						<div
+							className={`relative overflow-hidden rounded-[2rem] border shadow-[0_20px_70px_rgba(15,23,42,0.12)] backdrop-blur-xl ${theme === "light" ? "border-white/70 bg-white/70" : "border-white/10 bg-white/5"}`}
+						>
+							<div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 via-transparent to-indigo-500/5" />
+							<div className="relative p-4 sm:p-6">
+								<motion.div
+									className="flex gap-5"
 								animate={{ x: `-${currentIndex * (100 / slidesPerView)}%` }}
 								transition={{ type: "spring", stiffness: 220, damping: 28 }}
 							>
@@ -247,11 +270,11 @@ export default function TestimonialSection() {
 										whileInView={{ opacity: 1, y: 0 }}
 										viewport={{ once: true, amount: 0.15 }}
 										transition={{ duration: 0.45, delay: index * 0.04 }}
-										className={`rounded-2xl border overflow-hidden shadow-sm ${currentTheme.surface} ${currentTheme.outline}`}
-										style={{ flex: `0 0 calc(${100 / slidesPerView}% - 1rem)` }}
+											className={`group overflow-hidden rounded-[1.75rem] border shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl ${currentTheme.surface} ${currentTheme.outline}`}
+											style={{ flex: `0 0 calc(${100 / slidesPerView}% - 1.25rem)` }}
 									>
 										{item.embedUrl ? (
-											<div className="relative h-44 w-full bg-black">
+											<div className="relative h-52 w-full bg-black">
 												<iframe
 													src={item.embedUrl}
 													title={`${item?.name || "Customer"} testimonial video`}
@@ -266,47 +289,49 @@ export default function TestimonialSection() {
 													className="absolute inset-0 group"
 													aria-label={`Open ${item?.name || "customer"} video on YouTube`}
 												>
-													<div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-														<span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-white/90 text-red-600 shadow-sm">
+													<div className="absolute inset-0 flex items-center justify-center bg-black/10 transition-colors group-hover:bg-black/20">
+														<span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-white/90 text-red-600 shadow-lg">
 															<PlayCircle className="h-7 w-7" />
 														</span>
 													</div>
 												</a>
 											</div>
 										) : item.thumbnailUrl ? (
-											<a href={item.videoUrl} target="_blank" rel="noreferrer" className="block group relative">
+											<a href={item.videoUrl} target="_blank" rel="noreferrer" className="group relative block">
 												<img
 													src={item.thumbnailUrl}
 													alt={`${item?.name || "Customer"} video thumbnail`}
-													className="h-44 w-full object-cover"
+													className="h-52 w-full object-cover"
 													loading="lazy"
 												/>
-												<div className="absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-													<span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-white/90 text-red-600">
+												<div className="absolute inset-0 flex items-center justify-center bg-black/20 transition-colors group-hover:bg-black/30">
+													<span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-white/90 text-red-600 shadow-lg">
 														<PlayCircle className="h-7 w-7" />
 													</span>
 												</div>
 											</a>
 										) : (
-											<div className="h-44 w-full bg-gray-200/20 flex items-center justify-center">
+											<div className="flex h-52 w-full items-center justify-center bg-gray-200/20">
 												<PlayCircle className="h-10 w-10 text-gray-400" />
 											</div>
 										)}
 
-										<div className="p-5">
-											<div className="flex items-start justify-between gap-3 mb-3">
+										<div className="space-y-4 p-6">
+											<div className="flex items-start justify-between gap-3">
 												<div>
-													<h3 className={`text-lg font-semibold ${currentTheme.text}`}>
+													<h3 className={`text-lg font-bold tracking-tight ${currentTheme.text}`}>
 														{item?.name || "Customer"}
 													</h3>
 													<p className={`text-sm ${currentTheme.textSecondary}`}>
 														{item?.designation || "Business Owner"}
 													</p>
 												</div>
-												<Quote className="h-4 w-4 text-gray-400 mt-1" />
+												<div className={`rounded-full p-2 ${theme === "light" ? "bg-slate-100 text-slate-500" : "bg-white/5 text-slate-300"}`}>
+													<Quote className="h-4 w-4" />
+												</div>
 											</div>
 
-											<p className={`${currentTheme.textSecondary} text-sm leading-relaxed mb-4`}>
+											<p className={`text-sm leading-7 ${currentTheme.textSecondary}`}>
 												{item?.message || "Great product and support."}
 											</p>
 
@@ -315,7 +340,7 @@ export default function TestimonialSection() {
 													href={item.videoUrl}
 													target="_blank"
 													rel="noreferrer"
-													className="inline-flex items-center text-sm font-medium text-blue-600 hover:underline"
+													className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 transition-all hover:gap-2 hover:underline"
 												>
 													<PlayCircle className="h-4 w-4 mr-1.5" />
 													Watch Video
@@ -328,7 +353,7 @@ export default function TestimonialSection() {
 						</div>
 
 						{totalSlides > slidesPerView && (
-							<div className="flex items-center justify-between">
+							<div className="flex flex-wrap items-center justify-between gap-4">
 								<div className="flex items-center gap-2">
 									<ButtonNav onClick={handlePrev} ariaLabel="Previous testimonials">
 										<ChevronLeft className="h-4 w-4" />
@@ -350,6 +375,7 @@ export default function TestimonialSection() {
 								</div>
 							</div>
 						)}
+						</div>
 					</div>
 				)}
 			</div>
@@ -361,7 +387,7 @@ function ButtonNav({ onClick, ariaLabel, children }) {
 	return (
 		<button
 			onClick={onClick}
-			className="inline-flex items-center justify-center rounded-xl border h-9 w-9 bg-white hover:bg-gray-50 text-gray-700 transition-colors"
+			className="inline-flex h-10 w-10 items-center justify-center rounded-xl border bg-white/80 text-gray-700 shadow-sm backdrop-blur transition-all duration-200 hover:-translate-y-0.5 hover:bg-white hover:shadow-md"
 			aria-label={ariaLabel}
 		>
 			{children}

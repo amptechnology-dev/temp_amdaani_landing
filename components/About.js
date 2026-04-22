@@ -220,8 +220,14 @@ export default function AboutSection() {
   return (
     <section
       id="about"
-      className={`py-20 px-4 sm:px-6 lg:px-8 ${currentTheme.background}`}
+      className={`relative overflow-hidden py-24 px-4 sm:px-6 lg:px-8 ${currentTheme.background}`}
     >
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -left-24 top-10 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
+        <div className="absolute right-0 top-40 h-96 w-96 rounded-full bg-blue-500/10 blur-3xl" />
+        <div className="absolute bottom-0 left-1/2 h-80 w-80 -translate-x-1/2 rounded-full bg-indigo-500/10 blur-3xl" />
+      </div>
+
       <div className="max-w-7xl mx-auto">
         {/* Header Section */}
         <motion.div
@@ -229,22 +235,20 @@ export default function AboutSection() {
           initial={{ opacity: 0, y: 30 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6 }}
-          className="text-center mb-16"
+          className="relative mx-auto mb-16 max-w-4xl text-center"
         >
           <motion.div
             initial={{ scale: 0 }}
             animate={inView ? { scale: 1 } : {}}
             transition={{ delay: 0.2, type: "spring" }}
-            className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium mb-6 ${
-              currentTheme.accentLight
-            } ${currentTheme.accent.replace("bg-", "text-")}`}
+            className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold mb-6 ${currentTheme.accentLight} ${currentTheme.accent.replace("bg-", "text-")}`}
           >
             <Target className="w-4 h-4 mr-2" />
             {aboutData?.badgeTitle || FALLBACK_ABOUT.badgeTitle}
           </motion.div>
 
           <h2
-            className={`text-4xl md:text-5xl font-bold mb-6 ${currentTheme.text}`}
+            className={`text-4xl font-black leading-tight tracking-tight sm:text-5xl md:text-6xl mb-6 ${currentTheme.text}`}
           >
             {aboutData?.heading || FALLBACK_ABOUT.heading}
             <span
@@ -259,7 +263,7 @@ export default function AboutSection() {
           </h2>
 
           <p
-            className={`text-xl max-w-3xl mx-auto ${currentTheme.textSecondary}`}
+              className={`text-lg leading-8 sm:text-xl max-w-3xl mx-auto ${currentTheme.textSecondary}`}
           >
             {aboutData?.description || FALLBACK_ABOUT.description}
           </p>
@@ -271,7 +275,7 @@ export default function AboutSection() {
             initial={{ opacity: 0, y: 40 }}
             animate={inView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.3 }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-20"
+              className="mb-20 grid grid-cols-2 gap-5 md:grid-cols-4"
           >
             {stats.map((stat, index) => {
               const IconComponent = stat.icon;
@@ -281,10 +285,10 @@ export default function AboutSection() {
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={inView ? { opacity: 1, scale: 1 } : {}}
                   transition={{ duration: 0.5, delay: 0.4 + index * 0.1 }}
-                  className={`p-6 rounded-2xl text-center backdrop-blur-sm border ${currentTheme.surface} ${currentTheme.outline}`}
+                  className={`group rounded-3xl border p-6 text-center backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl ${currentTheme.surface} ${currentTheme.outline}`}
                 >
                   <div
-                    className={`w-12 h-12 rounded-lg ${currentTheme.accentLight} flex items-center justify-center mx-auto mb-4`}
+                    className={`mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl ${currentTheme.accentLight}`}
                   >
                     <IconComponent
                       className={`w-6 h-6 ${currentTheme.accent.replace(
@@ -294,12 +298,12 @@ export default function AboutSection() {
                     />
                   </div>
                   <div
-                    className={`text-2xl md:text-3xl font-bold mb-2 ${currentTheme.text}`}
+                    className={`text-3xl font-black tracking-tight mb-2 ${currentTheme.text}`}
                   >
                     {stat.number}
                   </div>
                   <div
-                    className={`text-sm font-medium ${currentTheme.textTertiary}`}
+                    className={`text-sm font-medium uppercase tracking-[0.12em] ${currentTheme.textTertiary}`}
                   >
                     {stat.label}
                   </div>
@@ -310,14 +314,18 @@ export default function AboutSection() {
         )}
 
         {/* Mission & Values */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-20">
+        <div className="mb-20 grid grid-cols-1 items-start gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-12">
           <motion.div
             initial={{ opacity: 0, x: -50 }}
             animate={inView ? { opacity: 1, x: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.5 }}
+            className={`rounded-[2rem] border p-8 sm:p-10 shadow-xl backdrop-blur-xl ${currentTheme.surface} ${currentTheme.outline}`}
           >
-            <h3 className={`text-3xl font-bold mb-6 ${currentTheme.text}`}>{aboutData?.missionTitle || FALLBACK_ABOUT.missionTitle}</h3>
-            <p className={`text-lg mb-6 ${currentTheme.textSecondary}`}>
+            <div className={`mb-4 inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${currentTheme.accentLight} ${currentTheme.accent.replace("bg-", "text-")}`}>
+              Mission
+            </div>
+            <h3 className={`text-3xl font-black tracking-tight mb-5 ${currentTheme.text}`}>{aboutData?.missionTitle || FALLBACK_ABOUT.missionTitle}</h3>
+            <p className={`text-lg leading-8 mb-8 ${currentTheme.textSecondary}`}>
               {aboutData?.missionDescription || FALLBACK_ABOUT.missionDescription}
             </p>
 
@@ -331,10 +339,10 @@ export default function AboutSection() {
                   initial={{ opacity: 0, x: -20 }}
                   animate={inView ? { opacity: 1, x: 0 } : {}}
                   transition={{ duration: 0.4, delay: 0.7 + index * 0.1 }}
-                  className="flex items-center space-x-3"
+                  className={`flex items-start gap-3 rounded-2xl border px-4 py-3 ${theme === "light" ? "border-slate-200/70 bg-white/70" : "border-white/10 bg-white/5"}`}
                 >
-                  <CheckCircle className={`w-5 h-5 ${currentTheme.success}`} />
-                  <span className={`font-medium ${currentTheme.text}`}>
+                  <CheckCircle className={`mt-0.5 w-5 h-5 flex-shrink-0 ${currentTheme.success}`} />
+                  <span className={`font-medium leading-7 ${currentTheme.text}`}>
                     {feature}
                   </span>
                 </motion.div>
@@ -346,10 +354,11 @@ export default function AboutSection() {
             initial={{ opacity: 0, x: 50 }}
             animate={inView ? { opacity: 1, x: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.5 }}
-            className={`p-8 rounded-2xl ${currentTheme.surface} ${currentTheme.outline} border`}
+            className={`relative overflow-hidden rounded-[2rem] border p-8 sm:p-10 shadow-xl backdrop-blur-xl ${currentTheme.surface} ${currentTheme.outline}`}
           >
+            <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl" />
             <div
-              className={`w-16 h-16 rounded-2xl ${currentTheme.accentLight} flex items-center justify-center mb-6`}
+              className={`relative mb-6 flex h-16 w-16 items-center justify-center rounded-2xl ${currentTheme.accentLight}`}
             >
               <Award
                 className={`w-8 h-8 ${currentTheme.accent.replace(
@@ -358,12 +367,12 @@ export default function AboutSection() {
                 )}`}
               />
             </div>
-            <h4 className={`text-2xl font-bold mb-4 ${currentTheme.text}`}>
+            <h4 className={`text-2xl font-black tracking-tight mb-4 ${currentTheme.text}`}>
               Why Choose Amdaani?
             </h4>
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className={`font-medium ${currentTheme.text}`}>
+              <div className={`flex items-center justify-between rounded-2xl border px-4 py-3 ${theme === "light" ? "border-slate-200 bg-white/70" : "border-white/10 bg-white/5"}`}>
+                <span className={`font-semibold ${currentTheme.text}`}>
                   Speed
                 </span>
                 <div className="flex space-x-1">
@@ -375,8 +384,8 @@ export default function AboutSection() {
                   ))}
                 </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className={`font-medium ${currentTheme.text}`}>
+              <div className={`flex items-center justify-between rounded-2xl border px-4 py-3 ${theme === "light" ? "border-slate-200 bg-white/70" : "border-white/10 bg-white/5"}`}>
+                <span className={`font-semibold ${currentTheme.text}`}>
                   Affordability
                 </span>
                 <div className="flex space-x-1">
@@ -388,8 +397,8 @@ export default function AboutSection() {
                   ))}
                 </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className={`font-medium ${currentTheme.text}`}>
+              <div className={`flex items-center justify-between rounded-2xl border px-4 py-3 ${theme === "light" ? "border-slate-200 bg-white/70" : "border-white/10 bg-white/5"}`}>
+                <span className={`font-semibold ${currentTheme.text}`}>
                   Ease of Use
                 </span>
                 <div className="flex space-x-1">
@@ -413,11 +422,11 @@ export default function AboutSection() {
           className="mb-20"
         >
           <h3
-            className={`text-3xl font-bold text-center mb-12 ${currentTheme.text}`}
+            className={`text-center text-3xl font-black tracking-tight mb-12 ${currentTheme.text}`}
           >
             Our Core Values
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
             {values.map((value, index) => {
               const IconComponent = value.icon;
               return (
@@ -426,17 +435,17 @@ export default function AboutSection() {
                   initial={{ opacity: 0, y: 30 }}
                   animate={inView ? { opacity: 1, y: 0 } : {}}
                   transition={{ duration: 0.5, delay: 0.7 + index * 0.1 }}
-                  className={`p-6 rounded-2xl border ${currentTheme.surface} ${currentTheme.outline} hover:shadow-lg transition-all duration-300`}
+                  className={`group rounded-[1.75rem] border p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl ${currentTheme.surface} ${currentTheme.outline}`}
                 >
                   <div
-                    className={`w-12 h-12 rounded-lg bg-gradient-to-r ${value.color} flex items-center justify-center mb-4`}
+                    className={`mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-r ${value.color}`}
                   >
                     <IconComponent className="w-6 h-6 text-white" />
                   </div>
-                  <h4 className={`text-xl font-bold mb-3 ${currentTheme.text}`}>
+                  <h4 className={`text-xl font-black tracking-tight mb-3 ${currentTheme.text}`}>
                     {value.title}
                   </h4>
-                  <p className={`text-sm ${currentTheme.textSecondary}`}>
+                  <p className={`text-sm leading-6 ${currentTheme.textSecondary}`}>
                     {value.description}
                   </p>
                 </motion.div>
