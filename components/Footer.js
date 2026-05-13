@@ -18,7 +18,7 @@ import { useState, useEffect } from "react";
 const HELPLINE_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/helpline`;
 
 const DEFAULT_HELPLINE = {
-  phone: "+1 (555) 123-4567",
+  phone: "",
   email: "hello@amdaani.com",
   location: "Kolkata, India",
   socialLinks: {
@@ -145,6 +145,8 @@ export default function Footer() {
   }, []);
 
   const normalizedPhone = (helpline?.phone || "").replace(/[^\d+]/g, "");
+  const hasPhone = Boolean(normalizedPhone);
+  const hasEmail = Boolean((helpline?.email || "").trim());
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -252,8 +254,12 @@ export default function Footer() {
           >
             {/* Logo */}
             <div className="flex items-center space-x-3 mb-6">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-[#1A73E8] to-[#03DAC5] flex items-center justify-center">
-                <span className="text-white font-bold text-lg">A</span>
+              <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center shadow-md ring-1 ring-black/5 overflow-hidden">
+                <img
+                  src="/images/Tapplogo.png"
+                  alt="Amdaani Logo"
+                  className="w-full h-full object-cover"
+                />
               </div>
               <div>
                 <span className={`text-2xl font-bold ${currentTheme.text}`}>
@@ -277,18 +283,22 @@ export default function Footer() {
 
             {/* Contact Info */}
             <div className="space-y-3 mb-6">
-              <div className="flex items-center space-x-3">
-                <Phone className={`w-4 h-4 ${currentTheme.textTertiary}`} />
-                <a href={`tel:${normalizedPhone}`} className={currentTheme.text}>
-                  {helpline.phone}
-                </a>
-              </div>
-              <div className="flex items-center space-x-3">
-                <Mail className={`w-4 h-4 ${currentTheme.textTertiary}`} />
-                <a href={`mailto:${helpline.email}`} className={currentTheme.text}>
-                  {helpline.email}
-                </a>
-              </div>
+              {hasPhone && (
+                <div className="flex items-center space-x-3">
+                  <Phone className={`w-4 h-4 ${currentTheme.textTertiary}`} />
+                  <a href={`tel:${normalizedPhone}`} className={currentTheme.text}>
+                    {helpline.phone}
+                  </a>
+                </div>
+              )}
+              {hasEmail && (
+                <div className="flex items-center space-x-3">
+                  <Mail className={`w-4 h-4 ${currentTheme.textTertiary}`} />
+                  <a href={`mailto:${helpline.email}`} className={currentTheme.text}>
+                    {helpline.email}
+                  </a>
+                </div>
+              )}
               <div className="flex items-center space-x-3">
                 <MapPin className={`w-4 h-4 ${currentTheme.textTertiary}`} />
                 <span className={currentTheme.text}>{helpline.location}</span>

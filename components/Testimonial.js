@@ -35,42 +35,46 @@ const normalizeVideoUrl = (rawUrl) => {
 	return `https://${value}`;
 };
 
-const extractVideoId = (rawUrl) => {
+const isValidYouTubeHost = (host) => {
+	const normalizedHost = String(host || "").toLowerCase();
+	return (
+		normalizedHost === "youtu.be" ||
+		normalizedHost.endsWith(".youtu.be") ||
+		normalizedHost === "youtube.com" ||
+		normalizedHost.endsWith(".youtube.com") ||
+		normalizedHost === "youtube-nocookie.com" ||
+		normalizedHost.endsWith(".youtube-nocookie.com")
+	);
+};
+
+const getYouTubeVideoId = (rawUrl) => {
 	const normalized = normalizeVideoUrl(rawUrl);
 	if (!normalized) return "";
 
 	try {
 		const parsed = new URL(normalized);
-		const host = parsed.hostname.toLowerCase();
+		if (!isValidYouTubeHost(parsed.hostname)) return "";
 
-		if (host.includes("youtu.be")) {
+		if (parsed.hostname.includes("youtu.be")) {
 			const id = parsed.pathname.split("/").filter(Boolean)[0];
 			return id || "";
 		}
 
-		if (host.includes("youtube.com") || host.includes("youtube-nocookie.com")) {
-			const queryId = parsed.searchParams.get("v");
-			if (queryId) return queryId;
+		const queryId = parsed.searchParams.get("v");
+		if (queryId) return queryId;
 
-			const parts = parsed.pathname.split("/").filter(Boolean);
-			if (parts[0] === "shorts" && parts[1]) return parts[1];
-			if (parts[0] === "embed" && parts[1]) return parts[1];
-		}
+		const parts = parsed.pathname.split("/").filter(Boolean);
+		if (parts[0] === "shorts" && parts[1]) return parts[1];
+		if (parts[0] === "embed" && parts[1]) return parts[1];
 	} catch {
-		const compact = String(rawUrl || "")
-			.replace(/\s+/g, "")
-			.replace(/,/g, "");
-		const fallbackMatch = compact.match(/([a-zA-Z0-9_-]{11})/);
-		return fallbackMatch ? fallbackMatch[1] : "";
+		return "";
 	}
 
-	const fallbackMatch = String(rawUrl || "").match(/([a-zA-Z0-9_-]{11})/);
-	return fallbackMatch ? fallbackMatch[1] : "";
+	return "";
 };
 
-const getThumbnailUrl = (rawUrl) => {
-	const videoId = extractVideoId(rawUrl);
-	return videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : "";
+const extractVideoId = (rawUrl) => {
+	return getYouTubeVideoId(rawUrl);
 };
 
 const getEmbedUrl = (rawUrl) => {
@@ -152,12 +156,22 @@ export default function TestimonialSection() {
 		() =>
 			(Array.isArray(testimonials) ? testimonials : []).map((item) => ({
 				...item,
+				imageUrl: item?.imageUrl || "",
 				videoId: extractVideoId(item?.youtubeLink),
 				videoUrl: normalizeVideoUrl(item?.youtubeLink),
-				thumbnailUrl: getThumbnailUrl(item?.youtubeLink),
 				embedUrl: getEmbedUrl(item?.youtubeLink),
 			})),
 		[testimonials]
+	);
+
+	const visibleCards = useMemo(
+		() =>
+			cards.map((item) => ({
+				...item,
+				hasVideo: Boolean(item?.videoId && item?.embedUrl),
+				hasImage: Boolean(item?.imageUrl),
+			})),
+		[cards]
 	);
 
 	const totalSlides = cards.length;
@@ -188,7 +202,7 @@ export default function TestimonialSection() {
 	return (
 		<section
 			id="testimonials"
-			className={`relative overflow-hidden py-24 px-4 sm:px-6 lg:px-8 ${currentTheme.background}`}
+			className={`relative overflow-hidden py-24 px-5 sm:px-8 lg:px-12 xl:px-16 ${currentTheme.background}`}
 		>
 			<div className="pointer-events-none absolute inset-0 overflow-hidden">
 				<div className="absolute -left-24 top-10 h-80 w-80 rounded-full bg-cyan-400/10 blur-3xl" />
@@ -196,7 +210,7 @@ export default function TestimonialSection() {
 				<div className="absolute bottom-0 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-indigo-500/10 blur-3xl" />
 			</div>
 
-			<div className="relative mx-auto max-w-7xl">
+			<div className="relative mx-auto w-full max-w-7xl">
 				<motion.div
 					initial={{ opacity: 0, y: 20 }}
 					whileInView={{ opacity: 1, y: 0 }}
@@ -260,10 +274,10 @@ export default function TestimonialSection() {
 							<div className="relative p-4 sm:p-6">
 								<motion.div
 									className="flex gap-5"
-								animate={{ x: `-${currentIndex * (100 / slidesPerView)}%` }}
+									animate={{ x: `-${currentIndex * (100 / slidesPerView)}%` }}
 								transition={{ type: "spring", stiffness: 220, damping: 28 }}
 							>
-								{cards.map((item, index) => (
+									{visibleCards.map((item, index) => (
 									<motion.div
 										key={item?._id || `${item?.name}-${index}`}
 										initial={{ opacity: 0, y: 20 }}
@@ -273,48 +287,46 @@ export default function TestimonialSection() {
 											className={`group overflow-hidden rounded-[1.75rem] border shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl ${currentTheme.surface} ${currentTheme.outline}`}
 											style={{ flex: `0 0 calc(${100 / slidesPerView}% - 1.25rem)` }}
 									>
-										{item.embedUrl ? (
-											<div className="relative h-52 w-full bg-black">
-												<iframe
-													src={item.embedUrl}
-													title={`${item?.name || "Customer"} testimonial video`}
-													className="h-full w-full pointer-events-none"
-													allow="autoplay; encrypted-media; picture-in-picture"
-													allowFullScreen
-												/>
-												<a
-													href={item.videoUrl}
-													target="_blank"
-													rel="noreferrer"
-													className="absolute inset-0 group"
-													aria-label={`Open ${item?.name || "customer"} video on YouTube`}
-												>
-													<div className="absolute inset-0 flex items-center justify-center bg-black/10 transition-colors group-hover:bg-black/20">
-														<span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-white/90 text-red-600 shadow-lg">
-															<PlayCircle className="h-7 w-7" />
-														</span>
-													</div>
-												</a>
-											</div>
-										) : item.thumbnailUrl ? (
-											<a href={item.videoUrl} target="_blank" rel="noreferrer" className="group relative block">
-												<img
-													src={item.thumbnailUrl}
-													alt={`${item?.name || "Customer"} video thumbnail`}
-													className="h-52 w-full object-cover"
-													loading="lazy"
-												/>
-												<div className="absolute inset-0 flex items-center justify-center bg-black/20 transition-colors group-hover:bg-black/30">
-													<span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-white/90 text-red-600 shadow-lg">
-														<PlayCircle className="h-7 w-7" />
-													</span>
+											{item.hasVideo ? (
+												<div className="relative h-52 w-full bg-black">
+													<iframe
+														src={item.embedUrl}
+														title={`${item?.name || "Customer"} testimonial video`}
+														className="h-full w-full pointer-events-none"
+														allow="autoplay; encrypted-media; picture-in-picture"
+														allowFullScreen
+													/>
+													<a
+														href={item.videoUrl}
+														target="_blank"
+														rel="noreferrer"
+														className="absolute inset-0 group"
+														aria-label={`Open ${item?.name || "customer"} video on YouTube`}
+													>
+														<div className="absolute inset-0 flex items-center justify-center bg-black/10 transition-colors group-hover:bg-black/20">
+															<span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-white/90 text-red-600 shadow-lg">
+																<PlayCircle className="h-7 w-7" />
+															</span>
+														</div>
+													</a>
 												</div>
-											</a>
-										) : (
-											<div className="flex h-52 w-full items-center justify-center bg-gray-200/20">
-												<PlayCircle className="h-10 w-10 text-gray-400" />
-											</div>
-										)}
+											) : item.hasImage ? (
+												<div className={`flex h-52 w-full items-center justify-center ${theme === "light" ? "bg-slate-50" : "bg-white/5"}`}>
+													<img
+														src={item.imageUrl}
+														alt={`${item?.name || "Customer"} testimonial image`}
+														className="h-full w-full object-cover"
+													/>
+												</div>
+											) : (
+												<div className={`flex h-52 w-full items-center justify-center ${theme === "light" ? "bg-slate-50" : "bg-white/5"}`}>
+													<img
+														src="/images/testimonial-avatar.svg"
+														alt={`${item?.name || "Customer"} avatar`}
+														className="h-40 w-40 rounded-full object-cover shadow-lg ring-4 ring-white/80"
+													/>
+												</div>
+											)}
 
 										<div className="space-y-4 p-6">
 											<div className="flex items-start justify-between gap-3">
@@ -335,7 +347,7 @@ export default function TestimonialSection() {
 												{item?.message || "Great product and support."}
 											</p>
 
-											{item.videoUrl && (
+											{item.hasVideo && (
 												<a
 													href={item.videoUrl}
 													target="_blank"

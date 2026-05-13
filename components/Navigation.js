@@ -21,9 +21,10 @@ import {
 import { useState, useRef, useEffect } from "react";
 
 const HELPLINE_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/helpline`;
+const HERO_BUTTON_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/herobutton/public-hero-button`;
 
 const DEFAULT_HELPLINE = {
-  phone: "+1 (555) 123-4567",
+  phone: "",
   email: "hello@amdaani.com",
   socialLinks: {
     facebook: "#",
@@ -105,6 +106,8 @@ export default function Navigation({
   const [isSolutionsOpen, setIsSolutionsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [helpline, setHelpline] = useState(DEFAULT_HELPLINE);
+  const [heroButton, setHeroButton] = useState(null);
+  const [heroButtonLoading, setHeroButtonLoading] = useState(true);
   const dropdownRef = useRef(null);
   const currentTheme = themeConfig[theme];
 
@@ -139,6 +142,35 @@ export default function Navigation({
     };
 
     fetchHelpline();
+  }, []);
+
+  useEffect(() => {
+    const fetchHeroButton = async () => {
+      try {
+        setHeroButtonLoading(true);
+        const response = await fetch(HERO_BUTTON_ENDPOINT, { method: "GET" });
+        const result = await response.json();
+
+        if (!response.ok || !result?.success || !Array.isArray(result?.data)) {
+          setHeroButton(null);
+          return;
+        }
+
+        const activeButton = result.data.find((item) => item?.isActive);
+        if (!activeButton?.name || !activeButton?.link) {
+          setHeroButton(null);
+          return;
+        }
+
+        setHeroButton(activeButton);
+      } catch {
+        setHeroButton(null);
+      } finally {
+        setHeroButtonLoading(false);
+      }
+    };
+
+    fetchHeroButton();
   }, []);
 
   const navigationItems = [
@@ -234,34 +266,49 @@ export default function Navigation({
       ? "bg-slate-900 text-white shadow-md"
       : "bg-white text-slate-950 shadow-md";
 
+  const hasPhone = Boolean((helpline?.phone || "").trim());
+  const hasEmail = Boolean((helpline?.email || "").trim());
+
+  const handleHeroButtonClick = () => {
+    if (!heroButton?.link) return;
+
+    const hasProtocol = /^https?:\/\//i.test(heroButton.link);
+    const href = hasProtocol ? heroButton.link : `https://${heroButton.link}`;
+    window.open(href, "_blank", "noopener,noreferrer");
+  };
+
   return (
-    <div className="fixed inset-x-0 top-0 z-50 overflow-x-hidden">
+    <div className="sticky top-0 z-50 overflow-x-hidden">
       {/* Top Header Bar - Hidden on mobile */}
       <div
         className={`hidden md:block w-full transition-all duration-300 border-b backdrop-blur ${topBarClass}`}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-2.5">
             {/* Contact Info */}
             <div className="flex items-center space-x-3 lg:space-x-4 text-xs lg:text-sm">
-              <div className={`flex items-center space-x-2 rounded-full px-3 py-1 ${currentTheme.surface}`}>
-                <Phone className="w-3 h-3" />
-                <a
-                  href={`tel:${(helpline?.phone || "").replace(/[^\d+]/g, "")}`}
-                  className="whitespace-nowrap font-medium transition-opacity duration-200 hover:opacity-80"
-                >
-                  {helpline.phone}
-                </a>
-              </div>
-              <div className={`flex items-center space-x-2 rounded-full px-3 py-1 ${currentTheme.surface}`}>
-                <Mail className="w-3 h-3" />
-                <a
-                  href={`mailto:${helpline.email}`}
-                  className="whitespace-nowrap font-medium transition-opacity duration-200 hover:opacity-80"
-                >
-                  {helpline.email}
-                </a>
-              </div>
+              {hasPhone && (
+                <div className={`flex items-center space-x-2 rounded-full px-3 py-1 ${currentTheme.surface}`}>
+                  <Phone className="w-3 h-3" />
+                  <a
+                    href={`tel:${(helpline?.phone || "").replace(/[^\d+]/g, "")}`}
+                    className="whitespace-nowrap font-medium transition-opacity duration-200 hover:opacity-80"
+                  >
+                    {helpline.phone}
+                  </a>
+                </div>
+              )}
+              {hasEmail && (
+                <div className={`flex items-center space-x-2 rounded-full px-3 py-1 ${currentTheme.surface}`}>
+                  <Mail className="w-3 h-3" />
+                  <a
+                    href={`mailto:${helpline.email}`}
+                    className="whitespace-nowrap font-medium transition-opacity duration-200 hover:opacity-80"
+                  >
+                    {helpline.email}
+                  </a>
+                </div>
+              )}
             </div>
 
             {/* Social Media Links */}
@@ -298,12 +345,14 @@ export default function Navigation({
       {/* Main Navigation */}
 
       <nav
-        className={`fixed left-0 w-full duration-300 ${
-          isScrolled ? "py-2" : "py-3"
-        }`}
+        className={`w-full border-b backdrop-blur-xl duration-300 ${
+          theme === "light"
+            ? "bg-white/95 border-[#E8EAED]"
+            : "bg-slate-950/85 border-[#2C2C2E]"
+        } ${isScrolled ? "py-2" : "py-3"}`}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className={`flex justify-between items-center border backdrop-blur-xl rounded-2xl px-3 sm:px-5 py-2 ${navClass}`}>
+        <div className="w-full px-4 sm:px-6 lg:px-8">
+          <div className={`flex justify-between items-center gap-3 px-0 sm:px-1 py-1 ${navClass}`}>
             {/* Logo */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
@@ -436,6 +485,16 @@ export default function Navigation({
             {/* Desktop Theme Toggle & CTA */}
 
             <div className="hidden lg:flex items-center space-x-3 flex-shrink-0">
+              {!heroButtonLoading && heroButton?.isActive && (
+                <button
+                  onClick={handleHeroButtonClick}
+                  className={`px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 shadow-md hover:shadow-lg hover:scale-[1.02] flex items-center gap-2 ${currentTheme.buttonPrimary}`}
+                >
+                  <PlayStoreIcon />
+                  {heroButton.name}
+                </button>
+              )}
+
               {/* Theme toggle always shown */}
               <button
                 onClick={toggleTheme}
@@ -456,6 +515,16 @@ export default function Navigation({
 
             {/* Mobile Menu Button */}
             <div className="flex lg:hidden items-center space-x-2 flex-shrink-0">
+              {!heroButtonLoading && heroButton?.isActive && (
+                <button
+                  onClick={handleHeroButtonClick}
+                  className={`px-3 py-2 rounded-xl font-semibold text-xs sm:text-sm transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-2 ${currentTheme.buttonPrimary}`}
+                >
+                  <PlayStoreIcon />
+                  {heroButton.name}
+                </button>
+              )}
+
               {!noLanding && (
                 <button
                   onClick={toggleTheme}
@@ -508,6 +577,16 @@ export default function Navigation({
                   }`}
                 >
                   <div className="flex flex-col space-y-1 p-3 w-full">
+                    {!heroButtonLoading && heroButton?.isActive && (
+                      <button
+                        onClick={handleHeroButtonClick}
+                        className={`w-full mb-2 px-4 py-3 rounded-xl font-semibold transition-all duration-200 shadow-md flex items-center justify-center gap-2 ${currentTheme.buttonPrimary}`}
+                      >
+                        <PlayStoreIcon />
+                        {heroButton.name}
+                      </button>
+                    )}
+
                     {navigationItems.map((item) => (
                       <div key={item.name} className="w-full">
                         {item.type === "dropdown" ? (
@@ -560,5 +639,30 @@ export default function Navigation({
         </div>
       </nav>
     </div>
+  );
+}
+
+function PlayStoreIcon() {
+  return (
+    <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden="true">
+      <defs>
+        <linearGradient id="playStoreGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#00C853" />
+          <stop offset="45%" stopColor="#1A73E8" />
+          <stop offset="100%" stopColor="#FBBC05" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M4.5 3.9c0-.8.9-1.3 1.6-.9l13.1 7.5c.7.4.7 1.4 0 1.8l-13.1 7.5c-.7.4-1.6-.1-1.6-.9V3.9z"
+        fill="url(#playStoreGradient)"
+      />
+      <path
+        d="M4.5 3.9l8.3 8.1-8.3 8.1"
+        fill="none"
+        stroke="rgba(255,255,255,0.9)"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }

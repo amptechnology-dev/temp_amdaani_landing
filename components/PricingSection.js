@@ -17,6 +17,7 @@ import {
 
 const LANDING_PLANS_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/plan/landing-plans`;
 const FAQ_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/faq`;
+const HERO_BUTTON_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/herobutton/public-hero-button`;
 
 const FALLBACK_FAQS = [
   {
@@ -52,6 +53,7 @@ export default function PricingSection() {
   const currentTheme = themeConfig[theme];
   const [isAnnual, setIsAnnual] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [heroButton, setHeroButton] = useState(null);
   const [plans, setPlans] = useState([]);
   const [loadingPlans, setLoadingPlans] = useState(true);
   const [plansError, setPlansError] = useState("");
@@ -63,6 +65,32 @@ export default function PricingSection() {
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 300);
     return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const fetchHeroButton = async () => {
+      try {
+        const response = await fetch(HERO_BUTTON_ENDPOINT, { method: "GET" });
+        const result = await response.json();
+
+        if (!response.ok || !result?.success || !Array.isArray(result?.data)) {
+          setHeroButton(null);
+          return;
+        }
+
+        const activeButton = result.data.find((item) => item?.isActive);
+        if (!activeButton?.name || !activeButton?.link) {
+          setHeroButton(null);
+          return;
+        }
+
+        setHeroButton(activeButton);
+      } catch {
+        setHeroButton(null);
+      }
+    };
+
+    fetchHeroButton();
   }, []);
 
   const fetchPlans = async () => {
@@ -236,6 +264,15 @@ export default function PricingSection() {
     const name = (plan?.name || "").toLowerCase();
     if (name.includes("premium") || name.includes("pro")) return true;
     return false;
+  };
+
+  const handleHeroButtonClick = () => {
+    const targetUrl = heroButton?.link;
+    if (!targetUrl) return;
+
+    const hasProtocol = /^https?:\/\//i.test(targetUrl);
+    const href = hasProtocol ? targetUrl : `https://${targetUrl}`;
+    window.open(href, "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -459,14 +496,18 @@ export default function PricingSection() {
                       <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
+                        onClick={handleHeroButtonClick}
+                        disabled={!heroButton?.link}
                         className={`w-full py-3 rounded-xl font-semibold transition-all duration-200 ${
                           isPopular
                             ? `${currentTheme.buttonPrimary} shadow-lg`
                             : `${currentTheme.buttonSecondary}`
-                        }`}
+                        }} ${!heroButton?.link ? "opacity-70 cursor-not-allowed" : ""}`}
                       >
-                        {isFree ? "Get Started Free" : "Choose Plan"}
-                        <ArrowRight className="w-4 h-4 ml-2 inline" />
+                        <span className="inline-flex items-center justify-center gap-2">
+                          <HeroButtonIcon />
+                          {heroButton?.name || (isFree ? "Get Started Free" : "Get Started")}
+                        </span>
                       </motion.button>
                     </div>
                   </motion.div>
@@ -481,7 +522,7 @@ export default function PricingSection() {
         </motion.div>
 
         {/* Feature Comparison */}
-        <motion.div
+        {/* <motion.div
           initial={{ opacity: 0, y: 40 }}
           animate={isVisible ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, delay: 0.6 }}
@@ -546,7 +587,7 @@ export default function PricingSection() {
               </tbody>
             </table>
           </div>
-        </motion.div>
+        </motion.div> */}
 
         {/* FAQ Section */}
         <motion.div
@@ -662,6 +703,31 @@ export default function PricingSection() {
         </motion.div>
       </div>
     </section>
+  );
+}
+
+function HeroButtonIcon() {
+  return (
+    <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden="true">
+      <defs>
+        <linearGradient id="pricingHeroButtonGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#00C853" />
+          <stop offset="45%" stopColor="#1A73E8" />
+          <stop offset="100%" stopColor="#FBBC05" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M4.5 3.9c0-.8.9-1.3 1.6-.9l13.1 7.5c.7.4.7 1.4 0 1.8l-13.1 7.5c-.7.4-1.6-.1-1.6-.9V3.9z"
+        fill="url(#pricingHeroButtonGradient)"
+      />
+      <path
+        d="M4.5 3.9l8.3 8.1-8.3 8.1"
+        fill="none"
+        stroke="rgba(255,255,255,0.9)"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 

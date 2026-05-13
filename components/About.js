@@ -220,7 +220,7 @@ export default function AboutSection() {
   return (
     <section
       id="about"
-      className={`relative overflow-hidden py-24 px-4 sm:px-6 lg:px-8 ${currentTheme.background}`}
+      className={`relative overflow-hidden py-12 sm:py-14 lg:py-20 px-5 sm:px-8 xl:px-12 ${currentTheme.background}`}
     >
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -left-24 top-10 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
@@ -228,7 +228,7 @@ export default function AboutSection() {
         <div className="absolute bottom-0 left-1/2 h-80 w-80 -translate-x-1/2 rounded-full bg-indigo-500/10 blur-3xl" />
       </div>
 
-      <div className="max-w-7xl mx-auto">
+      <div className="mx-auto w-full max-w-[1320px] px-2 sm:px-4 lg:px-6">
         {/* Header Section */}
         <motion.div
           ref={ref}
@@ -241,14 +241,14 @@ export default function AboutSection() {
             initial={{ scale: 0 }}
             animate={inView ? { scale: 1 } : {}}
             transition={{ delay: 0.2, type: "spring" }}
-            className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold mb-6 ${currentTheme.accentLight} ${currentTheme.accent.replace("bg-", "text-")}`}
+            className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold mb-4 ${currentTheme.accentLight} ${currentTheme.accent.replace("bg-", "text-")}`}
           >
             <Target className="w-4 h-4 mr-2" />
             {aboutData?.badgeTitle || FALLBACK_ABOUT.badgeTitle}
           </motion.div>
 
           <h2
-            className={`text-4xl font-black leading-tight tracking-tight sm:text-5xl md:text-6xl mb-6 ${currentTheme.text}`}
+            className={`text-3xl font-black leading-tight tracking-tight sm:text-4xl md:text-5xl mb-4 ${currentTheme.text}`}
           >
             {aboutData?.heading || FALLBACK_ABOUT.heading}
             <span
@@ -263,7 +263,7 @@ export default function AboutSection() {
           </h2>
 
           <p
-              className={`text-lg leading-8 sm:text-xl max-w-3xl mx-auto ${currentTheme.textSecondary}`}
+              className={`text-base leading-7 sm:text-lg max-w-3xl mx-auto ${currentTheme.textSecondary}`}
           >
             {aboutData?.description || FALLBACK_ABOUT.description}
           </p>
@@ -275,7 +275,7 @@ export default function AboutSection() {
             initial={{ opacity: 0, y: 40 }}
             animate={inView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.3 }}
-              className="mb-20 grid grid-cols-2 gap-5 md:grid-cols-4"
+              className="mb-12 grid grid-cols-2 gap-4 md:grid-cols-4"
           >
             {stats.map((stat, index) => {
               const IconComponent = stat.icon;
@@ -319,17 +319,17 @@ export default function AboutSection() {
             initial={{ opacity: 0, x: -50 }}
             animate={inView ? { opacity: 1, x: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.5 }}
-            className={`rounded-[2rem] border p-8 sm:p-10 shadow-xl backdrop-blur-xl ${currentTheme.surface} ${currentTheme.outline}`}
+            className={`rounded-[2rem] border p-6 sm:p-8 shadow-xl backdrop-blur-xl ${currentTheme.surface} ${currentTheme.outline}`}
           >
             <div className={`mb-4 inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${currentTheme.accentLight} ${currentTheme.accent.replace("bg-", "text-")}`}>
               Mission
             </div>
-            <h3 className={`text-3xl font-black tracking-tight mb-5 ${currentTheme.text}`}>{aboutData?.missionTitle || FALLBACK_ABOUT.missionTitle}</h3>
-            <p className={`text-lg leading-8 mb-8 ${currentTheme.textSecondary}`}>
+            <h3 className={`text-2xl font-black tracking-tight mb-4 ${currentTheme.text}`}>{aboutData?.missionTitle || FALLBACK_ABOUT.missionTitle}</h3>
+            <p className={`text-base leading-7 mb-6 ${currentTheme.textSecondary}`}>
               {aboutData?.missionDescription || FALLBACK_ABOUT.missionDescription}
             </p>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               {(Array.isArray(aboutData?.missionPoints)
                 ? aboutData.missionPoints
                 : FALLBACK_ABOUT.missionPoints
@@ -339,7 +339,7 @@ export default function AboutSection() {
                   initial={{ opacity: 0, x: -20 }}
                   animate={inView ? { opacity: 1, x: 0 } : {}}
                   transition={{ duration: 0.4, delay: 0.7 + index * 0.1 }}
-                  className={`flex items-start gap-3 rounded-2xl border px-4 py-3 ${theme === "light" ? "border-slate-200/70 bg-white/70" : "border-white/10 bg-white/5"}`}
+                  className={`flex items-start gap-3 rounded-2xl border px-4 py-2.5 ${theme === "light" ? "border-slate-200/70 bg-white/70" : "border-white/10 bg-white/5"}`}
                 >
                   <CheckCircle className={`mt-0.5 w-5 h-5 flex-shrink-0 ${currentTheme.success}`} />
                   <span className={`font-medium leading-7 ${currentTheme.text}`}>
@@ -354,7 +354,7 @@ export default function AboutSection() {
             initial={{ opacity: 0, x: 50 }}
             animate={inView ? { opacity: 1, x: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.5 }}
-            className={`relative overflow-hidden rounded-[2rem] border p-8 sm:p-10 shadow-xl backdrop-blur-xl ${currentTheme.surface} ${currentTheme.outline}`}
+            className={`relative overflow-hidden rounded-[2rem] border p-6 sm:p-8 shadow-xl backdrop-blur-xl ${currentTheme.surface} ${currentTheme.outline}`}
           >
             <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl" />
             <div
@@ -367,11 +367,11 @@ export default function AboutSection() {
                 )}`}
               />
             </div>
-            <h4 className={`text-2xl font-black tracking-tight mb-4 ${currentTheme.text}`}>
+            <h4 className={`text-xl font-black tracking-tight mb-3 ${currentTheme.text}`}>
               Why Choose Amdaani?
             </h4>
-            <div className="space-y-4">
-              <div className={`flex items-center justify-between rounded-2xl border px-4 py-3 ${theme === "light" ? "border-slate-200 bg-white/70" : "border-white/10 bg-white/5"}`}>
+            <div className="space-y-3">
+              <div className={`flex items-center justify-between rounded-2xl border px-4 py-2.5 ${theme === "light" ? "border-slate-200 bg-white/70" : "border-white/10 bg-white/5"}`}>
                 <span className={`font-semibold ${currentTheme.text}`}>
                   Speed
                 </span>
@@ -384,7 +384,7 @@ export default function AboutSection() {
                   ))}
                 </div>
               </div>
-              <div className={`flex items-center justify-between rounded-2xl border px-4 py-3 ${theme === "light" ? "border-slate-200 bg-white/70" : "border-white/10 bg-white/5"}`}>
+              <div className={`flex items-center justify-between rounded-2xl border px-4 py-2.5 ${theme === "light" ? "border-slate-200 bg-white/70" : "border-white/10 bg-white/5"}`}>
                 <span className={`font-semibold ${currentTheme.text}`}>
                   Affordability
                 </span>
@@ -397,7 +397,7 @@ export default function AboutSection() {
                   ))}
                 </div>
               </div>
-              <div className={`flex items-center justify-between rounded-2xl border px-4 py-3 ${theme === "light" ? "border-slate-200 bg-white/70" : "border-white/10 bg-white/5"}`}>
+              <div className={`flex items-center justify-between rounded-2xl border px-4 py-2.5 ${theme === "light" ? "border-slate-200 bg-white/70" : "border-white/10 bg-white/5"}`}>
                 <span className={`font-semibold ${currentTheme.text}`}>
                   Ease of Use
                 </span>
@@ -419,14 +419,14 @@ export default function AboutSection() {
           initial={{ opacity: 0, y: 40 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, delay: 0.6 }}
-          className="mb-20"
+          className="mb-12"
         >
           <h3
-            className={`text-center text-3xl font-black tracking-tight mb-12 ${currentTheme.text}`}
+            className={`text-center text-2xl sm:text-3xl font-black tracking-tight mb-8 ${currentTheme.text}`}
           >
             Our Core Values
           </h3>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             {values.map((value, index) => {
               const IconComponent = value.icon;
               return (
@@ -435,14 +435,14 @@ export default function AboutSection() {
                   initial={{ opacity: 0, y: 30 }}
                   animate={inView ? { opacity: 1, y: 0 } : {}}
                   transition={{ duration: 0.5, delay: 0.7 + index * 0.1 }}
-                  className={`group rounded-[1.75rem] border p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl ${currentTheme.surface} ${currentTheme.outline}`}
+                  className={`group rounded-[1.75rem] border p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl ${currentTheme.surface} ${currentTheme.outline}`}
                 >
                   <div
-                    className={`mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-r ${value.color}`}
+                    className={`mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-r ${value.color}`}
                   >
                     <IconComponent className="w-6 h-6 text-white" />
                   </div>
-                  <h4 className={`text-xl font-black tracking-tight mb-3 ${currentTheme.text}`}>
+                  <h4 className={`text-lg font-black tracking-tight mb-2 ${currentTheme.text}`}>
                     {value.title}
                   </h4>
                   <p className={`text-sm leading-6 ${currentTheme.textSecondary}`}>
