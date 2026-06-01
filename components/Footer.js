@@ -234,7 +234,7 @@ export default function Footer() {
           scale: showScrollTop ? 1 : 0,
         }}
         onClick={scrollToTop}
-        className={`fixed bottom-8 right-8 z-50 w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 ${theme === "light"
+        className={`fixed bottom-24 right-8 z-50 w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 ${theme === "light"
             ? "bg-white text-gray-700 hover:bg-gray-50 border border-gray-200"
             : "bg-[#1C1C1E] text-gray-300 hover:bg-[#2C2C2E] border border-gray-700"
           }`}

@@ -11,6 +11,7 @@ import CTASection from "../../components/CtaSection";
 import Footer from "../../components/Footer";
 import AboutSection from "../../components/About";
 import TestimonialSection from "../../components/Testimonial";
+import ChatBotWidget from "../../components/ChatBotWidget";
 
 export default function Home() {
   const { theme } = useTheme();
@@ -108,6 +109,7 @@ export default function Home() {
       <section ref={footerRef}>
         <Footer />
       </section>
+      <ChatBotWidget />
     </div>
   );
 }

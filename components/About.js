@@ -429,18 +429,28 @@ export default function AboutSection() {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             {values.map((value, index) => {
               const IconComponent = value.icon;
+              const isLight = theme === "light";
               return (
                 <motion.div
                   key={value.title}
                   initial={{ opacity: 0, y: 30 }}
                   animate={inView ? { opacity: 1, y: 0 } : {}}
                   transition={{ duration: 0.5, delay: 0.7 + index * 0.1 }}
-                  className={`group rounded-[1.75rem] border p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl ${currentTheme.surface} ${currentTheme.outline}`}
+                  className={`group relative overflow-hidden rounded-[1.75rem] border p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl ${currentTheme.surface} ${currentTheme.outline}`}
                 >
+                  <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${value.color}`} />
+                  <div className={`absolute -right-10 -top-10 h-28 w-28 rounded-full bg-gradient-to-br ${value.color} opacity-10 blur-2xl transition-opacity duration-300 group-hover:opacity-20`} />
                   <div
-                    className={`mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-r ${value.color}`}
+                    className={`relative mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border transition-all duration-300 ${
+                      isLight
+                        ? "border-slate-200 bg-white text-slate-900 shadow-[0_10px_30px_rgba(15,23,42,0.08)]"
+                        : "border-white/10 bg-white/5 text-white shadow-[0_10px_30px_rgba(2,6,23,0.28)]"
+                    }`}
                   >
-                    <IconComponent className="w-6 h-6 text-white" />
+                    <span className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${value.color} opacity-10`} />
+                    <IconComponent
+                      className={`relative z-10 w-6 h-6 ${isLight ? "text-slate-900" : "text-white"}`}
+                    />
                   </div>
                   <h4 className={`text-lg font-black tracking-tight mb-2 ${currentTheme.text}`}>
                     {value.title}

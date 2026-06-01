@@ -174,36 +174,6 @@ export default function Navigation({
   }, []);
 
   const navigationItems = [
-    {
-      name: "Solutions",
-      type: "dropdown",
-      items: [
-        {
-          name: "Small Business",
-          ref: null,
-          icon: Building,
-          description: "Perfect for growing businesses",
-        },
-        {
-          name: "Enterprise",
-          ref: null,
-          icon: Users,
-          description: "Scalable solutions for large organizations",
-        },
-        {
-          name: "Freelancers",
-          ref: null,
-          icon: Briefcase,
-          description: "Tools for independent professionals",
-        },
-        {
-          name: "Startups",
-          ref: null,
-          icon: Rocket,
-          description: "Built for rapid growth",
-        },
-      ],
-    },
     { name: "Pricing", ref: pricingRef },
     { name: "About", ref: aboutRef },
     { name: "Testimonial", ref: testimonialsRef },
@@ -277,6 +247,12 @@ export default function Navigation({
     window.open(href, "_blank", "noopener,noreferrer");
   };
 
+  const heroButtonClass =
+    "group inline-flex items-center gap-2 rounded-full border border-white/20 bg-gradient-to-r from-emerald-500 via-sky-500 to-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_16px_36px_rgba(37,99,235,0.28)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_20px_48px_rgba(37,99,235,0.38)]";
+
+  const heroIconWrapClass =
+    "flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/15 text-white shadow-inner backdrop-blur-md";
+
   return (
     <div className="sticky top-0 z-50 overflow-x-hidden">
       {/* Top Header Bar - Hidden on mobile */}
@@ -288,7 +264,9 @@ export default function Navigation({
             {/* Contact Info */}
             <div className="flex items-center space-x-3 lg:space-x-4 text-xs lg:text-sm">
               {hasPhone && (
-                <div className={`flex items-center space-x-2 rounded-full px-3 py-1 ${currentTheme.surface}`}>
+                <div
+                  className={`flex items-center space-x-2 rounded-full px-3 py-1 ${currentTheme.surface}`}
+                >
                   <Phone className="w-3 h-3" />
                   <a
                     href={`tel:${(helpline?.phone || "").replace(/[^\d+]/g, "")}`}
@@ -299,7 +277,9 @@ export default function Navigation({
                 </div>
               )}
               {hasEmail && (
-                <div className={`flex items-center space-x-2 rounded-full px-3 py-1 ${currentTheme.surface}`}>
+                <div
+                  className={`flex items-center space-x-2 rounded-full px-3 py-1 ${currentTheme.surface}`}
+                >
                   <Mail className="w-3 h-3" />
                   <a
                     href={`mailto:${helpline.email}`}
@@ -314,7 +294,10 @@ export default function Navigation({
             {/* Social Media Links */}
             <div className="flex items-center space-x-2 lg:space-x-3">
               <a
-                href={buildSocialUrl("facebook", helpline?.socialLinks?.facebook)}
+                href={buildSocialUrl(
+                  "facebook",
+                  helpline?.socialLinks?.facebook,
+                )}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={`p-1.5 rounded-full transition-all duration-200 ${currentTheme.surface} ${currentTheme.textSecondary} hover:scale-105 hover:${currentTheme.text}`}
@@ -330,7 +313,10 @@ export default function Navigation({
                 <Twitter className="w-3 h-3 lg:w-4 lg:h-4" />
               </a>
               <a
-                href={buildSocialUrl("linkedin", helpline?.socialLinks?.linkedin)}
+                href={buildSocialUrl(
+                  "linkedin",
+                  helpline?.socialLinks?.linkedin,
+                )}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={`p-1.5 rounded-full transition-all duration-200 ${currentTheme.surface} ${currentTheme.textSecondary} hover:scale-105 hover:${currentTheme.text}`}
@@ -352,7 +338,9 @@ export default function Navigation({
         } ${isScrolled ? "py-2" : "py-3"}`}
       >
         <div className="w-full px-4 sm:px-6 lg:px-8">
-          <div className={`flex justify-between items-center gap-3 px-0 sm:px-1 py-1 ${navClass}`}>
+          <div
+            className={`flex justify-between items-center gap-3 px-0 sm:px-1 py-1 ${navClass}`}
+          >
             {/* Logo */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
@@ -369,7 +357,9 @@ export default function Navigation({
                 />
               </div>
               <div className="flex flex-col">
-                <span className={`text-lg font-extrabold tracking-tight ${currentTheme.text}`}>
+                <span
+                  className={`text-lg font-extrabold tracking-tight ${currentTheme.text}`}
+                >
                   Amdaani
                 </span>
                 <span
@@ -423,7 +413,9 @@ export default function Navigation({
                               }`}
                             >
                               <div className="p-2.5">
-                                <div className={`px-3 pb-2 text-[11px] uppercase tracking-[0.14em] ${currentTheme.textTertiary}`}>
+                                <div
+                                  className={`px-3 pb-2 text-[11px] uppercase tracking-[0.14em] ${currentTheme.textTertiary}`}
+                                >
                                   Tailored Solutions
                                 </div>
                                 {item.items.map((subItem) => {
@@ -444,15 +436,19 @@ export default function Navigation({
                                           <IconComponent
                                             className={`w-4 h-4 ${currentTheme.accent.replace(
                                               "bg-",
-                                              "text-"
+                                              "text-",
                                             )}`}
                                           />
                                         </div>
                                         <div className="flex-1">
-                                          <div className={`font-semibold ${currentTheme.text}`}>
+                                          <div
+                                            className={`font-semibold ${currentTheme.text}`}
+                                          >
                                             {subItem.name}
                                           </div>
-                                          <div className={`text-sm mt-1 ${currentTheme.textTertiary}`}>
+                                          <div
+                                            className={`text-sm mt-1 ${currentTheme.textTertiary}`}
+                                          >
                                             {subItem.description}
                                           </div>
                                         </div>
@@ -488,9 +484,11 @@ export default function Navigation({
               {!heroButtonLoading && heroButton?.isActive && (
                 <button
                   onClick={handleHeroButtonClick}
-                  className={`px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 shadow-md hover:shadow-lg hover:scale-[1.02] flex items-center gap-2 ${currentTheme.buttonPrimary}`}
+                  className={heroButtonClass}
                 >
-                  <PlayStoreIcon />
+                  <span className={heroIconWrapClass}>
+                    <PlayStoreIcon />
+                  </span>
                   {heroButton.name}
                 </button>
               )}
@@ -518,9 +516,11 @@ export default function Navigation({
               {!heroButtonLoading && heroButton?.isActive && (
                 <button
                   onClick={handleHeroButtonClick}
-                  className={`px-3 py-2 rounded-xl font-semibold text-xs sm:text-sm transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-2 ${currentTheme.buttonPrimary}`}
+                  className={`${heroButtonClass} px-3 py-2 text-xs sm:text-sm`}
                 >
-                  <PlayStoreIcon />
+                  <span className={heroIconWrapClass}>
+                    <PlayStoreIcon />
+                  </span>
                   {heroButton.name}
                 </button>
               )}
@@ -646,7 +646,13 @@ function PlayStoreIcon() {
   return (
     <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden="true">
       <defs>
-        <linearGradient id="playStoreGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+        <linearGradient
+          id="playStoreGradient"
+          x1="0%"
+          y1="0%"
+          x2="100%"
+          y2="100%"
+        >
           <stop offset="0%" stopColor="#00C853" />
           <stop offset="45%" stopColor="#1A73E8" />
           <stop offset="100%" stopColor="#FBBC05" />
