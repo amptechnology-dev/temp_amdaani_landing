@@ -13,9 +13,7 @@ import {
 import { Textarea } from "../src/components/ui/textarea";
 import { Button } from "../src/components/ui/button";
 
-const CHATBOT_ENDPOINT =
-  process.env.NEXT_PUBLIC_CHATBOT_API_URL ||
-  "http://localhost:8001/api/chatbot/chat";
+const CHATBOT_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/chatbot/chat`;
 
 const INITIAL_MESSAGES = [
   {
