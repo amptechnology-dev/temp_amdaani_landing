@@ -12,6 +12,8 @@ import {
   ArrowRight,
   RefreshCw,
   ChevronDown,
+  Plus,
+  Minus,
   MessageCircleQuestion,
 } from "lucide-react";
 
@@ -105,9 +107,9 @@ export default function PricingSection() {
         throw new Error(result?.message || "Failed to load plans");
       }
 
-      const activePlans = (Array.isArray(result?.data) ? result.data : []).filter(
-        (plan) => plan?.isActive
-      );
+      const activePlans = (
+        Array.isArray(result?.data) ? result.data : []
+      ).filter((plan) => plan?.isActive);
 
       activePlans.sort((a, b) => {
         if ((a?.price ?? 0) !== (b?.price ?? 0)) {
@@ -190,8 +192,11 @@ export default function PricingSection() {
   };
 
   const hasAnnualPlans = useMemo(
-    () => plans.some((plan) => (plan?.durationDays ?? 0) >= 365 && (plan?.price ?? 0) > 0),
-    [plans]
+    () =>
+      plans.some(
+        (plan) => (plan?.durationDays ?? 0) >= 365 && (plan?.price ?? 0) > 0,
+      ),
+    [plans],
   );
 
   const displayPlans = useMemo(() => {
@@ -209,7 +214,8 @@ export default function PricingSection() {
       {
         key: "price",
         label: "Price",
-        value: (plan) => formatCurrency(plan?.price ?? 0, plan?.currency || "INR"),
+        value: (plan) =>
+          formatCurrency(plan?.price ?? 0, plan?.currency || "INR"),
       },
       {
         key: "billing",
@@ -223,16 +229,17 @@ export default function PricingSection() {
           plan?.usageLimits?.unlimited
             ? "Unlimited"
             : plan?.usageLimits?.invoices != null
-            ? `${plan.usageLimits.invoices}`
-            : "N/A",
+              ? `${plan.usageLimits.invoices}`
+              : "N/A",
       },
       {
         key: "features",
         label: "Features",
-        value: (plan) => `${Array.isArray(plan?.features) ? plan.features.length : 0} included`,
+        value: (plan) =>
+          `${Array.isArray(plan?.features) ? plan.features.length : 0} included`,
       },
     ],
-    []
+    [],
   );
 
   const getFeatureLines = (plan) => {
@@ -250,8 +257,8 @@ export default function PricingSection() {
     const invoiceLine = plan?.usageLimits?.unlimited
       ? "Unlimited invoices"
       : plan?.usageLimits?.invoices != null
-      ? `Up to ${plan.usageLimits.invoices} invoices`
-      : null;
+        ? `Up to ${plan.usageLimits.invoices} invoices`
+        : null;
 
     const durationLine = plan?.durationDays
       ? `Validity: ${plan.durationDays} days`
@@ -343,8 +350,8 @@ export default function PricingSection() {
                   isAnnual
                     ? currentTheme.accent
                     : theme === "light"
-                    ? "bg-gray-300"
-                    : "bg-gray-600"
+                      ? "bg-gray-300"
+                      : "bg-gray-600"
                 }`}
               >
                 <span
@@ -458,7 +465,10 @@ export default function PricingSection() {
                           <span
                             className={`text-4xl font-bold ${currentTheme.text}`}
                           >
-                            {formatCurrency(plan?.price ?? 0, plan?.currency || "INR")}
+                            {formatCurrency(
+                              plan?.price ?? 0,
+                              plan?.currency || "INR",
+                            )}
                           </span>
                           {!isFree && (
                             <span
@@ -468,7 +478,9 @@ export default function PricingSection() {
                             </span>
                           )}
                         </div>
-                        <div className={`text-sm ${currentTheme.textSecondary} mt-2`}>
+                        <div
+                          className={`text-sm ${currentTheme.textSecondary} mt-2`}
+                        >
                           {plan?.durationDays ?? 0} days validity
                         </div>
                       </div>
@@ -485,7 +497,9 @@ export default function PricingSection() {
                             }}
                             className="flex items-center space-x-3"
                           >
-                            <Check className={`w-5 h-5 ${currentTheme.success}`} />
+                            <Check
+                              className={`w-5 h-5 ${currentTheme.success}`}
+                            />
                             <span className={`text-sm ${currentTheme.text}`}>
                               {feature}
                             </span>
@@ -506,7 +520,8 @@ export default function PricingSection() {
                       >
                         <span className="inline-flex items-center justify-center gap-2">
                           <HeroButtonIcon />
-                          {heroButton?.name || (isFree ? "Get Started Free" : "Get Started")}
+                          {heroButton?.name ||
+                            (isFree ? "Get Started Free" : "Get Started")}
                         </span>
                       </motion.button>
                     </div>
@@ -515,7 +530,9 @@ export default function PricingSection() {
               })}
 
           {!loadingPlans && !displayPlans.length && !plansError && (
-            <div className={`md:col-span-3 text-center ${currentTheme.textSecondary}`}>
+            <div
+              className={`md:col-span-3 text-center ${currentTheme.textSecondary}`}
+            >
               No active plans available right now.
             </div>
           )}
@@ -604,10 +621,14 @@ export default function PricingSection() {
               <MessageCircleQuestion className="h-4 w-4" />
               FAQs
             </div>
-            <h3 className={`text-3xl md:text-4xl font-bold mb-3 ${currentTheme.text}`}>
+            <h3
+              className={`text-3xl md:text-4xl font-bold mb-3 ${currentTheme.text}`}
+            >
               Frequently Asked Questions
             </h3>
-            <p className={`max-w-2xl mx-auto text-base ${currentTheme.textSecondary}`}>
+            <p
+              className={`max-w-2xl mx-auto text-base ${currentTheme.textSecondary}`}
+            >
               Answers update automatically from your admin panel. Expand any
               question to learn more.
             </p>
@@ -647,54 +668,146 @@ export default function PricingSection() {
                 No FAQs available right now.
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-5">
                 {visibleFaqs.map((faq, index) => {
                   const isOpen = index === openFaqIndex;
 
                   return (
-                    <div
+                    <motion.div
                       key={`faq-row-${faq.question}-${index}`}
-                      className={`rounded-2xl border overflow-hidden ${currentTheme.surface} ${currentTheme.outline}`}
+                      layout
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      whileHover={{
+                        y: -4,
+                      }}
+                      transition={{
+                        duration: 0.3,
+                      }}
+                      className={`
+          relative overflow-hidden rounded-3xl border
+          backdrop-blur-xl transition-all duration-300
+          
+          ${
+            isOpen
+              ? theme === "light"
+                ? "border-blue-200 bg-white shadow-[0_25px_60px_rgba(26,115,232,0.15)]"
+                : "border-blue-400/30 bg-white/5 shadow-[0_25px_60px_rgba(138,180,248,0.15)]"
+              : `${currentTheme.surface} ${currentTheme.outline}`
+          }
+        `}
                     >
+                      {isOpen && (
+                        <>
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-500"
+                          />
+
+                          <motion.div
+                            animate={{
+                              opacity: [0.05, 0.15, 0.05],
+                            }}
+                            transition={{
+                              duration: 3,
+                              repeat: Infinity,
+                            }}
+                            className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-cyan-500/5 to-transparent"
+                          />
+                        </>
+                      )}
+
                       <button
                         type="button"
                         onClick={() =>
-                          setOpenFaqIndex((prev) => (prev === index ? -1 : index))
+                          setOpenFaqIndex((prev) =>
+                            prev === index ? -1 : index,
+                          )
                         }
-                        className={`w-full px-5 py-4 flex items-center justify-between gap-4 text-left ${
-                          isOpen ? currentTheme.surfaceVariant : ""
-                        }`}
-                        aria-expanded={isOpen}
+                        className="relative z-10 flex w-full items-center justify-between gap-5 px-6 py-5 text-left"
                       >
-                        <span className={`text-base md:text-lg font-semibold ${currentTheme.text}`}>
-                          {faq.question}
-                        </span>
-                        <ChevronDown
-                          className={`h-5 w-5 shrink-0 transition-transform ${
-                            isOpen ? "rotate-180" : "rotate-0"
-                          } ${currentTheme.textSecondary}`}
-                        />
+                        <div className="flex items-center gap-4">
+                          <div
+                            className={`
+                flex h-10 w-10 items-center justify-center rounded-xl
+                ${
+                  isOpen
+                    ? "bg-gradient-to-r from-blue-500 to-cyan-500 text-white"
+                    : theme === "light"
+                      ? "bg-slate-100 text-slate-600"
+                      : "bg-white/10 text-slate-300"
+                }
+              `}
+                          >
+                            {isOpen ? (
+                              <Minus className="h-5 w-5" />
+                            ) : (
+                              <Plus className="h-5 w-5" />
+                            )}
+                          </div>
+
+                          <h4
+                            className={`text-base md:text-lg font-bold ${currentTheme.text}`}
+                          >
+                            {faq.question}
+                          </h4>
+                        </div>
+
+                        <motion.div
+                          animate={{
+                            rotate: isOpen ? 180 : 0,
+                          }}
+                          transition={{
+                            duration: 0.25,
+                          }}
+                        >
+                          <ChevronDown
+                            className={`h-5 w-5 ${currentTheme.textSecondary}`}
+                          />
+                        </motion.div>
                       </button>
 
-                      <AnimatePresence initial={false}>
+                      <AnimatePresence>
                         {isOpen && (
                           <motion.div
-                            key={`faq-answer-${index}`}
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: "auto", opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.25, ease: "easeOut" }}
+                            initial={{
+                              height: 0,
+                              opacity: 0,
+                            }}
+                            animate={{
+                              height: "auto",
+                              opacity: 1,
+                            }}
+                            exit={{
+                              height: 0,
+                              opacity: 0,
+                            }}
+                            transition={{
+                              duration: 0.35,
+                            }}
                             className="overflow-hidden"
                           >
-                            <div className={`px-5 pb-5 border-t ${currentTheme.outline}`}>
-                              <p className={`pt-4 text-sm md:text-base leading-relaxed ${currentTheme.textSecondary}`}>
+                            <div
+                              className={`
+                  px-6 pb-6 pt-2
+                  border-t
+                  ${currentTheme.outline}
+                `}
+                            >
+                              <p
+                                className={`
+                    leading-8 text-sm md:text-base
+                    ${currentTheme.textSecondary}
+                  `}
+                              >
                                 {faq.answer}
                               </p>
                             </div>
                           </motion.div>
                         )}
                       </AnimatePresence>
-                    </div>
+                    </motion.div>
                   );
                 })}
               </div>
@@ -710,7 +823,13 @@ function HeroButtonIcon() {
   return (
     <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden="true">
       <defs>
-        <linearGradient id="pricingHeroButtonGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+        <linearGradient
+          id="pricingHeroButtonGradient"
+          x1="0%"
+          y1="0%"
+          x2="100%"
+          y2="100%"
+        >
           <stop offset="0%" stopColor="#00C853" />
           <stop offset="45%" stopColor="#1A73E8" />
           <stop offset="100%" stopColor="#FBBC05" />

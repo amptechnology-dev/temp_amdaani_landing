@@ -3,12 +3,20 @@ import { motion } from "framer-motion";
 import { useTheme } from "../context/ThemeContext";
 import { themeConfig } from "../utils/ThemeConfig";
 import { useEffect, useState } from "react";
-import { Play, Clock, Shield, Smartphone, Star, BadgeCheck } from "lucide-react";
+import {
+  Play,
+  Clock,
+  Shield,
+  Smartphone,
+  Star,
+  BadgeCheck,
+} from "lucide-react";
 
 const HERO_BUTTON_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/herobutton/public-hero-button`;
 const LANDING_APP_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/app-version/landing-apk`;
 const PLAY_STORE_FALLBACK_URL =
-  process.env.NEXT_PUBLIC_PLAY_STORE_URL || "https://play.google.com/store/apps";
+  process.env.NEXT_PUBLIC_PLAY_STORE_URL ||
+  "https://play.google.com/store/apps";
 
 export default function CTASection() {
   const { theme } = useTheme();
@@ -73,14 +81,19 @@ export default function CTASection() {
   }, []);
 
   const handlePlayStoreOpen = () => {
-    const targetUrl = heroButton?.link || latestRelease?.playStoreUrl || PLAY_STORE_FALLBACK_URL;
+    const targetUrl =
+      heroButton?.link ||
+      latestRelease?.playStoreUrl ||
+      PLAY_STORE_FALLBACK_URL;
     const hasProtocol = /^https?:\/\//i.test(targetUrl);
     const href = hasProtocol ? targetUrl : `https://${targetUrl}`;
     window.open(href, "_blank", "noopener,noreferrer");
   };
 
   return (
-    <section className={`py-20 px-5 sm:px-8 lg:px-12 ${currentTheme.background}`}>
+    <section
+      className={`py-20 px-5 sm:px-8 lg:px-12 ${currentTheme.background}`}
+    >
       <div className="max-w-6xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
           <motion.div
@@ -99,14 +112,16 @@ export default function CTASection() {
               {loading
                 ? "Loading Play Store link..."
                 : latestRelease?.version
-                ? `Latest version v${latestRelease.version}`
-                : "Available on Google Play"}
+                  ? `Latest version v${latestRelease.version}`
+                  : "Available on Google Play"}
             </motion.div>
 
-            <h2 className={`text-4xl md:text-5xl font-bold mb-6 ${currentTheme.text}`}>
+            <h2
+              className={`text-4xl md:text-5xl font-bold mb-6 leading-[1.25] ${currentTheme.text}`}
+            >
               Get Amdaani Now
               <span
-                className={`block bg-gradient-to-r ${
+                className={`block pb-2 bg-gradient-to-r ${
                   theme === "light"
                     ? "from-[#1A73E8] to-[#03DAC5]"
                     : "from-[#8AB4F8] to-[#66FFF9]"
@@ -181,18 +196,20 @@ export default function CTASection() {
                   <div className="px-5 py-4">
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center shadow-lg ring-1 ring-slate-200 overflow-hidden">
-                            <img
-                              src="/images/Tapplogo.png"
-                              alt="Amdaani"
-                              className="w-full h-full object-cover"
-                            />
+                        <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center shadow-lg ring-1 ring-slate-200 overflow-hidden">
+                          <img
+                            src="/images/Tapplogo.png"
+                            alt="Amdaani"
+                            className="w-full h-full object-cover"
+                          />
                         </div>
                         <div>
                           <h3 className="text-lg font-bold text-slate-900">
                             Amdaani
                           </h3>
-                          <p className="text-sm text-slate-500">Smart Billing</p>
+                          <p className="text-sm text-slate-500">
+                            Smart Billing
+                          </p>
                         </div>
                       </div>
                       <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
@@ -265,7 +282,11 @@ export default function CTASection() {
 
               <motion.div
                 animate={{ y: [0, -10, 0] }}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
                 className={`absolute -top-4 -right-4 w-20 h-20 rounded-2xl ${currentTheme.accentLight} flex items-center justify-center shadow-lg`}
               >
                 <Smartphone
@@ -275,7 +296,12 @@ export default function CTASection() {
 
               <motion.div
                 animate={{ y: [0, 10, 0] }}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: 1,
+                }}
                 className="absolute -bottom-4 -left-4 w-16 h-16 rounded-2xl bg-[#34A853] flex items-center justify-center shadow-lg"
               >
                 <Play className="w-6 h-6 text-white fill-white" />
@@ -292,7 +318,13 @@ function HeroButtonIcon() {
   return (
     <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
       <defs>
-        <linearGradient id="ctaHeroButtonGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+        <linearGradient
+          id="ctaHeroButtonGradient"
+          x1="0%"
+          y1="0%"
+          x2="100%"
+          y2="100%"
+        >
           <stop offset="0%" stopColor="#00C853" />
           <stop offset="45%" stopColor="#1A73E8" />
           <stop offset="100%" stopColor="#FBBC05" />

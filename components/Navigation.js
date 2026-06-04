@@ -248,10 +248,10 @@ export default function Navigation({
   };
 
   const heroButtonClass =
-    "group inline-flex items-center gap-2 rounded-full border border-white/20 bg-gradient-to-r from-emerald-500 via-sky-500 to-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_16px_36px_rgba(37,99,235,0.28)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_20px_48px_rgba(37,99,235,0.38)]";
+    "group inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-gradient-to-r from-emerald-500 via-sky-500 to-blue-600 px-3.5 py-1.5 text-xs font-medium text-white shadow-[0_8px_20px_rgba(37,99,235,0.22)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(37,99,235,0.30)]";
 
   const heroIconWrapClass =
-    "flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/15 text-white shadow-inner backdrop-blur-md";
+    "flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white";
 
   return (
     <div className="sticky top-0 z-50 overflow-x-hidden">
@@ -348,7 +348,7 @@ export default function Navigation({
               className="flex items-center space-x-3 flex-shrink-0"
             >
               <div
-                className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-md ring-1 ring-black/5 ${currentTheme.surfaceVariant}`}
+                className={`w-13 h-13 rounded-xl flex items-center justify-center shadow-md ring-1 ring-black/5 ${currentTheme.surfaceVariant}`}
               >
                 <img
                   src="/images/Tapplogo.png"
@@ -516,7 +516,7 @@ export default function Navigation({
               {!heroButtonLoading && heroButton?.isActive && (
                 <button
                   onClick={handleHeroButtonClick}
-                  className={`${heroButtonClass} px-3 py-2 text-xs sm:text-sm`}
+                  className={`${heroButtonClass} px-2.5 py-1.5 text-xs`}
                 >
                   <span className={heroIconWrapClass}>
                     <PlayStoreIcon />

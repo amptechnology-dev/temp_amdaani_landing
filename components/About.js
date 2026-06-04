@@ -44,10 +44,13 @@ const normalizeIconKey = (value) =>
     .replace(/[\s_-]+/g, "")
     .toLowerCase();
 
-const NORMALIZED_ICON_MAP = Object.entries(ICON_MAP).reduce((acc, [key, Icon]) => {
-  acc[normalizeIconKey(key)] = Icon;
-  return acc;
-}, {});
+const NORMALIZED_ICON_MAP = Object.entries(ICON_MAP).reduce(
+  (acc, [key, Icon]) => {
+    acc[normalizeIconKey(key)] = Icon;
+    return acc;
+  },
+  {},
+);
 
 const FALLBACK_ABOUT = {
   badgeTitle: "About Amdaani",
@@ -109,8 +112,8 @@ const getIconComponent = (iconName, fallback = Zap) => {
     typeof iconName === "string"
       ? iconName
       : typeof iconName === "object" && iconName !== null
-      ? iconName.name || iconName.icon || ""
-      : "";
+        ? iconName.name || iconName.icon || ""
+        : "";
 
   if (!rawIconName) return fallback;
 
@@ -167,20 +170,23 @@ export default function AboutSection() {
           return;
         }
 
-        const activeItem = result.data.find((item) => item?.isActive) || result.data[0];
+        const activeItem =
+          result.data.find((item) => item?.isActive) || result.data[0];
         if (!activeItem) return;
 
         setAboutData({
           badgeTitle: activeItem?.badgeTitle || FALLBACK_ABOUT.badgeTitle,
           heading: activeItem?.heading || FALLBACK_ABOUT.heading,
-          highlightText: activeItem?.highlightText || FALLBACK_ABOUT.highlightText,
+          highlightText:
+            activeItem?.highlightText || FALLBACK_ABOUT.highlightText,
           description: activeItem?.description || FALLBACK_ABOUT.description,
           stats: normalizeStats(activeItem?.stats),
           missionTitle: activeItem?.missionTitle || FALLBACK_ABOUT.missionTitle,
           missionDescription:
             activeItem?.missionDescription || FALLBACK_ABOUT.missionDescription,
           missionPoints:
-            Array.isArray(activeItem?.missionPoints) && activeItem.missionPoints.length
+            Array.isArray(activeItem?.missionPoints) &&
+            activeItem.missionPoints.length
               ? activeItem.missionPoints
               : FALLBACK_ABOUT.missionPoints,
           values:
@@ -203,19 +209,88 @@ export default function AboutSection() {
         label: stat?.label || "Metric",
         icon: getIconComponent(stat?.icon, Users),
       })),
-    [aboutData?.stats]
+    [aboutData?.stats],
   );
 
   const values = useMemo(
     () =>
-      (Array.isArray(aboutData?.values) ? aboutData.values : []).map((value) => ({
-        icon: getIconComponent(value?.icon, Zap),
-        title: value?.title || "Value",
-        description: value?.description || "",
-        color: value?.color || "from-blue-500 to-cyan-500",
-      })),
-    [aboutData?.values]
+      (Array.isArray(aboutData?.values) ? aboutData.values : []).map(
+        (value) => ({
+          icon: getIconComponent(value?.icon, Zap),
+          title: value?.title || "Value",
+          description: value?.description || "",
+          color: value?.color || "from-blue-500 to-cyan-500",
+        }),
+      ),
+    [aboutData?.values],
   );
+
+  // Static core values to be shown instead of the dynamic backend-driven values
+  const STATIC_VALUES = [
+    {
+      icon: Zap,
+      animation: {
+        scale: [1, 1.08, 1],
+        opacity: [1, 0.75, 1],
+      },
+      transition: {
+        duration: 1.8,
+        repeat: Infinity,
+      },
+      title: "Lightning Fast",
+      description:
+        "Process invoices 3x faster with a streamlined workflow and instant preview.",
+      color: "from-blue-500 to-cyan-500",
+    },
+
+    {
+      icon: Users,
+      animation: {
+        rotate: [0, -2, 2, -2, 0],
+      },
+      transition: {
+        duration: 0.6,
+        repeat: Infinity,
+        repeatDelay: 3,
+      },
+      title: "Customer First",
+      description:
+        "Built with real user feedback to keep the experience simple and effective.",
+      color: "from-orange-500 to-red-500",
+    },
+
+    {
+      icon: Shield,
+      animation: {
+        y: [0, -3, 0],
+      },
+      transition: {
+        duration: 2.5,
+        repeat: Infinity,
+        ease: "easeInOut",
+      },
+      title: "Secure & Reliable",
+      description:
+        "Bank-grade security, automatic backups, and high availability.",
+      color: "from-purple-500 to-pink-500",
+    },
+
+    {
+      icon: Rocket,
+      animation: {
+        y: [0, -5, 0],
+      },
+      transition: {
+        duration: 2,
+        repeat: Infinity,
+        ease: "easeInOut",
+      },
+      title: "Scalable",
+      description:
+        "Designed to scale with your business — from single stores to enterprises.",
+      color: "from-green-500 to-emerald-500",
+    },
+  ];
 
   return (
     <section
@@ -258,12 +333,12 @@ export default function AboutSection() {
                   : "from-[#8AB4F8] to-[#66FFF9]"
               } bg-clip-text text-transparent`}
             >
-                {aboutData?.highlightText || FALLBACK_ABOUT.highlightText}
+              {aboutData?.highlightText || FALLBACK_ABOUT.highlightText}
             </span>
           </h2>
 
           <p
-              className={`text-base leading-7 sm:text-lg max-w-3xl mx-auto ${currentTheme.textSecondary}`}
+            className={`text-base leading-7 sm:text-lg max-w-3xl mx-auto ${currentTheme.textSecondary}`}
           >
             {aboutData?.description || FALLBACK_ABOUT.description}
           </p>
@@ -275,7 +350,7 @@ export default function AboutSection() {
             initial={{ opacity: 0, y: 40 }}
             animate={inView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.3 }}
-              className="mb-12 grid grid-cols-2 gap-4 md:grid-cols-4"
+            className="mb-12 grid grid-cols-2 gap-4 md:grid-cols-4"
           >
             {stats.map((stat, index) => {
               const IconComponent = stat.icon;
@@ -293,7 +368,7 @@ export default function AboutSection() {
                     <IconComponent
                       className={`w-6 h-6 ${currentTheme.accent.replace(
                         "bg-",
-                        "text-"
+                        "text-",
                       )}`}
                     />
                   </div>
@@ -321,12 +396,21 @@ export default function AboutSection() {
             transition={{ duration: 0.6, delay: 0.5 }}
             className={`rounded-[2rem] border p-6 sm:p-8 shadow-xl backdrop-blur-xl ${currentTheme.surface} ${currentTheme.outline}`}
           >
-            <div className={`mb-4 inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${currentTheme.accentLight} ${currentTheme.accent.replace("bg-", "text-")}`}>
+            <div
+              className={`mb-4 inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${currentTheme.accentLight} ${currentTheme.accent.replace("bg-", "text-")}`}
+            >
               Mission
             </div>
-            <h3 className={`text-2xl font-black tracking-tight mb-4 ${currentTheme.text}`}>{aboutData?.missionTitle || FALLBACK_ABOUT.missionTitle}</h3>
-            <p className={`text-base leading-7 mb-6 ${currentTheme.textSecondary}`}>
-              {aboutData?.missionDescription || FALLBACK_ABOUT.missionDescription}
+            <h3
+              className={`text-2xl font-black tracking-tight mb-4 ${currentTheme.text}`}
+            >
+              {aboutData?.missionTitle || FALLBACK_ABOUT.missionTitle}
+            </h3>
+            <p
+              className={`text-base leading-7 mb-6 ${currentTheme.textSecondary}`}
+            >
+              {aboutData?.missionDescription ||
+                FALLBACK_ABOUT.missionDescription}
             </p>
 
             <div className="space-y-3">
@@ -341,8 +425,12 @@ export default function AboutSection() {
                   transition={{ duration: 0.4, delay: 0.7 + index * 0.1 }}
                   className={`flex items-start gap-3 rounded-2xl border px-4 py-2.5 ${theme === "light" ? "border-slate-200/70 bg-white/70" : "border-white/10 bg-white/5"}`}
                 >
-                  <CheckCircle className={`mt-0.5 w-5 h-5 flex-shrink-0 ${currentTheme.success}`} />
-                  <span className={`font-medium leading-7 ${currentTheme.text}`}>
+                  <CheckCircle
+                    className={`mt-0.5 w-5 h-5 flex-shrink-0 ${currentTheme.success}`}
+                  />
+                  <span
+                    className={`font-medium leading-7 ${currentTheme.text}`}
+                  >
                     {feature}
                   </span>
                 </motion.div>
@@ -363,15 +451,19 @@ export default function AboutSection() {
               <Award
                 className={`w-8 h-8 ${currentTheme.accent.replace(
                   "bg-",
-                  "text-"
+                  "text-",
                 )}`}
               />
             </div>
-            <h4 className={`text-xl font-black tracking-tight mb-3 ${currentTheme.text}`}>
+            <h4
+              className={`text-xl font-black tracking-tight mb-3 ${currentTheme.text}`}
+            >
               Why Choose Amdaani?
             </h4>
             <div className="space-y-3">
-              <div className={`flex items-center justify-between rounded-2xl border px-4 py-2.5 ${theme === "light" ? "border-slate-200 bg-white/70" : "border-white/10 bg-white/5"}`}>
+              <div
+                className={`flex items-center justify-between rounded-2xl border px-4 py-2.5 ${theme === "light" ? "border-slate-200 bg-white/70" : "border-white/10 bg-white/5"}`}
+              >
                 <span className={`font-semibold ${currentTheme.text}`}>
                   Speed
                 </span>
@@ -384,7 +476,9 @@ export default function AboutSection() {
                   ))}
                 </div>
               </div>
-              <div className={`flex items-center justify-between rounded-2xl border px-4 py-2.5 ${theme === "light" ? "border-slate-200 bg-white/70" : "border-white/10 bg-white/5"}`}>
+              <div
+                className={`flex items-center justify-between rounded-2xl border px-4 py-2.5 ${theme === "light" ? "border-slate-200 bg-white/70" : "border-white/10 bg-white/5"}`}
+              >
                 <span className={`font-semibold ${currentTheme.text}`}>
                   Affordability
                 </span>
@@ -397,7 +491,9 @@ export default function AboutSection() {
                   ))}
                 </div>
               </div>
-              <div className={`flex items-center justify-between rounded-2xl border px-4 py-2.5 ${theme === "light" ? "border-slate-200 bg-white/70" : "border-white/10 bg-white/5"}`}>
+              <div
+                className={`flex items-center justify-between rounded-2xl border px-4 py-2.5 ${theme === "light" ? "border-slate-200 bg-white/70" : "border-white/10 bg-white/5"}`}
+              >
                 <span className={`font-semibold ${currentTheme.text}`}>
                   Ease of Use
                 </span>
@@ -427,6 +523,7 @@ export default function AboutSection() {
             Our Core Values
           </h3>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {/* Dynamic core values (commented out) - keep for future use
             {values.map((value, index) => {
               const IconComponent = value.icon;
               const isLight = theme === "light";
@@ -456,6 +553,74 @@ export default function AboutSection() {
                     {value.title}
                   </h4>
                   <p className={`text-sm leading-6 ${currentTheme.textSecondary}`}>
+                    {value.description}
+                  </p>
+                </motion.div>
+              );
+            })}
+            */}
+
+            {/* Static core values - shown now */}
+            {STATIC_VALUES.map((value, index) => {
+              const IconComponent = value.icon;
+              const isLight = theme === "light";
+              return (
+                <motion.div
+                  key={value.title}
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={inView ? { opacity: 1, y: 0 } : {}}
+                  transition={{ duration: 0.5, delay: 0.7 + index * 0.08 }}
+                  className={`group relative overflow-hidden rounded-[1.75rem] border p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl ${currentTheme.surface} ${currentTheme.outline}`}
+                >
+                  {value.title === "Lightning Fast" && (
+                    <motion.div
+                      className="absolute inset-0 rounded-[1.75rem] bg-cyan-400/5"
+                      animate={{
+                        opacity: [0.15, 0.4, 0.15],
+                      }}
+                      transition={{
+                        duration: 1.8,
+                        repeat: Infinity,
+                      }}
+                    />
+                  )}
+
+                  <div
+                    className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${value.color}`}
+                  />
+                  <div
+                    className={`absolute -right-10 -top-10 h-28 w-28 rounded-full bg-gradient-to-br ${value.color} opacity-10 blur-2xl transition-opacity duration-300 group-hover:opacity-20`}
+                  />
+                  <div
+                    className={`relative mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border transition-all duration-300 ${
+                      isLight
+                        ? "border-slate-200 bg-white text-slate-900 shadow-[0_10px_30px_rgba(15,23,42,0.08)]"
+                        : "border-white/10 bg-white/5 text-white shadow-[0_10px_30px_rgba(2,6,23,0.28)]"
+                    }`}
+                  >
+                    <span
+                      className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${value.color} opacity-10`}
+                    />
+                    <motion.div
+                      animate={value.animation}
+                      transition={value.transition}
+                      className="relative z-10"
+                    >
+                      <IconComponent
+                        className={`w-6 h-6 ${
+                          isLight ? "text-slate-900" : "text-white"
+                        }`}
+                      />
+                    </motion.div>
+                  </div>
+                  <h4
+                    className={`text-lg font-black tracking-tight mb-2 ${currentTheme.text}`}
+                  >
+                    {value.title}
+                  </h4>
+                  <p
+                    className={`text-sm leading-6 ${currentTheme.textSecondary}`}
+                  >
                     {value.description}
                   </p>
                 </motion.div>
