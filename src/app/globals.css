@@ -128,3 +128,57 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* ===== Google Translate Compact Fix ===== */
+
+.goog-te-gadget {
+  font-size: 0 !important;
+  line-height: 0 !important;
+}
+
+/* dropdown */
+.goog-te-combo {
+  height: 28px !important;
+  font-size: 12px !important;
+  padding: 2px 8px !important;
+
+  border-radius: 999px !important;
+  border: 1px solid #e5e7eb !important;
+
+  background: white !important;
+  width: auto !important;
+  min-width: 90px !important;
+  max-width: 110px !important;
+
+  outline: none !important;
+}
+
+/* remove weird spacing */
+.goog-te-gadget > div {
+  display: inline !important;
+}
+
+/* hide google branding extra spacing */
+.goog-logo-link,
+.goog-te-gadget span {
+  display: none !important;
+}
+
+/* iframe banner remove gap */
+.goog-te-banner-frame {
+  display: none !important;
+}
+
+.translate-mini select {
+  min-width: 120px !important;
+  font-size: 13px !important;
+  padding: 4px 6px !important;
+}
+
+.translate-mini {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  overflow: visible;
+}

@@ -19,9 +19,28 @@ import {
   Briefcase,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
+import dynamic from "next/dynamic";
+const GoogleTranslate = dynamic(() => import("./GoogleTranslate"), {
+  ssr: false,
+});
 
 const HELPLINE_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/helpline`;
 const HERO_BUTTON_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/herobutton/public-hero-button`;
+
+function TranslateWidget() {
+  return (
+    <div
+      suppressHydrationWarning
+      className="flex items-center gap-1.5 px-2.5 h-9 rounded-full border border-gray-200/60 dark:border-slate-700/60 bg-white/60 dark:bg-slate-900/40 backdrop-blur-md shadow-sm overflow-visible min-w-[140px]"
+    >
+      <span className="text-[12px] leading-none flex-shrink-0">🌐</span>
+
+      <div className="translate-mini flex-1 min-w-0">
+        <GoogleTranslate />
+      </div>
+    </div>
+  );
+}
 
 const DEFAULT_HELPLINE = {
   phone: "",
@@ -481,6 +500,8 @@ export default function Navigation({
             {/* Desktop Theme Toggle & CTA */}
 
             <div className="hidden lg:flex items-center space-x-3 flex-shrink-0">
+              <TranslateWidget />
+
               {!heroButtonLoading && heroButton?.isActive && (
                 <button
                   onClick={handleHeroButtonClick}
