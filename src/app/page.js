@@ -108,28 +108,59 @@ export default function Home() {
       aria-busy={isPageLoading}
     >
       {isPageLoading && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden bg-slate-950/95 backdrop-blur-xl">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.14),_transparent_45%),radial-gradient(circle_at_bottom,_rgba(34,211,238,0.12),_transparent_35%)]" />
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden bg-white">
+          <div className="absolute inset-0 bg-gradient-to-b from-white/95 to-white/95" />
           <div className="relative flex flex-col items-center gap-6 px-6 text-center">
-            <div className="relative flex h-28 w-28 items-center justify-center">
-              <div className="absolute inset-0 rounded-full border border-cyan-400/30 bg-white/5 shadow-[0_0_60px_rgba(34,211,238,0.25)]" />
-              <div className="absolute inset-3 rounded-full border border-white/15 border-t-cyan-300 animate-spin" />
-              <div className="absolute inset-7 rounded-full bg-gradient-to-br from-cyan-300 via-sky-400 to-blue-500 shadow-[0_0_40px_rgba(56,189,248,0.45)] animate-pulse" />
+            {/* Logo spins and pulses — the logo itself is the loader */}
+            <div className="flex flex-col items-center gap-4">
+              <div
+                className={`w-24 h-24 rounded-2xl flex items-center justify-center shadow-lg border ${currentTheme.surfaceVariant} relative`}
+              >
+                {/* Rotating ring outside the logo */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div
+                    className="w-full h-full rounded-2xl border border-transparent border-t-4 border-t-emerald-400/75 animate-[spin_1.6s_linear_infinite] motion-safe:animate-[spin_1.6s_linear_infinite]"
+                    style={{ boxShadow: "0 18px 50px rgba(37,99,235,0.12)" }}
+                  />
+                </div>
+
+                {/* Logo: not rounded so it's shown clearly */}
+                <div className="relative z-10 flex items-center justify-center w-20 h-20 bg-white">
+                  <img
+                    src="/images/Tapplogo.png"
+                    alt="Amdaani Logo"
+                    className="w-30 h-30 object-contain"
+                  />
+                </div>
+
+                {/* subtle background glow */}
+                <div
+                  className="pointer-events-none absolute inset-0 rounded-2xl opacity-30"
+                  style={{ boxShadow: "0 18px 50px rgba(37,99,235,0.08)" }}
+                />
+              </div>
+
+              <div className="text-center">
+                <div className="text-2xl font-extrabold tracking-tight text-slate-900">
+                  AMDAANI
+                </div>
+                <div className="text-xs tracking-[0.12em] text-slate-500">
+                  Smart Business Solutions
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.4em] text-cyan-200/80">
+
+            <div className="space-y-2 max-w-lg">
+              <p className="text-xs font-semibold uppercase tracking-[0.36em] text-slate-600">
                 Loading Amdaani
               </p>
-              <p className="max-w-md text-sm leading-6 text-slate-300">
+              <p className="max-w-md text-sm leading-6 text-slate-600">
                 Please wait a moment while the page finishes loading.
               </p>
             </div>
-            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-slate-400">
-              <span className="h-2 w-2 rounded-full bg-cyan-300 animate-pulse" />
-              <span>Optimizing assets</span>
-              <span className="h-2 w-2 rounded-full bg-sky-300 animate-pulse [animation-delay:150ms]" />
-            </div>
           </div>
+
+          {/* Using Tailwind arbitrary animation to avoid styled-jsx hydration issues */}
         </div>
       )}
       <Navigation

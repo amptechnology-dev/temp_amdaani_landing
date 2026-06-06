@@ -17,6 +17,32 @@ import {
   MessageCircleQuestion,
 } from "lucide-react";
 
+// Motion variants for pricing animations
+const gridVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+      when: "beforeChildren",
+    },
+  },
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 24 },
+  visible: (i = 0) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.48, ease: [0.2, 0.8, 0.2, 1], delay: i * 0.08 },
+  }),
+  hover: {
+    scale: 1.03,
+    y: -6,
+    transition: { duration: 0.28, ease: "easeOut" },
+  },
+};
+
 const LANDING_PLANS_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/plan/landing-plans`;
 const FAQ_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/faq`;
 const HERO_BUTTON_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/herobutton/public-hero-button`;
@@ -53,7 +79,7 @@ const planCardStyles = [
 export default function PricingSection() {
   const { theme } = useTheme();
   const currentTheme = themeConfig[theme];
-  const [isAnnual, setIsAnnual] = useState(false);
+  // removed billing toggle state — show all plans
   const [isVisible, setIsVisible] = useState(false);
   const [heroButton, setHeroButton] = useState(null);
   const [plans, setPlans] = useState([]);
@@ -191,23 +217,8 @@ export default function PricingSection() {
     return `${durationDays} days`;
   };
 
-  const hasAnnualPlans = useMemo(
-    () =>
-      plans.some(
-        (plan) => (plan?.durationDays ?? 0) >= 365 && (plan?.price ?? 0) > 0,
-      ),
-    [plans],
-  );
-
-  const displayPlans = useMemo(() => {
-    return plans.filter((plan) => {
-      if ((plan?.price ?? 0) === 0) return true;
-      if (!hasAnnualPlans) return true;
-
-      const isYearlyPlan = (plan?.durationDays ?? 0) >= 365;
-      return isAnnual ? isYearlyPlan : !isYearlyPlan;
-    });
-  }, [hasAnnualPlans, isAnnual, plans]);
+  // Show all active plans (no monthly/annual filter)
+  const displayPlans = useMemo(() => plans, [plans]);
 
   const comparisonRows = useMemo(
     () => [
@@ -329,46 +340,7 @@ export default function PricingSection() {
             charges.
           </p>
 
-          {/* Billing Toggle */}
-          {hasAnnualPlans && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={isVisible ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.6, delay: 0.3 }}
-              className="flex items-center justify-center space-x-4 mb-12"
-            >
-              <span
-                className={`font-medium ${currentTheme.text} ${
-                  !isAnnual ? "opacity-100" : "opacity-60"
-                }`}
-              >
-                Monthly
-              </span>
-              <button
-                onClick={() => setIsAnnual(!isAnnual)}
-                className={`relative w-14 h-7 rounded-full transition-colors duration-300 focus:outline-none ${
-                  isAnnual
-                    ? currentTheme.accent
-                    : theme === "light"
-                      ? "bg-gray-300"
-                      : "bg-gray-600"
-                }`}
-              >
-                <span
-                  className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-transform duration-300 ${
-                    isAnnual ? "transform translate-x-7" : ""
-                  }`}
-                />
-              </button>
-              <span
-                className={`font-medium ${currentTheme.text} ${
-                  isAnnual ? "opacity-100" : "opacity-60"
-                }`}
-              >
-                Annual
-              </span>
-            </motion.div>
-          )}
+          {/* Billing toggle removed — showing all plans */}
 
           {plansError && (
             <div className="mb-12 flex flex-col items-center gap-3">
@@ -386,25 +358,29 @@ export default function PricingSection() {
 
         {/* Pricing Cards */}
         <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          animate={isVisible ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6, delay: 0.4 }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20"
+          variants={gridVariants}
+          initial="hidden"
+          animate={isVisible ? "visible" : "hidden"}
+          className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-20 px-4 md:px-8 lg:px-16"
         >
           {loadingPlans
             ? [0, 1, 2].map((idx) => (
                 <div
                   key={`skeleton-${idx}`}
-                  className={`rounded-2xl border-2 p-8 animate-pulse ${currentTheme.outline} ${currentTheme.surface}`}
+                  className={`rounded-2xl border p-8 animate-pulse ${currentTheme.outline} ${currentTheme.surface}`}
                 >
-                  <div className="h-12 w-12 rounded-xl bg-gray-300/40 mx-auto mb-4" />
-                  <div className="h-6 w-32 bg-gray-300/40 rounded mx-auto mb-3" />
-                  <div className="h-4 w-44 bg-gray-300/40 rounded mx-auto mb-8" />
-                  <div className="h-10 w-28 bg-gray-300/40 rounded mx-auto mb-8" />
+                  <div className="h-12 w-12 rounded-2xl bg-gray-300/40 mb-5" />
+                  <div className="h-5 w-32 bg-gray-300/40 rounded mb-2" />
+                  <div className="h-4 w-44 bg-gray-300/40 rounded mb-8" />
+                  <div className="h-10 w-28 bg-gray-300/40 rounded mb-2" />
+                  <div className="h-3 w-20 bg-gray-300/40 rounded mb-8" />
                   <div className="space-y-3 mb-8">
-                    <div className="h-4 w-full bg-gray-300/40 rounded" />
-                    <div className="h-4 w-full bg-gray-300/40 rounded" />
-                    <div className="h-4 w-4/5 bg-gray-300/40 rounded" />
+                    {[1, 2, 3, 4].map((i) => (
+                      <div
+                        key={i}
+                        className="h-4 w-full bg-gray-300/40 rounded"
+                      />
+                    ))}
                   </div>
                   <div className="h-11 w-full bg-gray-300/40 rounded-xl" />
                 </div>
@@ -416,122 +392,162 @@ export default function PricingSection() {
                 const isPopular = getIsPopular(plan);
                 const planFeatures = getFeatureLines(plan);
 
+                const accentColors = [
+                  {
+                    iconBg: "bg-[#E1F5EE]",
+                    iconText: "text-[#0F6E56]",
+                    checkBg: "bg-[#E1F5EE]",
+                    checkText: "text-[#0F6E56]",
+                  },
+                  {
+                    iconBg: "bg-[#E6F1FB]",
+                    iconText: "text-[#185FA5]",
+                    checkBg: "bg-[#E6F1FB]",
+                    checkText: "text-[#185FA5]",
+                  },
+                  {
+                    iconBg: "bg-[#FAEEDA]",
+                    iconText: "text-[#854F0B]",
+                    checkBg: "bg-[#FAEEDA]",
+                    checkText: "text-[#854F0B]",
+                  },
+                ];
+                const accent = accentColors[index % accentColors.length];
+
                 return (
                   <motion.div
                     key={plan._id || plan.name}
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={isVisible ? { opacity: 1, y: 0 } : {}}
-                    transition={{ duration: 0.5, delay: 0.5 + index * 0.1 }}
-                    className={`relative rounded-2xl border-2 transition-all duration-300 hover:scale-105 hover:shadow-xl ${
+                    custom={index}
+                    variants={cardVariants}
+                    initial="hidden"
+                    animate={isVisible ? "visible" : "hidden"}
+                    whileHover={{ y: -5, transition: { duration: 0.2 } }}
+                    className={`relative flex flex-col rounded-2xl transition-all duration-300 p-8 ${
                       isPopular
-                        ? `${
-                            theme === "light"
-                              ? "border-[#1A73E8] shadow-2xl"
-                              : "border-[#8AB4F8] shadow-2xl"
-                          } transform scale-105`
-                        : `${currentTheme.outline} ${currentTheme.surface}`
-                    } ${currentTheme.surface}`}
+                        ? theme === "light"
+                          ? "border-2 border-[#1A73E8] bg-white shadow-2xl shadow-blue-100"
+                          : "border-2 border-[#8AB4F8] bg-slate-900 shadow-2xl shadow-blue-900/30"
+                        : theme === "light"
+                          ? "border border-gray-200 bg-white shadow-sm hover:shadow-md"
+                          : "border border-slate-800 bg-slate-900 shadow-sm hover:shadow-md"
+                    }`}
                   >
-                    {isPopular && (
-                      <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                        <div
-                          className={`px-4 py-2 rounded-full text-sm font-bold text-white bg-gradient-to-r ${style.color} flex items-center space-x-1`}
+                    {/* Popular Badge */}
+                    {/* {isPopular && (
+                      <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
+                        <motion.div
+                          className="px-4 py-1.5 rounded-full text-xs font-bold text-white bg-gradient-to-r from-[#1A73E8] to-[#0D47A1] flex items-center gap-1.5 shadow-lg whitespace-nowrap"
+                          animate={{ scale: [1, 1.03, 1] }}
+                          transition={{
+                            duration: 2.5,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                          }}
                         >
-                          <Sparkles className="w-4 h-4" />
-                          <span>MOST POPULAR</span>
-                        </div>
+                          <Sparkles className="w-3 h-3" />
+                          MOST POPULAR
+                        </motion.div>
                       </div>
-                    )}
+                    )} */}
 
-                    <div className="p-8">
-                      <div className="text-center mb-6">
-                        <div
-                          className={`w-12 h-12 rounded-xl bg-gradient-to-r ${style.color} flex items-center justify-center mx-auto mb-4`}
-                        >
-                          <IconComponent className="w-6 h-6 text-white" />
-                        </div>
-                        <h3
-                          className={`text-2xl font-bold mb-2 ${currentTheme.text}`}
-                        >
-                          {plan.name}
-                        </h3>
-                        <p className={`text-sm ${currentTheme.textSecondary}`}>
-                          {plan.description}
-                        </p>
-                      </div>
-
-                      <div className="text-center mb-6">
-                        <div className="flex items-baseline justify-center space-x-1">
-                          <span
-                            className={`text-4xl font-bold ${currentTheme.text}`}
-                          >
-                            {formatCurrency(
-                              plan?.price ?? 0,
-                              plan?.currency || "INR",
-                            )}
-                          </span>
-                          {!isFree && (
-                            <span
-                              className={`text-lg ${currentTheme.textTertiary}`}
-                            >
-                              /{getDurationLabel(plan?.durationDays ?? 0)}
-                            </span>
-                          )}
-                        </div>
-                        <div
-                          className={`text-sm ${currentTheme.textSecondary} mt-2`}
-                        >
-                          {plan?.durationDays ?? 0} days validity
-                        </div>
-                      </div>
-
-                      <div className="space-y-3 mb-8">
-                        {planFeatures.map((feature, featureIndex) => (
-                          <motion.div
-                            key={`${plan._id || plan.name}-${featureIndex}`}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={isVisible ? { opacity: 1, x: 0 } : {}}
-                            transition={{
-                              duration: 0.4,
-                              delay: 0.7 + featureIndex * 0.05,
-                            }}
-                            className="flex items-center space-x-3"
-                          >
-                            <Check
-                              className={`w-5 h-5 ${currentTheme.success}`}
-                            />
-                            <span className={`text-sm ${currentTheme.text}`}>
-                              {feature}
-                            </span>
-                          </motion.div>
-                        ))}
-                      </div>
-
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={handleHeroButtonClick}
-                        disabled={!heroButton?.link}
-                        className={`w-full py-3 rounded-xl font-semibold transition-all duration-200 ${
-                          isPopular
-                            ? `${currentTheme.buttonPrimary} shadow-lg`
-                            : `${currentTheme.buttonSecondary}`
-                        }} ${!heroButton?.link ? "opacity-70 cursor-not-allowed" : ""}`}
-                      >
-                        <span className="inline-flex items-center justify-center gap-2">
-                          <HeroButtonIcon />
-                          {heroButton?.name ||
-                            (isFree ? "Get Started Free" : "Get Started")}
-                        </span>
-                      </motion.button>
+                    {/* Icon */}
+                    <div
+                      className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-5 ${accent.iconBg}`}
+                    >
+                      <IconComponent className={`w-5 h-5 ${accent.iconText}`} />
                     </div>
+
+                    {/* Plan Name & Description */}
+                    <h3
+                      className={`text-xl font-bold mb-1.5 ${currentTheme.text}`}
+                    >
+                      {plan.name}
+                    </h3>
+                    <p
+                      className={`text-sm leading-relaxed mb-5 ${currentTheme.textSecondary}`}
+                    >
+                      {plan.description}
+                    </p>
+
+                    {/* Price */}
+                    <div className="flex items-baseline gap-1 mb-1">
+                      <span
+                        className={`text-4xl font-extrabold tracking-tight ${currentTheme.text}`}
+                      >
+                        {formatCurrency(
+                          plan?.price ?? 0,
+                          plan?.currency || "INR",
+                        )}
+                      </span>
+                      {!isFree && (
+                        <span
+                          className={`text-base ${currentTheme.textTertiary}`}
+                        >
+                          /{getDurationLabel(plan?.durationDays ?? 0)}
+                        </span>
+                      )}
+                    </div>
+                    <p className={`text-xs mb-5 ${currentTheme.textTertiary}`}>
+                      {plan?.durationDays ?? 0} days validity
+                    </p>
+
+                    {/* Divider */}
+                    <div
+                      className={`h-px mb-5 ${
+                        theme === "light" ? "bg-gray-100" : "bg-slate-800"
+                      }`}
+                    />
+
+                    {/* Features */}
+                    <ul className="flex flex-col gap-3 mb-7 flex-1">
+                      {planFeatures.map((feature, featureIndex) => (
+                        <motion.li
+                          key={`${plan._id || plan.name}-${featureIndex}`}
+                          initial={{ opacity: 0, x: -12 }}
+                          animate={isVisible ? { opacity: 1, x: 0 } : {}}
+                          transition={{
+                            duration: 0.35,
+                            delay: 0.6 + featureIndex * 0.06,
+                          }}
+                          className="flex items-center gap-3"
+                        >
+                          <span
+                            className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${accent.checkBg}`}
+                          >
+                            <Check className={`w-3 h-3 ${accent.checkText}`} />
+                          </span>
+                          <span className={`text-sm ${currentTheme.text}`}>
+                            {feature}
+                          </span>
+                        </motion.li>
+                      ))}
+                    </ul>
+
+                    {/* CTA Button */}
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={handleHeroButtonClick}
+                      disabled={!heroButton?.link}
+                      className={`w-full py-3.5 rounded-xl text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2 ${
+                        isPopular
+                          ? "bg-[#1A73E8] hover:bg-[#1558B0] text-white shadow-lg shadow-blue-200 dark:shadow-blue-900/30"
+                          : theme === "light"
+                            ? "bg-gray-100 hover:bg-gray-200 text-gray-800 border border-gray-200"
+                            : "bg-slate-800 hover:bg-slate-700 text-white border border-slate-700"
+                      } ${!heroButton?.link ? "opacity-60 cursor-not-allowed" : ""}`}
+                    >
+                      <HeroButtonIcon />
+                      {heroButton?.name ||
+                        (isFree ? "Get Started Free" : "Get Started")}
+                    </motion.button>
                   </motion.div>
                 );
               })}
 
           {!loadingPlans && !displayPlans.length && !plansError && (
             <div
-              className={`md:col-span-3 text-center ${currentTheme.textSecondary}`}
+              className={`md:col-span-3 text-center py-16 ${currentTheme.textSecondary}`}
             >
               No active plans available right now.
             </div>

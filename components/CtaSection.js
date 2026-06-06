@@ -102,7 +102,7 @@ export default function CTASection() {
             transition={{ duration: 0.6 }}
             className="text-left"
           >
-            <motion.div
+            {/* <motion.div
               initial={{ scale: 0 }}
               animate={isVisible ? { scale: 1 } : {}}
               transition={{ delay: 0.2, type: "spring" }}
@@ -114,7 +114,7 @@ export default function CTASection() {
                 : latestRelease?.version
                   ? `Latest version v${latestRelease.version}`
                   : "Available on Google Play"}
-            </motion.div>
+            </motion.div> */}
 
             <h2
               className={`text-4xl md:text-5xl font-bold mb-6 leading-[1.25] ${currentTheme.text}`}
@@ -146,10 +146,10 @@ export default function CTASection() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={handlePlayStoreOpen}
-                className={`w-full sm:w-auto px-8 py-4 rounded-xl font-semibold text-lg transition-colors shadow-lg flex items-center justify-center space-x-3 ${currentTheme.buttonPrimary}`}
+                className="p-0 bg-transparent border-0 inline-flex items-center"
+                aria-label="Get it on Google Play"
               >
-                <HeroButtonIcon />
-                <span>{heroButton?.name || "Visit Here"}</span>
+                <PlayStoreBadge className="h-9 w-auto" />
               </motion.button>
             </motion.div>
 
@@ -183,9 +183,6 @@ export default function CTASection() {
               <div className="w-full max-w-[320px] sm:max-w-[360px] h-[560px] sm:h-[600px] rounded-[3rem] border-[14px] border-slate-900 bg-slate-900 shadow-2xl mx-auto lg:mx-0">
                 <div className="h-full rounded-[2rem] overflow-hidden bg-white">
                   <div className="h-12 flex items-center justify-between px-6 bg-white border-b border-slate-200">
-                    <span className="text-xs font-semibold text-slate-500">
-                      9:41
-                    </span>
                     <div className="flex items-center gap-1.5 text-slate-400">
                       <div className="w-1 h-4 rounded-full bg-slate-300" />
                       <div className="w-1 h-4 rounded-full bg-slate-400" />
@@ -227,12 +224,12 @@ export default function CTASection() {
                             Play Store Listing
                           </h4>
                         </div>
-                        <div className="flex items-center gap-1 rounded-full bg-white px-3 py-1.5 shadow-sm border border-slate-200">
+                        {/* <div className="flex items-center gap-1 rounded-full bg-white px-3 py-1.5 shadow-sm border border-slate-200">
                           <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
                           <span className="text-sm font-bold text-slate-700">
                             4.9
                           </span>
-                        </div>
+                        </div> */}
                       </div>
 
                       <div className="flex items-center gap-3 mb-4">
@@ -249,13 +246,16 @@ export default function CTASection() {
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={handlePlayStoreOpen}
-                        className="w-full rounded-2xl bg-[#1A73E8] px-4 py-3.5 font-semibold text-white shadow-lg"
-                      >
-                        Open Play Store
-                      </button>
+                      <div className="w-full">
+                        <button
+                          type="button"
+                          onClick={handlePlayStoreOpen}
+                          className="p-0 bg-transparent border-0 inline-flex items-center justify-center w-full"
+                          aria-label="Get it on Google Play"
+                        >
+                          <PlayStoreBadge className="h-10 w-auto" />
+                        </button>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
@@ -319,28 +319,68 @@ function HeroButtonIcon() {
     <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
       <defs>
         <linearGradient
-          id="ctaHeroButtonGradient"
+          id="playGradientHero"
           x1="0%"
           y1="0%"
           x2="100%"
           y2="100%"
         >
-          <stop offset="0%" stopColor="#00C853" />
-          <stop offset="45%" stopColor="#1A73E8" />
-          <stop offset="100%" stopColor="#FBBC05" />
+          <stop offset="0%" stopColor="#34A853" />
+          <stop offset="40%" stopColor="#4285F4" />
+          <stop offset="70%" stopColor="#FBBC05" />
+          <stop offset="100%" stopColor="#EA4335" />
         </linearGradient>
       </defs>
       <path
-        d="M4.5 3.9c0-.8.9-1.3 1.6-.9l13.1 7.5c.7.4.7 1.4 0 1.8l-13.1 7.5c-.7.4-1.6-.1-1.6-.9V3.9z"
-        fill="url(#ctaHeroButtonGradient)"
+        d="M3 2 L21 12 L3 22 Z"
+        fill="url(#playGradientHero)"
+        stroke="none"
       />
-      <path
-        d="M4.5 3.9l8.3 8.1-8.3 8.1"
-        fill="none"
-        stroke="rgba(255,255,255,0.9)"
-        strokeWidth="1.3"
-        strokeLinejoin="round"
-      />
+      <path d="M4.2 3.2 L18.5 12 L4.2 20.8 Z" fill="rgba(255,255,255,0.06)" />
+    </svg>
+  );
+}
+
+function PlayStoreBadge({ className = "h-8 w-auto" }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 180 48"
+      xmlns="http://www.w3.org/2000/svg"
+      role="img"
+      aria-hidden="false"
+    >
+      <defs>
+        <linearGradient id="g1" x1="0%" x2="100%" y1="0%" y2="100%">
+          <stop offset="0%" stopColor="#34A853" />
+          <stop offset="40%" stopColor="#4285F4" />
+          <stop offset="70%" stopColor="#FBBC05" />
+          <stop offset="100%" stopColor="#EA4335" />
+        </linearGradient>
+      </defs>
+      <rect width="180" height="48" rx="8" fill="#fff" stroke="#e6e7eb" />
+      <g transform="translate(12,8)">
+        <path d="M0 0 L14 10 L0 20 z" fill="url(#g1)" />
+      </g>
+      <text
+        x="40"
+        y="16"
+        fill="#6b7280"
+        fontSize="8"
+        fontFamily="Helvetica, Arial, sans-serif"
+      >
+        GET IT ON
+      </text>
+      <text
+        x="40"
+        y="36"
+        fill="#111827"
+        fontSize="16"
+        fontWeight="700"
+        fontFamily="Helvetica, Arial, sans-serif"
+      >
+        Google Play
+      </text>
     </svg>
   );
 }

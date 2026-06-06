@@ -19,13 +19,13 @@ const HELPLINE_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/helpline`;
 
 const DEFAULT_HELPLINE = {
   phone: "",
-  email: "hello@amdaani.com",
-  location: "Kolkata, India",
+  email: "",
+  location: "",
   socialLinks: {
-    facebook: "#",
-    instagram: "#",
-    youtube: "#",
-    linkedin: "#",
+    facebook: "",
+    instagram: "",
+    youtube: "",
+    linkedin: "",
   },
 };
 
@@ -34,6 +34,15 @@ const SOCIAL_BASE_URLS = {
   instagram: "https://instagram.com",
   youtube: "https://youtube.com",
   linkedin: "https://linkedin.com",
+};
+
+const isValidLinkRaw = (raw) => {
+  if (!raw || typeof raw !== "string") return false;
+  const v = raw.trim();
+  if (!v) return false;
+  if (v === "#") return false;
+  if (/^(n\/?a|na)$/i.test(v)) return false;
+  return true;
 };
 
 const buildSocialUrl = (platform, rawUrl) => {
@@ -154,43 +163,13 @@ export default function Footer() {
 
   const footerSections = [
     {
-      title: "Product",
+      title: "Quick Links",
       links: [
         { name: "Features", href: "#features" },
         { name: "Pricing", href: "#pricing" },
-        { name: "Download APK", href: "#download" },
-        { name: "Mobile App", href: "#mobile" },
-        { name: "Updates", href: "#updates" },
-      ],
-    },
-    {
-      title: "Solutions",
-      links: [
-        { name: "Small Business", href: "#small-business" },
-        { name: "Enterprise", href: "#enterprise" },
-        { name: "Freelancers", href: "#freelancers" },
-        { name: "Startups", href: "#startups" },
-        { name: "Retail Stores", href: "#retail" },
-      ],
-    },
-    {
-      title: "Resources",
-      links: [
-        { name: "Documentation", href: "#docs" },
-        { name: "Help Center", href: "#help" },
-        { name: "Blog", href: "#blog" },
-        { name: "Tutorials", href: "#tutorials" },
-        { name: "Community", href: "#community" },
-      ],
-    },
-    {
-      title: "Company",
-      links: [
         { name: "About Us", href: "#about" },
-        { name: "Careers", href: "#careers" },
+        { name: "Testimonial", href: "#testimonials" },
         { name: "Contact", href: "#contact" },
-        { name: "Partners", href: "#partners" },
-        { name: "Press Kit", href: "#press" },
       ],
     },
   ];
@@ -199,24 +178,28 @@ export default function Footer() {
     {
       name: "Facebook",
       icon: Facebook,
+      raw: helpline?.socialLinks?.facebook,
       href: buildSocialUrl("facebook", helpline?.socialLinks?.facebook),
       color: "hover:text-blue-600",
     },
     {
       name: "Instagram",
       icon: Instagram,
+      raw: helpline?.socialLinks?.instagram,
       href: buildSocialUrl("instagram", helpline?.socialLinks?.instagram),
       color: "hover:text-pink-600",
     },
     {
       name: "YouTube",
       icon: Youtube,
+      raw: helpline?.socialLinks?.youtube,
       href: buildSocialUrl("youtube", helpline?.socialLinks?.youtube),
       color: "hover:text-red-600",
     },
     {
       name: "LinkedIn",
       icon: Linkedin,
+      raw: helpline?.socialLinks?.linkedin,
       href: buildSocialUrl("linkedin", helpline?.socialLinks?.linkedin),
       color: "hover:text-blue-700",
     },
@@ -244,7 +227,7 @@ export default function Footer() {
 
       {/* Main Footer Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-6 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-8">
           {/* Brand Section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -254,21 +237,23 @@ export default function Footer() {
           >
             {/* Logo */}
             <div className="flex items-center space-x-3 mb-6">
-              <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center shadow-md ring-1 ring-black/5 overflow-hidden">
+              <div className="w-18 h-18 rounded-xl overflow-hidden">
                 <img
                   src="/images/Tapplogo.png"
                   alt="Amdaani Logo"
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal"
                 />
               </div>
-              <div>
-                <span className={`text-2xl font-bold ${currentTheme.text}`}>
-                  Amdaani
+              <div className="flex flex-col">
+                <span
+                  className={`text-lg font-extrabold tracking-tight ${currentTheme.text}`}
+                >
+                  AMDAANI
                 </span>
                 <span
-                  className={`block text-sm ${currentTheme.textTertiary} font-medium`}
+                  className={`text-[11px] tracking-[0.16em] ${currentTheme.textTertiary} hidden sm:block`}
                 >
-                  Smart Billing
+                  Smart Business Solutions
                 </span>
               </div>
             </div>
@@ -276,13 +261,11 @@ export default function Footer() {
             <p
               className={`text-lg mb-6 ${currentTheme.textSecondary} max-w-md`}
             >
-              The fastest and cheapest billing solution for Indian businesses.
-              Create invoices, manage customers, and grow your business
-              effortlessly.
+              Reliable billing software designed for Indian businesses. Create professional invoices, manage customer records, and support your business growth effortlessly
             </p>
 
             {/* Contact Info */}
-            <div className="space-y-3 mb-6">
+            {/* <div className="space-y-3 mb-6">
               {hasPhone && (
                 <div className="flex items-center space-x-3">
                   <Phone className={`w-4 h-4 ${currentTheme.textTertiary}`} />
@@ -303,10 +286,10 @@ export default function Footer() {
                 <MapPin className={`w-4 h-4 ${currentTheme.textTertiary}`} />
                 <span className={currentTheme.text}>{helpline.location}</span>
               </div>
-            </div>
+            </div> */}
 
             {/* Social Links */}
-            <div className="flex space-x-4">
+            {/* <div className="flex space-x-4">
               {socialLinks.map((social) => {
                 const IconComponent = social.icon;
                 return (
@@ -323,34 +306,88 @@ export default function Footer() {
                   </motion.a>
                 );
               })}
-            </div>
+            </div> */}
           </motion.div>
 
-          {/* Links Sections */}
-          {footerSections.map((section, index) => (
-            <motion.div
-              key={section.title}
-              initial={{ opacity: 0, y: 20 }}
-              animate={isVisible ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.6, delay: 0.1 + index * 0.1 }}
-            >
-              <h3 className={`text-lg font-semibold mb-4 ${currentTheme.text}`}>
-                {section.title}
-              </h3>
-              <ul className="space-y-3">
-                {section.links.map((link) => (
-                  <li key={link.name}>
-                    <a
-                      href={link.href}
-                      className={`text-sm transition-colors duration-200 hover:${currentTheme.text} ${currentTheme.textSecondary}`}
-                    >
-                      {link.name}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </motion.div>
-          ))}
+          {/* Quick Links */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={isVisible ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.6, delay: 0.12 }}
+            className="xl:col-span-1"
+          >
+            <h3 className={`text-lg font-semibold mb-4 ${currentTheme.text}`}>
+              {footerSections[0].title}
+            </h3>
+            <ul className="space-y-3">
+              {footerSections[0].links.map((link) => (
+                <li key={link.name} className="flex items-center space-x-3">
+                  <span className={`w-2 h-2 rounded-full ${currentTheme.textTertiary} inline-block mt-1`} />
+                  <a
+                    href={link.href}
+                    className={`text-sm transition-colors duration-200 hover:${currentTheme.text} ${currentTheme.textSecondary}`}
+                  >
+                    {link.name}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+
+          {/* Contact & Social */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={isVisible ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.6, delay: 0.18 }}
+            className="xl:col-span-1"
+          >
+            <h3 className={`text-lg font-semibold mb-4 ${currentTheme.text}`}>Contact</h3>
+
+            <div className="space-y-3 mb-4">
+              {hasPhone && (
+                <div className="flex items-center space-x-3">
+                  <Phone className={`w-4 h-4 ${currentTheme.textTertiary}`} />
+                  <a href={`tel:${normalizedPhone}`} className={`text-sm ${currentTheme.text}`}>
+                    {helpline.phone}
+                  </a>
+                </div>
+              )}
+
+              {hasEmail && (
+                <div className="flex items-center space-x-3">
+                  <Mail className={`w-4 h-4 ${currentTheme.textTertiary}`} />
+                  <a href={`mailto:${helpline.email}`} className={`text-sm ${currentTheme.text}`}>
+                    {helpline.email}
+                  </a>
+                </div>
+              )}
+
+              {/* <div className="flex items-center space-x-3">
+                <MapPin className={`w-4 h-4 ${currentTheme.textTertiary}`} />
+                <span className={`text-sm ${currentTheme.text}`}>{helpline.location}</span>
+              </div> */}
+            </div>
+
+            <div className="flex items-center space-x-3">
+              {socialLinks.map((social) => {
+                if (!isValidLinkRaw(social.raw)) return null;
+                const IconComponent = social.icon;
+                return (
+                  <motion.a
+                    key={social.name}
+                    href={social.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    whileHover={{ scale: 1.08 }}
+                    whileTap={{ scale: 0.95 }}
+                    className={`w-10 h-10 rounded-lg ${currentTheme.surfaceVariant} flex items-center justify-center transition-colors duration-200 ${currentTheme.textTertiary} ${social.color}`}
+                  >
+                    <IconComponent className="w-5 h-5" />
+                  </motion.a>
+                );
+              })}
+            </div>
+          </motion.div>
         </div>
       </div>
     </footer>

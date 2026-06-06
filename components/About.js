@@ -495,6 +495,21 @@ export default function AboutSection() {
                 className={`flex items-center justify-between rounded-2xl border px-4 py-2.5 ${theme === "light" ? "border-slate-200 bg-white/70" : "border-white/10 bg-white/5"}`}
               >
                 <span className={`font-semibold ${currentTheme.text}`}>
+                  Security
+                </span>
+                <div className="flex space-x-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star
+                      key={star}
+                      className="w-4 h-4 fill-yellow-400 text-yellow-400"
+                    />
+                  ))}
+                </div>
+              </div>
+              <div
+                className={`flex items-center justify-between rounded-2xl border px-4 py-2.5 ${theme === "light" ? "border-slate-200 bg-white/70" : "border-white/10 bg-white/5"}`}
+              >
+                <span className={`font-semibold ${currentTheme.text}`}>
                   Ease of Use
                 </span>
                 <div className="flex space-x-1">

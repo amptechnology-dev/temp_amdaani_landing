@@ -12,6 +12,8 @@ import {
   Facebook,
   Twitter,
   Linkedin,
+  Instagram,
+  Youtube,
   ChevronDown,
   Building,
   Users,
@@ -44,11 +46,13 @@ function TranslateWidget() {
 
 const DEFAULT_HELPLINE = {
   phone: "",
-  email: "hello@amdaani.com",
+  email: "",
   socialLinks: {
-    facebook: "#",
-    twitter: "#",
-    linkedin: "#",
+    facebook: "",
+    twitter: "",
+    linkedin: "",
+    instagram: "",
+    youtube: "",
   },
 };
 
@@ -110,6 +114,15 @@ const buildSocialUrl = (platform, rawUrl) => {
   return baseUrl;
 };
 
+const isValidLinkRaw = (raw) => {
+  if (!raw || typeof raw !== "string") return false;
+  const v = raw.trim();
+  if (!v) return false;
+  if (v === "#") return false;
+  if (/^(n\/?a|na)$/i.test(v)) return false;
+  return true;
+};
+
 export default function Navigation({
   featuresRef,
   pricingRef,
@@ -146,6 +159,7 @@ export default function Navigation({
           socialLinks: {
             facebook:
               result?.data?.socialLinks?.facebook ||
+              result?.data?.socialLinks?.fb ||
               DEFAULT_HELPLINE.socialLinks.facebook,
             twitter:
               result?.data?.socialLinks?.twitter ||
@@ -153,6 +167,12 @@ export default function Navigation({
             linkedin:
               result?.data?.socialLinks?.linkedin ||
               DEFAULT_HELPLINE.socialLinks.linkedin,
+            instagram:
+              result?.data?.socialLinks?.instagram ||
+              DEFAULT_HELPLINE.socialLinks.instagram,
+            youtube:
+              result?.data?.socialLinks?.youtube ||
+              DEFAULT_HELPLINE.socialLinks.youtube,
           },
         });
       } catch {
@@ -312,36 +332,66 @@ export default function Navigation({
 
             {/* Social Media Links */}
             <div className="flex items-center space-x-2 lg:space-x-3">
-              <a
-                href={buildSocialUrl(
-                  "facebook",
-                  helpline?.socialLinks?.facebook,
-                )}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`p-1.5 rounded-full transition-all duration-200 ${currentTheme.surface} ${currentTheme.textSecondary} hover:scale-105 hover:${currentTheme.text}`}
-              >
-                <Facebook className="w-3 h-3 lg:w-4 lg:h-4" />
-              </a>
-              <a
-                href={buildSocialUrl("twitter", helpline?.socialLinks?.twitter)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`p-1.5 rounded-full transition-all duration-200 ${currentTheme.surface} ${currentTheme.textSecondary} hover:scale-105 hover:${currentTheme.text}`}
-              >
-                <Twitter className="w-3 h-3 lg:w-4 lg:h-4" />
-              </a>
-              <a
-                href={buildSocialUrl(
-                  "linkedin",
-                  helpline?.socialLinks?.linkedin,
-                )}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`p-1.5 rounded-full transition-all duration-200 ${currentTheme.surface} ${currentTheme.textSecondary} hover:scale-105 hover:${currentTheme.text}`}
-              >
-                <Linkedin className="w-3 h-3 lg:w-4 lg:h-4" />
-              </a>
+              {isValidLinkRaw(helpline?.socialLinks?.facebook) && (
+                <a
+                  href={buildSocialUrl(
+                    "facebook",
+                    helpline?.socialLinks?.facebook,
+                  )}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`p-1.5 rounded-full transition-all duration-200 ${currentTheme.surface} ${currentTheme.textSecondary} hover:scale-105 hover:${currentTheme.text}`}
+                >
+                  <Facebook className="w-3 h-3 lg:w-4 lg:h-4" />
+                </a>
+              )}
+
+              {isValidLinkRaw(helpline?.socialLinks?.instagram) && (
+                <a
+                  href={buildSocialUrl("instagram", helpline?.socialLinks?.instagram)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`p-1.5 rounded-full transition-all duration-200 ${currentTheme.surface} ${currentTheme.textSecondary} hover:scale-105 hover:${currentTheme.text}`}
+                >
+                  <Instagram className="w-3 h-3 lg:w-4 lg:h-4" />
+                </a>
+              )}
+
+              {isValidLinkRaw(helpline?.socialLinks?.youtube) && (
+                <a
+                  href={buildSocialUrl("youtube", helpline?.socialLinks?.youtube)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`p-1.5 rounded-full transition-all duration-200 ${currentTheme.surface} ${currentTheme.textSecondary} hover:scale-105 hover:${currentTheme.text}`}
+                >
+                  <Youtube className="w-3 h-3 lg:w-4 lg:h-4" />
+                </a>
+              )}
+
+              {isValidLinkRaw(helpline?.socialLinks?.twitter) && (
+                <a
+                  href={buildSocialUrl("twitter", helpline?.socialLinks?.twitter)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`p-1.5 rounded-full transition-all duration-200 ${currentTheme.surface} ${currentTheme.textSecondary} hover:scale-105 hover:${currentTheme.text}`}
+                >
+                  <Twitter className="w-3 h-3 lg:w-4 lg:h-4" />
+                </a>
+              )}
+
+              {isValidLinkRaw(helpline?.socialLinks?.linkedin) && (
+                <a
+                  href={buildSocialUrl(
+                    "linkedin",
+                    helpline?.socialLinks?.linkedin,
+                  )}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`p-1.5 rounded-full transition-all duration-200 ${currentTheme.surface} ${currentTheme.textSecondary} hover:scale-105 hover:${currentTheme.text}`}
+                >
+                  <Linkedin className="w-3 h-3 lg:w-4 lg:h-4" />
+                </a>
+              )}
             </div>
           </div>
         </div>
@@ -366,25 +416,23 @@ export default function Navigation({
               animate={{ opacity: 1, x: 0 }}
               className="flex items-center space-x-3 flex-shrink-0"
             >
-              <div
-                className={`w-13 h-13 rounded-xl flex items-center justify-center shadow-md ring-1 ring-black/5 ${currentTheme.surfaceVariant}`}
-              >
+              <div className="w-15 h-15 rounded-xl overflow-hidden">
                 <img
                   src="/images/Tapplogo.png"
                   alt="Amdaani Logo"
-                  className="w-full h-full rounded-xl object-cover"
+                  className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal"
                 />
               </div>
               <div className="flex flex-col">
                 <span
                   className={`text-lg font-extrabold tracking-tight ${currentTheme.text}`}
                 >
-                  Amdaani
+                  AMDAANI
                 </span>
                 <span
-                  className={`text-[11px] uppercase tracking-[0.16em] ${currentTheme.textTertiary} hidden sm:block`}
+                  className={`text-[11px] tracking-[0.16em] ${currentTheme.textTertiary} hidden sm:block`}
                 >
-                  Smart Billing
+                  Smart Business Solutions
                 </span>
               </div>
             </motion.div>
@@ -505,12 +553,10 @@ export default function Navigation({
               {!heroButtonLoading && heroButton?.isActive && (
                 <button
                   onClick={handleHeroButtonClick}
-                  className={heroButtonClass}
+                  className="p-0 bg-transparent border-0 inline-flex items-center"
+                  aria-label="Get it on Google Play"
                 >
-                  <span className={heroIconWrapClass}>
-                    <PlayStoreIcon />
-                  </span>
-                  {heroButton.name}
+                  <PlayStoreBadge className="h-9 w-auto" />
                 </button>
               )}
 
@@ -537,12 +583,10 @@ export default function Navigation({
               {!heroButtonLoading && heroButton?.isActive && (
                 <button
                   onClick={handleHeroButtonClick}
-                  className={`${heroButtonClass} px-2.5 py-1.5 text-xs`}
+                  className="p-0 bg-transparent border-0 inline-flex items-center"
+                  aria-label="Get it on Google Play"
                 >
-                  <span className={heroIconWrapClass}>
-                    <PlayStoreIcon />
-                  </span>
-                  {heroButton.name}
+                  <PlayStoreBadge className="h-8 w-auto" />
                 </button>
               )}
 
@@ -599,13 +643,14 @@ export default function Navigation({
                 >
                   <div className="flex flex-col space-y-1 p-3 w-full">
                     {!heroButtonLoading && heroButton?.isActive && (
-                      <button
-                        onClick={handleHeroButtonClick}
-                        className={`w-full mb-2 px-4 py-3 rounded-xl font-semibold transition-all duration-200 shadow-md flex items-center justify-center gap-2 ${currentTheme.buttonPrimary}`}
-                      >
-                        <PlayStoreIcon />
-                        {heroButton.name}
-                      </button>
+                      <div className="w-full mb-2 flex items-center justify-center">
+                        <button
+                          onClick={handleHeroButtonClick}
+                          className={`p-0 bg-transparent border-0 transition-all duration-200 ${currentTheme.buttonPrimary} rounded-xl`}
+                        >
+                          <PlayStoreBadge className="h-10 w-auto" />
+                        </button>
+                      </div>
                     )}
 
                     {navigationItems.map((item) => (
@@ -663,33 +708,45 @@ export default function Navigation({
   );
 }
 
-function PlayStoreIcon() {
+function PlayStoreBadge({ className = "h-8 w-auto" }) {
   return (
-    <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden="true">
+    <svg
+      className={className}
+      viewBox="0 0 180 48"
+      xmlns="http://www.w3.org/2000/svg"
+      role="img"
+      aria-hidden="false"
+    >
       <defs>
-        <linearGradient
-          id="playStoreGradient"
-          x1="0%"
-          y1="0%"
-          x2="100%"
-          y2="100%"
-        >
+        <linearGradient id="g1" x1="0%" x2="100%" y1="0%" y2="100%">
           <stop offset="0%" stopColor="#00C853" />
           <stop offset="45%" stopColor="#1A73E8" />
           <stop offset="100%" stopColor="#FBBC05" />
         </linearGradient>
       </defs>
-      <path
-        d="M4.5 3.9c0-.8.9-1.3 1.6-.9l13.1 7.5c.7.4.7 1.4 0 1.8l-13.1 7.5c-.7.4-1.6-.1-1.6-.9V3.9z"
-        fill="url(#playStoreGradient)"
-      />
-      <path
-        d="M4.5 3.9l8.3 8.1-8.3 8.1"
-        fill="none"
-        stroke="rgba(255,255,255,0.9)"
-        strokeWidth="1.3"
-        strokeLinejoin="round"
-      />
+      <rect width="180" height="48" rx="8" fill="#fff" stroke="#e6e7eb" />
+      <g transform="translate(12,8) scale(1)">
+        <path d="M0 0 L14 10 L0 20 z" fill="url(#g1)" />
+      </g>
+      <text
+        x="40"
+        y="16"
+        fill="#6b7280"
+        fontSize="8"
+        fontFamily="Helvetica, Arial, sans-serif"
+      >
+        GET IT ON
+      </text>
+      <text
+        x="40"
+        y="36"
+        fill="#111827"
+        fontSize="16"
+        fontWeight="700"
+        fontFamily="Helvetica, Arial, sans-serif"
+      >
+        Google Play
+      </text>
     </svg>
   );
 }

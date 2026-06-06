@@ -8,7 +8,7 @@ export default function GoogleTranslate() {
       new window.google.translate.TranslateElement(
         {
           pageLanguage: "en",
-          includedLanguages: "bn,en",
+          // includedLanguages: "bn,en",
           autoDisplay: false,
         },
         "google_translate_element"
