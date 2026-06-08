@@ -165,7 +165,6 @@ export default function Footer() {
     {
       title: "Quick Links",
       links: [
-        { name: "Features", href: "#features" },
         { name: "Pricing", href: "#pricing" },
         { name: "About Us", href: "#about" },
         { name: "Testimonial", href: "#testimonials" },
@@ -217,10 +216,11 @@ export default function Footer() {
           scale: showScrollTop ? 1 : 0,
         }}
         onClick={scrollToTop}
-        className={`fixed bottom-24 right-8 z-50 w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 ${theme === "light"
+        className={`fixed bottom-24 right-8 z-50 w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 ${
+          theme === "light"
             ? "bg-white text-gray-700 hover:bg-gray-50 border border-gray-200"
             : "bg-[#1C1C1E] text-gray-300 hover:bg-[#2C2C2E] border border-gray-700"
-          }`}
+        }`}
       >
         <ArrowUp className="w-5 h-5" />
       </motion.button>
@@ -246,12 +246,16 @@ export default function Footer() {
               </div>
               <div className="flex flex-col">
                 <span
-                  className={`text-lg font-extrabold tracking-tight ${currentTheme.text}`}
+                  style={{
+                    fontFamily: "'Hit and Run', sans-serif",
+                    color: "#255e97",
+                  }}
+                  className="text-lg font-extrabold tracking-tight"
                 >
                   AMDAANI
                 </span>
                 <span
-                  className={`text-[11px] tracking-[0.16em] ${currentTheme.textTertiary} hidden sm:block`}
+                  className={`text-[11px] tracking-[0.16em] font-bold ${currentTheme.textTertiary} hidden sm:block`}
                 >
                   Smart Business Solutions
                 </span>
@@ -261,7 +265,9 @@ export default function Footer() {
             <p
               className={`text-lg mb-6 ${currentTheme.textSecondary} max-w-md`}
             >
-              Reliable billing software designed for Indian businesses. Create professional invoices, manage customer records, and support your business growth effortlessly
+              Reliable billing software designed for Indian businesses. Create
+              professional invoices, manage customer records, and support your
+              business growth effortlessly
             </p>
 
             {/* Contact Info */}
@@ -322,7 +328,9 @@ export default function Footer() {
             <ul className="space-y-3">
               {footerSections[0].links.map((link) => (
                 <li key={link.name} className="flex items-center space-x-3">
-                  <span className={`w-2 h-2 rounded-full ${currentTheme.textTertiary} inline-block mt-1`} />
+                  <span
+                    className={`w-2 h-2 rounded-full ${currentTheme.textTertiary} inline-block mt-1`}
+                  />
                   <a
                     href={link.href}
                     className={`text-sm transition-colors duration-200 hover:${currentTheme.text} ${currentTheme.textSecondary}`}
@@ -341,13 +349,18 @@ export default function Footer() {
             transition={{ duration: 0.6, delay: 0.18 }}
             className="xl:col-span-1"
           >
-            <h3 className={`text-lg font-semibold mb-4 ${currentTheme.text}`}>Contact</h3>
+            <h3 className={`text-lg font-semibold mb-4 ${currentTheme.text}`}>
+              Contact
+            </h3>
 
             <div className="space-y-3 mb-4">
               {hasPhone && (
                 <div className="flex items-center space-x-3">
                   <Phone className={`w-4 h-4 ${currentTheme.textTertiary}`} />
-                  <a href={`tel:${normalizedPhone}`} className={`text-sm ${currentTheme.text}`}>
+                  <a
+                    href={`tel:${normalizedPhone}`}
+                    className={`text-sm ${currentTheme.text}`}
+                  >
                     {helpline.phone}
                   </a>
                 </div>
@@ -356,7 +369,10 @@ export default function Footer() {
               {hasEmail && (
                 <div className="flex items-center space-x-3">
                   <Mail className={`w-4 h-4 ${currentTheme.textTertiary}`} />
-                  <a href={`mailto:${helpline.email}`} className={`text-sm ${currentTheme.text}`}>
+                  <a
+                    href={`mailto:${helpline.email}`}
+                    className={`text-sm ${currentTheme.text}`}
+                  >
                     {helpline.email}
                   </a>
                 </div>

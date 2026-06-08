@@ -182,3 +182,11 @@ body {
   min-width: 0;
   overflow: visible;
 }
+
+@font-face {
+  font-family: 'Hit and Run';
+  src: url('/fonts/HitAndRun.woff2') format('woff2'),
+       url('/fonts/HitAndRun.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+}

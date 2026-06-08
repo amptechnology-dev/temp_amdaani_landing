@@ -12,6 +12,7 @@ import Footer from "../../components/Footer";
 import AboutSection from "../../components/About";
 import TestimonialSection from "../../components/Testimonial";
 import ChatBotWidget from "../../components/ChatBotWidget";
+import FaqSection from "../../components/FaqSection";
 
 export default function Home() {
   const { theme } = useTheme();
@@ -21,6 +22,7 @@ export default function Home() {
   const aboutRef = useRef(null);
   const testimonialsRef = useRef(null);
   const pricingRef = useRef(null);
+  const faqRef = useRef(null);
   const footerRef = useRef(null);
 
   useEffect(() => {
@@ -55,34 +57,36 @@ export default function Home() {
       { id: "about", ref: aboutRef },
       { id: "testimonials", ref: testimonialsRef },
       { id: "pricing", ref: pricingRef },
+      { id: "faq", ref: faqRef },
       { id: "contact", ref: footerRef },
     ];
 
-    const updateActiveSection = () => {
-      const scrollPosition = window.scrollY + 160;
-      let currentSection = "home";
-
-      sections.forEach(({ id, ref }) => {
-        if (!ref.current) return;
-
-        const sectionTop =
-          ref.current.getBoundingClientRect().top + window.scrollY;
-        if (scrollPosition >= sectionTop) {
-          currentSection = id;
-        }
-      });
-
-      setActiveSection(currentSection);
+    const observerOptions = {
+      root: null,
+      rootMargin: "-40% 0px -55% 0px",
+      threshold: [0, 0.1, 0.25, 0.5, 0.75, 1],
     };
 
-    updateActiveSection();
-    window.addEventListener("scroll", updateActiveSection);
-    window.addEventListener("resize", updateActiveSection);
+    const handleIntersect = (entries) => {
+      const visibleEntries = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
 
-    return () => {
-      window.removeEventListener("scroll", updateActiveSection);
-      window.removeEventListener("resize", updateActiveSection);
+      if (visibleEntries.length > 0) {
+        const activeId = visibleEntries[0].target.id || "home";
+        setActiveSection(activeId);
+      }
     };
+
+    const observer = new IntersectionObserver(handleIntersect, observerOptions);
+
+    sections.forEach(({ ref }) => {
+      if (ref.current) {
+        observer.observe(ref.current);
+      }
+    });
+
+    return () => observer.disconnect();
   }, []);
 
   const currentTheme = themeConfig[theme];
@@ -141,10 +145,16 @@ export default function Home() {
               </div>
 
               <div className="text-center">
-                <div className="text-2xl font-extrabold tracking-tight text-slate-900">
+                <div
+                  style={{
+                    fontFamily: "'Hit and Run', sans-serif",
+                    color: "#255e97",
+                  }}
+                  className="text-lg font-extrabold tracking-tight"
+                >
                   AMDAANI
                 </div>
-                <div className="text-xs tracking-[0.12em] text-slate-500">
+                <div className={`text-[11px] tracking-[0.16em] font-bold ${currentTheme.textTertiary} hidden sm:block`}>
                   Smart Business Solutions
                 </div>
               </div>
@@ -167,22 +177,26 @@ export default function Home() {
         pricingRef={pricingRef}
         aboutRef={aboutRef}
         testimonialsRef={testimonialsRef}
-        faqRef={footerRef}
+        faqRef={faqRef}
         scrollToSection={scrollToSection}
         activeSection={activeSection}
       />
       <HeroSection featuresRef={pricingRef} scrollToSection={scrollToSection} />
 
-      <section ref={aboutRef}>
+      <section ref={aboutRef} id="about">
         <AboutSection />
       </section>
 
-      <section ref={testimonialsRef}>
+      <section ref={testimonialsRef} id="testimonials">
         <TestimonialSection />
       </section>
 
-      <section ref={pricingRef}>
+      <section ref={pricingRef} id="pricing">
         <PricingSection pricingRef={pricingRef} />
+      </section>
+
+      <section ref={faqRef} id="faq">
+        <FaqSection />
       </section>
 
       <CTASection />

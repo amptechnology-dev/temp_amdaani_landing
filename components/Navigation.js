@@ -134,6 +134,7 @@ export default function Navigation({
   noLanding = false,
 }) {
   const { theme, toggleTheme } = useTheme();
+  const [localActive, setLocalActive] = useState(activeSection);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSolutionsOpen, setIsSolutionsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -216,15 +217,16 @@ export default function Navigation({
     { name: "Pricing", ref: pricingRef },
     { name: "About", ref: aboutRef },
     { name: "Testimonial", ref: testimonialsRef },
-    { name: "Contact", ref: faqRef },
+    { name: "FAQ", ref: faqRef },
   ];
 
-  // Handle scroll effect
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20);
     };
+
     window.addEventListener("scroll", handleScroll);
+    handleScroll();
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
@@ -239,10 +241,34 @@ export default function Navigation({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleNavigationClick = (itemRef) => {
-    if (itemRef) {
-      scrollToSection(itemRef);
+  const handleNavigationClick = (itemRef, itemName) => {
+    // set active immediately so clicked item highlights
+    try {
+      let key = String(itemName || "").toLowerCase();
+      if (key === "testimonial") key = "testimonials";
+      if (key === "testimonials") key = "testimonials";
+      if (key === "pricing") key = "pricing";
+      if (key === "about") key = "about";
+      if (key === "faq") key = "faq";
+      if (key) setLocalActive(key);
+    } catch (e) {
+      // ignore
     }
+
+    if (itemRef) {
+      // prefer parent provided scroll helper
+      try {
+        scrollToSection(itemRef);
+      } catch {
+        if (itemRef.current) itemRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    } else {
+      // fallback to id-based scrolling
+      const id = String(itemName || "").toLowerCase();
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
     setIsMobileMenuOpen(false);
   };
 
@@ -259,16 +285,16 @@ export default function Navigation({
   const isItemActive = (itemName) => {
     const normalizedName = String(itemName || "").toLowerCase();
 
-    if (normalizedName === "testimonial") {
-      return activeSection === "testimonials";
-    }
+    // map some display names to section keys
+    if (normalizedName === "testimonial") return localActive === "testimonials";
+    if (normalizedName === "contact") return localActive === "contact";
+    if (normalizedName === "faq") return localActive === "faq";
 
-    if (normalizedName === "contact") {
-      return activeSection === "contact";
-    }
-
-    return activeSection === normalizedName;
+    return localActive === normalizedName || activeSection === normalizedName;
   };
+
+  // Keep localActive in sync when parent changes activeSection
+  useEffect(() => setLocalActive(activeSection), [activeSection]);
 
   const activeNavClass =
     theme === "light"
@@ -348,7 +374,10 @@ export default function Navigation({
 
               {isValidLinkRaw(helpline?.socialLinks?.instagram) && (
                 <a
-                  href={buildSocialUrl("instagram", helpline?.socialLinks?.instagram)}
+                  href={buildSocialUrl(
+                    "instagram",
+                    helpline?.socialLinks?.instagram,
+                  )}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={`p-1.5 rounded-full transition-all duration-200 ${currentTheme.surface} ${currentTheme.textSecondary} hover:scale-105 hover:${currentTheme.text}`}
@@ -359,7 +388,10 @@ export default function Navigation({
 
               {isValidLinkRaw(helpline?.socialLinks?.youtube) && (
                 <a
-                  href={buildSocialUrl("youtube", helpline?.socialLinks?.youtube)}
+                  href={buildSocialUrl(
+                    "youtube",
+                    helpline?.socialLinks?.youtube,
+                  )}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={`p-1.5 rounded-full transition-all duration-200 ${currentTheme.surface} ${currentTheme.textSecondary} hover:scale-105 hover:${currentTheme.text}`}
@@ -370,7 +402,10 @@ export default function Navigation({
 
               {isValidLinkRaw(helpline?.socialLinks?.twitter) && (
                 <a
-                  href={buildSocialUrl("twitter", helpline?.socialLinks?.twitter)}
+                  href={buildSocialUrl(
+                    "twitter",
+                    helpline?.socialLinks?.twitter,
+                  )}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={`p-1.5 rounded-full transition-all duration-200 ${currentTheme.surface} ${currentTheme.textSecondary} hover:scale-105 hover:${currentTheme.text}`}
@@ -416,7 +451,7 @@ export default function Navigation({
               animate={{ opacity: 1, x: 0 }}
               className="flex items-center space-x-3 flex-shrink-0"
             >
-              <div className="w-15 h-15 rounded-xl overflow-hidden">
+              <div className="w-18 h-18 rounded-xl overflow-hidden">
                 <img
                   src="/images/Tapplogo.png"
                   alt="Amdaani Logo"
@@ -425,12 +460,16 @@ export default function Navigation({
               </div>
               <div className="flex flex-col">
                 <span
-                  className={`text-lg font-extrabold tracking-tight ${currentTheme.text}`}
+                  style={{
+                    fontFamily: "'Hit and Run', sans-serif",
+                    color: "#255e97",
+                  }}
+                  className="text-lg font-extrabold tracking-tight"
                 >
                   AMDAANI
                 </span>
                 <span
-                  className={`text-[11px] tracking-[0.16em] ${currentTheme.textTertiary} hidden sm:block`}
+                  className={`text-[11px] tracking-[0.16em] font-bold ${currentTheme.textTertiary} hidden sm:block`}
                 >
                   Smart Business Solutions
                 </span>
@@ -530,7 +569,7 @@ export default function Navigation({
                       </div>
                     ) : (
                       <button
-                        onClick={() => handleNavigationClick(item.ref)}
+                        onClick={() => handleNavigationClick(item.ref, item.name)}
                         className={`px-4 py-2.5 rounded-xl font-semibold text-[15px] transition-all duration-200 ${
                           theme === "light"
                             ? `${currentTheme.text} hover:${currentTheme.surfaceVariant}`
@@ -646,9 +685,10 @@ export default function Navigation({
                       <div className="w-full mb-2 flex items-center justify-center">
                         <button
                           onClick={handleHeroButtonClick}
-                          className={`p-0 bg-transparent border-0 transition-all duration-200 ${currentTheme.buttonPrimary} rounded-xl`}
+                          className={`p-0 bg-transparent border-0 inline-flex items-center transition-all duration-200`}
+                          aria-label="Get it on Google Play"
                         >
-                          <PlayStoreBadge className="h-10 w-auto" />
+                          <PlayStoreBadge className="h-10 w-auto block" />
                         </button>
                       </div>
                     )}
@@ -685,7 +725,7 @@ export default function Navigation({
                           </div>
                         ) : (
                           <button
-                            onClick={() => handleNavigationClick(item.ref)}
+                            onClick={() => handleNavigationClick(item.ref, item.name)}
                             className={`w-full text-left px-4 py-3 rounded-xl font-semibold transition-all duration-200 ${
                               theme === "light"
                                 ? `hover:${currentTheme.surfaceVariant} ${currentTheme.text}`
@@ -710,43 +750,14 @@ export default function Navigation({
 
 function PlayStoreBadge({ className = "h-8 w-auto" }) {
   return (
-    <svg
-      className={className}
-      viewBox="0 0 180 48"
-      xmlns="http://www.w3.org/2000/svg"
-      role="img"
-      aria-hidden="false"
-    >
-      <defs>
-        <linearGradient id="g1" x1="0%" x2="100%" y1="0%" y2="100%">
-          <stop offset="0%" stopColor="#00C853" />
-          <stop offset="45%" stopColor="#1A73E8" />
-          <stop offset="100%" stopColor="#FBBC05" />
-        </linearGradient>
-      </defs>
-      <rect width="180" height="48" rx="8" fill="#fff" stroke="#e6e7eb" />
-      <g transform="translate(12,8) scale(1)">
-        <path d="M0 0 L14 10 L0 20 z" fill="url(#g1)" />
-      </g>
-      <text
-        x="40"
-        y="16"
-        fill="#6b7280"
-        fontSize="8"
-        fontFamily="Helvetica, Arial, sans-serif"
-      >
-        GET IT ON
-      </text>
-      <text
-        x="40"
-        y="36"
-        fill="#111827"
-        fontSize="16"
-        fontWeight="700"
-        fontFamily="Helvetica, Arial, sans-serif"
-      >
-        Google Play
-      </text>
-    </svg>
+    <img
+      src="/images/play.jpeg"
+      alt="Get it on Google Play"
+      className={`${className} object-contain block rounded-lg
+                  [mix-blend-mode:multiply]
+                  dark:[mix-blend-mode:screen]`}
+      loading="lazy"
+      draggable={false}
+    />
   );
 }

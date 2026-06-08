@@ -149,7 +149,7 @@ export default function CTASection() {
                 className="p-0 bg-transparent border-0 inline-flex items-center"
                 aria-label="Get it on Google Play"
               >
-                <PlayStoreBadge className="h-9 w-auto" />
+                <PlayStoreBadge className="h-12 sm:h-14 md:h-16 w-auto" />
               </motion.button>
             </motion.div>
 
@@ -253,7 +253,7 @@ export default function CTASection() {
                           className="p-0 bg-transparent border-0 inline-flex items-center justify-center w-full"
                           aria-label="Get it on Google Play"
                         >
-                          <PlayStoreBadge className="h-10 w-auto" />
+                          <PlayStoreBadge className="h-12 sm:h-14 w-auto" />
                         </button>
                       </div>
                     </div>
@@ -342,45 +342,15 @@ function HeroButtonIcon() {
 }
 
 function PlayStoreBadge({ className = "h-8 w-auto" }) {
+  // Use the same raster badge as elsewhere so it displays consistently
+  // and doesn't render a white rounded rect behind the image.
   return (
-    <svg
-      className={className}
-      viewBox="0 0 180 48"
-      xmlns="http://www.w3.org/2000/svg"
-      role="img"
-      aria-hidden="false"
-    >
-      <defs>
-        <linearGradient id="g1" x1="0%" x2="100%" y1="0%" y2="100%">
-          <stop offset="0%" stopColor="#34A853" />
-          <stop offset="40%" stopColor="#4285F4" />
-          <stop offset="70%" stopColor="#FBBC05" />
-          <stop offset="100%" stopColor="#EA4335" />
-        </linearGradient>
-      </defs>
-      <rect width="180" height="48" rx="8" fill="#fff" stroke="#e6e7eb" />
-      <g transform="translate(12,8)">
-        <path d="M0 0 L14 10 L0 20 z" fill="url(#g1)" />
-      </g>
-      <text
-        x="40"
-        y="16"
-        fill="#6b7280"
-        fontSize="8"
-        fontFamily="Helvetica, Arial, sans-serif"
-      >
-        GET IT ON
-      </text>
-      <text
-        x="40"
-        y="36"
-        fill="#111827"
-        fontSize="16"
-        fontWeight="700"
-        fontFamily="Helvetica, Arial, sans-serif"
-      >
-        Google Play
-      </text>
-    </svg>
+    <img
+      src="/images/play.jpeg"
+      alt="Get it on Google Play"
+      className={`${className} object-contain block`}
+      loading="lazy"
+      draggable={false}
+    />
   );
 }
