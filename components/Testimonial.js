@@ -9,13 +9,18 @@ import { Quote, PlayCircle, RefreshCw, ChevronLeft, ChevronRight } from "lucide-
 const TESTIMONIALS_ENDPOINT =
 	`${process.env.NEXT_PUBLIC_API_URL}/testimonial/public-testimonials`;
 
+const DEFAULT_STATIC_MESSAGE = "Amdaani app is good — nice billing.";
+const DEFAULT_NAME = "Amdaani User";
+const DEFAULT_DESIGNATION = "Business Owner";
+
+// Fallback testimonial: intentionally does not include a YouTube link so
+// the UI shows the static avatar and default message when real data is absent.
 const FALLBACK_TESTIMONIALS = [
 	{
 		_id: "fallback-1",
-		name: "Susanth Pal",
-		designation: "Shop Owner",
-		message: "Amdaani app made my billing system very easy.",
-		youtubeLink: "https://youtu.be/dx4Teh-nv3A",
+		name: DEFAULT_NAME,
+		designation: DEFAULT_DESIGNATION,
+		message: DEFAULT_STATIC_MESSAGE,
 		isActive: true,
 	},
 ];
@@ -154,13 +159,26 @@ export default function TestimonialSection() {
 
 	const cards = useMemo(
 		() =>
-			(Array.isArray(testimonials) ? testimonials : []).map((item) => ({
-				...item,
-				imageUrl: item?.imageUrl || "",
-				videoId: extractVideoId(item?.youtubeLink),
-				videoUrl: normalizeVideoUrl(item?.youtubeLink),
-				embedUrl: getEmbedUrl(item?.youtubeLink),
-			})),
+			(Array.isArray(testimonials) ? testimonials : []).map((item) => {
+				const name = item?.name || DEFAULT_NAME;
+				const designation = item?.designation || DEFAULT_DESIGNATION;
+				const message = item?.message || DEFAULT_STATIC_MESSAGE;
+				const imageUrl = item?.imageUrl || "";
+				const videoId = extractVideoId(item?.youtubeLink);
+				const videoUrl = item?.youtubeLink ? normalizeVideoUrl(item?.youtubeLink) : "";
+				const embedUrl = videoId ? getEmbedUrl(item?.youtubeLink) : "";
+
+				return {
+					...item,
+					name,
+					designation,
+					message,
+					imageUrl,
+					videoId,
+					videoUrl,
+					embedUrl,
+				};
+			}),
 		[testimonials]
 	);
 
@@ -344,7 +362,7 @@ export default function TestimonialSection() {
 											</div>
 
 											<p className={`text-sm leading-7 ${currentTheme.textSecondary}`}>
-												{item?.message || "Great product and support."}
+												{item?.message || DEFAULT_STATIC_MESSAGE}
 											</p>
 
 											{item.hasVideo && (
