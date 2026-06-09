@@ -214,10 +214,10 @@ export default function Navigation({
   }, []);
 
   const navigationItems = [
-    { name: "Pricing", ref: pricingRef },
-    { name: "About", ref: aboutRef },
+    { name: "About Us", ref: aboutRef },
     { name: "Testimonial", ref: testimonialsRef },
-    { name: "FAQ", ref: faqRef },
+    { name: "Pricing", ref: pricingRef },
+    { name: "Contact Us", ref: null },
   ];
 
   useEffect(() => {
@@ -260,7 +260,11 @@ export default function Navigation({
       try {
         scrollToSection(itemRef);
       } catch {
-        if (itemRef.current) itemRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+        if (itemRef.current)
+          itemRef.current.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
       }
     } else {
       // fallback to id-based scrolling
@@ -449,8 +453,9 @@ export default function Navigation({
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              className="flex items-center space-x-3 flex-shrink-0"
+              className="flex items-center space-x-1 flex-shrink-0"
             >
+              {/* Logo (UNCHANGED) */}
               <div className="w-18 h-18 rounded-xl overflow-hidden">
                 <img
                   src="/images/Tapplogo.png"
@@ -458,18 +463,22 @@ export default function Navigation({
                   className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal"
                 />
               </div>
-              <div className="flex flex-col">
+
+              {/* TEXT BLOCK */}
+              <div className="flex flex-col ml-[-8px]">
                 <span
                   style={{
                     fontFamily: "'Hit and Run', sans-serif",
                     color: "#255e97",
                   }}
-                  className="text-lg font-extrabold tracking-tight"
+                  className="text-lg font-extrabold tracking-tight leading-none"
                 >
                   AMDAANI
                 </span>
+
+                {/* 👇 FIXED SPACING HERE */}
                 <span
-                  className={`text-[11px] tracking-[0.16em] font-bold ${currentTheme.textTertiary} hidden sm:block`}
+                  className={`text-[11px] mt-[2px] tracking-[0.14em] font-bold ${currentTheme.textTertiary} hidden sm:block`}
                 >
                   Smart Business Solutions
                 </span>
@@ -569,7 +578,9 @@ export default function Navigation({
                       </div>
                     ) : (
                       <button
-                        onClick={() => handleNavigationClick(item.ref, item.name)}
+                        onClick={() =>
+                          handleNavigationClick(item.ref, item.name)
+                        }
                         className={`px-4 py-2.5 rounded-xl font-semibold text-[15px] transition-all duration-200 ${
                           theme === "light"
                             ? `${currentTheme.text} hover:${currentTheme.surfaceVariant}`
@@ -725,7 +736,9 @@ export default function Navigation({
                           </div>
                         ) : (
                           <button
-                            onClick={() => handleNavigationClick(item.ref, item.name)}
+                            onClick={() =>
+                              handleNavigationClick(item.ref, item.name)
+                            }
                             className={`w-full text-left px-4 py-3 rounded-xl font-semibold transition-all duration-200 ${
                               theme === "light"
                                 ? `hover:${currentTheme.surfaceVariant} ${currentTheme.text}`

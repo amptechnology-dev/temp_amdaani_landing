@@ -165,10 +165,11 @@ export default function Footer() {
     {
       title: "Quick Links",
       links: [
-        { name: "Pricing", href: "#pricing" },
         { name: "About Us", href: "#about" },
         { name: "Testimonial", href: "#testimonials" },
-        { name: "Contact", href: "#contact" },
+        { name: "Pricing", href: "#pricing" },
+        { name: "Contact Us", href: "#contact" },
+        {name:"FAQs", href:"#faq" }
       ],
     },
   ];
@@ -236,7 +237,7 @@ export default function Footer() {
             className="xl:col-span-2"
           >
             {/* Logo */}
-            <div className="flex items-center space-x-3 mb-6">
+            <div className="flex items-center space-x-1 flex-shrink-0">
               <div className="w-18 h-18 rounded-xl overflow-hidden">
                 <img
                   src="/images/Tapplogo.png"
@@ -244,18 +245,18 @@ export default function Footer() {
                   className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal"
                 />
               </div>
-              <div className="flex flex-col">
+              <div className="flex flex-col ml-[-8px]">
                 <span
                   style={{
                     fontFamily: "'Hit and Run', sans-serif",
                     color: "#255e97",
                   }}
-                  className="text-lg font-extrabold tracking-tight"
+                  className="text-lg font-extrabold tracking-tight leading-none"
                 >
                   AMDAANI
                 </span>
                 <span
-                  className={`text-[11px] tracking-[0.16em] font-bold ${currentTheme.textTertiary} hidden sm:block`}
+                  className={`text-[11px] mt-[2px] tracking-[0.14em] font-bold ${currentTheme.textTertiary} hidden sm:block`}
                 >
                   Smart Business Solutions
                 </span>

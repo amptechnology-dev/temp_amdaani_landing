@@ -140,17 +140,35 @@ export default function CTASection() {
               initial={{ opacity: 0, y: 20 }}
               animate={isVisible ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.6, delay: 0.3 }}
-              className="flex flex-col sm:flex-row gap-4 mb-8"
+              className="flex flex-col sm:flex-row gap-6 mb-8 items-start"
             >
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handlePlayStoreOpen}
-                className="p-0 bg-transparent border-0 inline-flex items-center"
-                aria-label="Get it on Google Play"
-              >
-                <PlayStoreBadge className="h-12 sm:h-14 md:h-16 w-auto" />
-              </motion.button>
+              <div className="flex flex-col items-start gap-2">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handlePlayStoreOpen}
+                  className="p-0 bg-transparent border-0 inline-flex items-center"
+                  aria-label="Get it on Google Play"
+                >
+                  <PlayStoreBadge className="h-12 sm:h-14 md:h-16 w-auto" />
+                </motion.button>
+                <p className={`text-sm ${currentTheme.textSecondary}`}>
+                  Or tap the button above
+                </p>
+              </div>
+
+              <div className="flex flex-col items-center gap-2">
+                <div className={`p-3 rounded-2xl border-2 ${currentTheme.outline} ${currentTheme.surfaceVariant} bg-white shadow-md`}>
+                  <img
+                    src="/images/PlayScanner.png"
+                    alt="QR Code Scanner"
+                    className="w-28 h-28 sm:w-32 sm:h-32 object-contain"
+                  />
+                </div>
+                <p className={`text-sm font-medium ${currentTheme.text} text-center`}>
+                  Scan to Download
+                </p>
+              </div>
             </motion.div>
 
             <motion.div
@@ -192,26 +210,40 @@ export default function CTASection() {
 
                   <div className="px-5 py-4">
                     <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center shadow-lg ring-1 ring-slate-200 overflow-hidden">
+                      <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="flex items-center space-x-1 flex-shrink-0"
+                      >
+                        {/* Logo (UNCHANGED) */}
+                        <div className="w-18 h-18 rounded-xl overflow-hidden">
                           <img
                             src="/images/Tapplogo.png"
-                            alt="Amdaani"
-                            className="w-full h-full object-cover"
+                            alt="Amdaani Logo"
+                            className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal"
                           />
                         </div>
-                        <div>
-                          <h3 className="text-lg font-bold text-slate-900">
-                            Amdaani
-                          </h3>
-                          <p className="text-sm text-slate-500">
-                            Smart Billing
-                          </p>
+
+                        {/* TEXT BLOCK */}
+                        <div className="flex flex-col ml-[-8px]">
+                          <span
+                            style={{
+                              fontFamily: "'Hit and Run', sans-serif",
+                              color: "#255e97",
+                            }}
+                            className="text-lg font-extrabold tracking-tight leading-none"
+                          >
+                            AMDAANI
+                          </span>
+
+                          {/* 👇 FIXED SPACING HERE */}
+                          <span
+                            className={`text-[11px] mt-[2px] tracking-[0.14em] font-bold ${currentTheme.textTertiary} hidden sm:block`}
+                          >
+                            Smart Business Solutions
+                          </span>
                         </div>
-                      </div>
-                      <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
-                        Play Store
-                      </div>
+                      </motion.div>
                     </div>
 
                     <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5 mb-5">
@@ -255,6 +287,19 @@ export default function CTASection() {
                         >
                           <PlayStoreBadge className="h-12 sm:h-14 w-auto" />
                         </button>
+                      </div>
+
+                      <div className="flex items-center justify-center gap-3 py-3 border-t border-slate-200">
+                        <p className={`text-xs font-semibold text-slate-500`}>
+                          Or scan:
+                        </p>
+                        <div className="w-12 h-12 rounded-lg border border-slate-300 bg-white p-1 shadow-sm">
+                          <img
+                            src="/images/PlayScanner.png"
+                            alt="QR Code"
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
                       </div>
                     </div>
 
