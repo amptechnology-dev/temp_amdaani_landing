@@ -295,7 +295,7 @@ export default function CTASection() {
                         </p>
                         <div className="w-12 h-12 rounded-lg border border-slate-300 bg-white p-1 shadow-sm">
                           <img
-                            src="/images/PlayScanner.png"
+                            src="/images/PlayScanner.PNG"
                             alt="QR Code"
                             className="w-full h-full object-contain"
                           />
