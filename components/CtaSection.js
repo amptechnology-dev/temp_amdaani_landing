@@ -160,7 +160,7 @@ export default function CTASection() {
               <div className="flex flex-col items-center gap-2">
                 <div className={`p-3 rounded-2xl border-2 ${currentTheme.outline} ${currentTheme.surfaceVariant} bg-white shadow-md`}>
                   <img
-                    src="/images/PlayScanner.png"
+                    src="/images/PlayScanner.PNG"
                     alt="QR Code Scanner"
                     className="w-28 h-28 sm:w-32 sm:h-32 object-contain"
                   />
