@@ -6,21 +6,21 @@ EMAIL="devs.amptechnology@gmail.com"
 APP_CONTAINER="landing-app"
 APP_PORT="7010"
 
-# Path to the ALREADY RUNNING admin project — we reuse its nginx + certbot,
-# we never create our own here.
-ADMIN_PROJECT_DIR="/root/temp-amdaani-admin-fronted"
-NGINX_CONF_DIR="$ADMIN_PROJECT_DIR/nginx/conf.d"
-CERTBOT_WWW_DIR="$ADMIN_PROJECT_DIR/certbot/www"
-CERTBOT_CONF_DIR="$ADMIN_PROJECT_DIR/certbot/conf"
+# Reuse nginx + certbot from the backend project
+BACKEND_PROJECT_DIR="/root/amp_portal_backend"
+NGINX_CONF_DIR="$BACKEND_PROJECT_DIR/nginx/conf.d"
+CERTBOT_WWW_DIR="$BACKEND_PROJECT_DIR/certbot/www"
+CERTBOT_CONF_DIR="$BACKEND_PROJECT_DIR/certbot/conf"
 
 CONF_FILE="$NGINX_CONF_DIR/$DOMAIN.conf"
 CERT_PATH="$CERTBOT_CONF_DIR/live/$DOMAIN/fullchain.pem"
 
 echo "=== Starting SSL setup for $DOMAIN (using existing nginx) ==="
 
+# Make sure the backend nginx is running
 if ! docker ps --format '{{.Names}}' | grep -q '^nginx$'; then
-  echo "ERROR: the existing 'nginx' container isn't running. This script expects"
-  echo "it to already be up from the admin project — start that first."
+  echo "ERROR: nginx container is not running."
+  echo "Start the backend project first: cd $BACKEND_PROJECT_DIR && ./init-ssl.sh"
   exit 1
 fi
 
@@ -66,16 +66,16 @@ NGINXEOF
 }
 
 # ─────────────────────────────────────────────────────────────
-# CASE 1: Certificate already exists → just write config + reload
+# CASE 1: Certificate already exists → just redeploy
 # ─────────────────────────────────────────────────────────────
 if test -f "$CERT_PATH"; then
   echo "Certificate already exists — writing HTTPS config."
   write_https_config
 
-  echo "Building and starting the landing app container..."
-  docker compose up -d --build
+  echo "Building and starting frontend container..."
+  docker compose up -d --build --remove-orphans
 
-  echo "Reloading the existing nginx container..."
+  echo "Reloading nginx..."
   docker exec nginx nginx -s reload
 
   echo ""
@@ -89,7 +89,7 @@ fi
 # ─────────────────────────────────────────────────────────────
 echo "No certificate found — starting first-time SSL setup..."
 
-# Write a temporary HTTP-only config into the EXISTING nginx's conf.d
+# Write temporary HTTP-only config
 cat > "$CONF_FILE" << NGINXEOF
 server {
     listen 80;
@@ -106,18 +106,18 @@ server {
 }
 NGINXEOF
 
-echo "Temporary HTTP config written to $CONF_FILE"
+echo "Temporary HTTP config written."
 
-echo "Reloading existing nginx to pick up the new server block..."
+# Reload existing nginx to pick up new domain config
 docker exec nginx nginx -s reload
+sleep 3
 
 echo "Verifying $DOMAIN responds on port 80..."
 curl -sf -H "Host: $DOMAIN" http://localhost:80 > /dev/null \
-  && echo "domain responding OK" \
-  || { echo "ERROR: $DOMAIN not responding via existing nginx — check DNS and nginx logs"; docker logs nginx --tail 30; exit 1; }
+  && echo "Domain responding OK" \
+  || { echo "ERROR: $DOMAIN not responding — check DNS points to this VPS"; docker logs nginx --tail 30; exit 1; }
 
-# Request certificate from Let's Encrypt, writing into the ADMIN project's
-# certbot directories — the same ones its nginx already mounts and serves
+# Request certificate
 echo "Requesting certificate from Let's Encrypt..."
 docker run --rm \
   -v "$CERTBOT_WWW_DIR:/var/www/certbot" \
@@ -138,15 +138,16 @@ fi
 
 echo "Certificate obtained successfully!"
 
-# Write the real HTTPS config now that the cert exists
+# Write real HTTPS config
 write_https_config
-echo "HTTPS config written to $CONF_FILE"
+echo "HTTPS config written."
 
-# Build and start the landing app on the shared network
-echo "Starting landing app container..."
-docker compose up -d --build
+# Start frontend container
+echo "Starting frontend container..."
+docker compose up -d --build --remove-orphans
 
-echo "Reloading existing nginx with the final HTTPS config..."
+# Reload nginx with HTTPS config
+echo "Reloading nginx with HTTPS config..."
 docker exec nginx nginx -s reload
 
 echo ""

@@ -13,4 +13,4 @@ services:
 networks:
   app-network:
     external: true
-    name: temp-amdaani-admin-fronted_app-network
+    name: amp_portal_backend_app-network
