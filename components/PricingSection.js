@@ -3,7 +3,15 @@ import { useTheme } from "../context/ThemeContext";
 import { AnimatePresence, motion } from "framer-motion";
 import { themeConfig } from "../utils/ThemeConfig";
 import { useEffect, useMemo, useState } from "react";
-import { Check, Users, CreditCard, Crown, Sparkles, ArrowRight, RefreshCw } from "lucide-react";
+import {
+  Check,
+  Users,
+  CreditCard,
+  Crown,
+  Sparkles,
+  ArrowRight,
+  RefreshCw,
+} from "lucide-react";
 
 // Motion variants for pricing animations
 const gridVariants = {
@@ -34,8 +42,6 @@ const cardVariants = {
 const LANDING_PLANS_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/plan/landing-plans`;
 const HERO_BUTTON_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/herobutton/public-hero-button`;
 
-
-
 const planCardStyles = [
   { color: "from-blue-500 to-cyan-500", icon: Users },
   { color: "from-purple-500 to-pink-500", icon: Crown },
@@ -51,7 +57,6 @@ export default function PricingSection() {
   const [plans, setPlans] = useState([]);
   const [loadingPlans, setLoadingPlans] = useState(true);
   const [plansError, setPlansError] = useState("");
-  
 
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 300);
@@ -98,7 +103,10 @@ export default function PricingSection() {
 
       const activePlans = (
         Array.isArray(result?.data) ? result.data : []
-      ).filter((plan) => plan?.isActive);
+      ).filter(
+        (plan) =>
+          plan?.isActive && !plan?.name?.toLowerCase().startsWith("topup"),
+      );
 
       activePlans.sort((a, b) => {
         if ((a?.price ?? 0) !== (b?.price ?? 0)) {
@@ -119,8 +127,6 @@ export default function PricingSection() {
   useEffect(() => {
     fetchPlans();
   }, []);
-
-  
 
   const formatCurrency = (amount, currency = "INR") => {
     return new Intl.NumberFormat("en-IN", {
@@ -457,8 +463,7 @@ export default function PricingSection() {
                       } ${!heroButton?.link ? "opacity-60 cursor-not-allowed" : ""}`}
                     >
                       <HeroButtonIcon />
-                      {heroButton?.name ||
-                        (isFree ? "Get Started Free" : "Get Started")}
+                      {heroButton?.name || (isFree ? "Buy Now" : "Buy Now")}
                     </motion.button>
                   </motion.div>
                 );
