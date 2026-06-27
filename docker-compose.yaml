@@ -1,0 +1,16 @@
+services:
+  app:
+    build: .
+    container_name: landing-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    expose:
+      - "7010"
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    external: true
+    name: amp_portal_backend_app-network
