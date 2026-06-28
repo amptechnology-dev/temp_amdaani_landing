@@ -140,8 +140,9 @@ export default function CTASection() {
               initial={{ opacity: 0, y: 20 }}
               animate={isVisible ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.6, delay: 0.3 }}
-              className="flex flex-col sm:flex-row gap-6 mb-8 items-start"
+              className="inline-flex flex-row items-center gap-5 mb-8"
             >
+              {/* Play Store Badge */}
               <div className="flex flex-col items-start gap-2">
                 <motion.button
                   whileHover={{ scale: 1.05 }}
@@ -150,22 +151,27 @@ export default function CTASection() {
                   className="p-0 bg-transparent border-0 inline-flex items-center"
                   aria-label="Get it on Google Play"
                 >
-                  <PlayStoreBadge className="h-12 sm:h-14 md:h-16 w-auto" />
+                  <PlayStoreBadge className="h-12 sm:h-14 w-auto" />
                 </motion.button>
                 <p className={`text-sm ${currentTheme.textSecondary}`}>
                   Or tap the button above
                 </p>
               </div>
 
-              <div className="flex flex-col items-center gap-2">
-                <div className={`p-3 rounded-2xl border-2 ${currentTheme.outline} ${currentTheme.surfaceVariant} bg-white shadow-md`}>
+              {/* QR Code — right side এ, same row এ */}
+              <div className="flex flex-col items-center gap-1.5">
+                <div
+                  className={`p-2 rounded-xl border-2 ${currentTheme.outline} bg-white shadow-md`}
+                >
                   <img
                     src="/images/PlayScanner.PNG"
                     alt="QR Code Scanner"
-                    className="w-28 h-28 sm:w-32 sm:h-32 object-contain"
+                    className="w-25 h-25 object-contain"
                   />
                 </div>
-                <p className={`text-sm font-medium ${currentTheme.text} text-center`}>
+                <p
+                  className={`text-xs font-medium ${currentTheme.textSecondary} text-center`}
+                >
                   Scan to Download
                 </p>
               </div>
