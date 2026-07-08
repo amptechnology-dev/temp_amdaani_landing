@@ -1,8 +1,7 @@
 "use client";
 
-import { Trash } from "lucide-react";
+import { Trash2, Plus, Minus, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 
 export default function CartItems({
   cartItems,
@@ -13,63 +12,65 @@ export default function CartItems({
   if (cartItems.length === 0) return null;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold text-slate-600 flex items-center gap-1.5">
+          <ShoppingBag className="w-4 h-4 text-blue-600" />
+          Cart ({cartItems.length})
+        </p>
+        <button
+          onClick={handleClearCart}
+          className="text-xs font-medium text-rose-500 hover:text-rose-600"
+        >
+          Clear all
+        </button>
+      </div>
+
       {cartItems.map((item) => (
         <div
           key={item._id}
-          className="flex items-center gap-3 p-3 border rounded-lg"
+          className="flex items-center gap-3 bg-white border border-slate-100 rounded-2xl p-3"
         >
-          <div className="flex-1">
-            <p className="font-medium">{item.name}</p>
-            <p className="text-sm text-muted-foreground">
-              ₹{item.price} × {item.qty}
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-slate-800 truncate">{item.name}</p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              ₹{item.price} × {item.qty} ={" "}
+              <span className="text-blue-600 font-semibold">
+                ₹{(item.price * item.qty).toFixed(2)}
+              </span>
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 bg-blue-50 rounded-full px-1 py-1">
             <Button
-              size="sm"
-              variant="outline"
+              size="icon"
+              variant="ghost"
+              className="w-7 h-7 rounded-full bg-white shadow-sm"
               onClick={() => handleUpdateQuantity(item._id, item.qty - 1)}
             >
-              -
+              <Minus className="w-3.5 h-3.5 text-blue-600" />
             </Button>
-
-            <Input
-              className="w-14 text-center"
-              value={item.qty}
-              onChange={(e) =>
-                handleUpdateQuantity(item._id, Number(e.target.value))
-              }
-            />
-
+            <span className="w-6 text-center text-sm font-semibold text-blue-700">
+              {item.qty}
+            </span>
             <Button
-              size="sm"
-              variant="outline"
+              size="icon"
+              variant="ghost"
+              className="w-7 h-7 rounded-full bg-blue-600 hover:bg-blue-700"
               onClick={() => handleUpdateQuantity(item._id, item.qty + 1)}
             >
-              +
+              <Plus className="w-3.5 h-3.5 text-white" />
             </Button>
           </div>
 
-          <Button
-            size="sm"
-            variant="ghost"
+          <button
             onClick={() => handleRemoveItem(item._id)}
-            className="text-red-600"
+            className="w-8 h-8 flex items-center justify-center rounded-full text-rose-400 hover:bg-rose-50 hover:text-rose-500"
           >
-            <Trash className="w-4 h-4" />
-          </Button>
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
       ))}
-
-      <Button
-        variant="outline"
-        className="text-red-600"
-        onClick={handleClearCart}
-      >
-        Clear Cart
-      </Button>
     </div>
   );
 }
