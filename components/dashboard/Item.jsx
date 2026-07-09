@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "../../context/ThemeContext";
 import { themeConfig } from "../../utils/ThemeConfig";
@@ -16,11 +16,11 @@ import {
   Search,
   Loader2,
   MoreVertical,
-  Package,
-  Hash,
-  Scale,
-  Percent,
-  IndianRupee,
+  Trophy,
+  ShoppingCart,
+  Clock,
+  Flame,
+  Repeat,
   X,
 } from "lucide-react";
 
@@ -35,14 +35,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Card,
   CardHeader,
@@ -73,7 +65,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import * as Yup from "yup";
-import { Formik, Form, Field, ErrorMessage } from "formik";
+import { Formik, Form } from "formik";
 
 // =========================
 // Fetch Items API
@@ -83,7 +75,6 @@ const fetchItems = async ({ queryKey }) => {
 
   const params = { page, limit };
   const res = await api.get("/product", { params });
-  console.log("ITEM FETCH RESPONSE", res);
 
   return {
     items: res.data?.docs ?? [],
@@ -105,6 +96,22 @@ const itemSchema = Yup.object().shape({
 });
 
 // =========================
+// Sort chip config (RN app er SORT_MODES/SORT_CHIPS er sathe consistent)
+// =========================
+const SORT_MODES = {
+  DEFAULT: "default",
+  RECENT: "recent",
+  TOP_SELLING: "top_selling",
+  RESELLING: "reselling",
+};
+
+const SORT_CHIPS = [
+  { kind: "sort", mode: SORT_MODES.RECENT, label: "Recent", icon: Clock },
+  { kind: "sort", mode: SORT_MODES.TOP_SELLING, label: "Top Selling", icon: Flame },
+  { kind: "sort", mode: SORT_MODES.RESELLING, label: "Re-selling", icon: Repeat },
+];
+
+// =========================
 // MAIN COMPONENT
 // =========================
 export default function ItemsPage() {
@@ -119,6 +126,9 @@ export default function ItemsPage() {
   const [limit, setLimit] = useState(10);
   const [search, setSearch] = useState("");
 
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [sortMode, setSortMode] = useState(SORT_MODES.DEFAULT);
+
   const [selectedItem, setSelectedItem] = useState(null);
   const [isItemDialogOpen, setIsItemDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -126,7 +136,7 @@ export default function ItemsPage() {
   // -----------------------
   // Query
   // -----------------------
-  const { data, isLoading, isFetching } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["items", { page, limit }],
     queryFn: fetchItems,
     staleTime: 20000,
@@ -137,11 +147,112 @@ export default function ItemsPage() {
   const totalPages = data?.totalPages ?? 1;
 
   // -----------------------
-  // Local Search Filter
+  // Top-selling product (current page items theke — RN app er logic)
   // -----------------------
-  const filteredItems = items.filter((i) =>
-    i.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const topSellingProduct = useMemo(() => {
+    if (items.length === 0) return null;
+    return items.reduce((top, current) => {
+      const topSell = top.sellCount || 0;
+      const currentSell = current.sellCount || 0;
+      if (currentSell > topSell) return current;
+      if (currentSell === topSell)
+        return (current.sellingPrice || 0) > (top.sellingPrice || 0)
+          ? current
+          : top;
+      return top;
+    });
+  }, [items]);
+
+  // -----------------------
+  // Search filter (name)
+  // -----------------------
+  const searchFiltered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((i) => i.name?.toLowerCase().includes(q));
+  }, [items, search]);
+
+  // -----------------------
+  // Category filter
+  // -----------------------
+  const categoryFiltered = useMemo(() => {
+    if (selectedCategory === "all") return searchFiltered;
+    return searchFiltered.filter(
+      (item) => (item.category?.name || item.category || "Uncategorised") ===
+        selectedCategory
+    );
+  }, [searchFiltered, selectedCategory]);
+
+  // -----------------------
+  // Sort pipeline
+  // -----------------------
+  const orderedItems = useMemo(() => {
+    let result = [...categoryFiltered];
+
+    switch (sortMode) {
+      case SORT_MODES.RECENT:
+        result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        break;
+      case SORT_MODES.TOP_SELLING:
+        result.sort((a, b) => (b.sellCount || 0) - (a.sellCount || 0));
+        break;
+      case SORT_MODES.RESELLING:
+        result = result
+          .filter((item) => (item.sellCount || 0) > 0)
+          .sort((a, b) => (b.sellCount || 0) - (a.sellCount || 0));
+        break;
+      case SORT_MODES.DEFAULT:
+      default:
+        result.sort((a, b) => (b.sellCount || 0) - (a.sellCount || 0));
+        if (topSellingProduct && !search.trim() && selectedCategory === "all") {
+          const rest = result.filter((i) => i._id !== topSellingProduct._id);
+          result = [topSellingProduct, ...rest];
+        }
+        break;
+    }
+
+    return result;
+  }, [categoryFiltered, sortMode, topSellingProduct, search, selectedCategory]);
+
+  // -----------------------
+  // Unified chip list: All + sort chips + category chips
+  // -----------------------
+  const allChips = useMemo(() => {
+    const categoryNames = [
+      ...new Set(
+        items.map((item) => item.category?.name || item.category || "Uncategorised")
+      ),
+    ];
+
+    return [
+      { kind: "all", label: "All" },
+      ...SORT_CHIPS,
+      ...categoryNames.map((name) => ({ kind: "category", label: name })),
+    ];
+  }, [items]);
+
+  const isChipActive = (chip) => {
+    if (chip.kind === "all")
+      return sortMode === SORT_MODES.DEFAULT && selectedCategory === "all";
+    if (chip.kind === "sort") return sortMode === chip.mode;
+    if (chip.kind === "category") return selectedCategory === chip.label;
+    return false;
+  };
+
+  const handleChipClick = (chip) => {
+    if (chip.kind === "all") {
+      setSortMode(SORT_MODES.DEFAULT);
+      setSelectedCategory("all");
+      return;
+    }
+    if (chip.kind === "sort") {
+      setSortMode((prev) => (prev === chip.mode ? SORT_MODES.DEFAULT : chip.mode));
+      return;
+    }
+    if (chip.kind === "category") {
+      setSelectedCategory((prev) => (prev === chip.label ? "all" : chip.label));
+    }
+  };
 
   // -----------------------
   // Mutations
@@ -178,7 +289,7 @@ export default function ItemsPage() {
   const initialValues = {
     name: selectedItem?.name || "",
     unit: selectedItem?.unit || "",
-    category: selectedItem?.category || "",
+    category: selectedItem?.category?.name || selectedItem?.category || "",
     sku: selectedItem?.sku || "",
     hsn: selectedItem?.hsn || "",
     sellingPrice: selectedItem?.sellingPrice || "",
@@ -206,6 +317,13 @@ export default function ItemsPage() {
     setIsDeleteDialogOpen(true);
   };
 
+  const formatCurrency = (amount) =>
+    new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 2,
+    }).format(amount || 0);
+
   return (
     <div className={`min-h-screen p-6 ${currentTheme.background}`}>
       {/* HEADER */}
@@ -223,14 +341,14 @@ export default function ItemsPage() {
         </Button>
       </div>
 
-      {/* SEARCH */}
-      <Card className={`mb-6 ${currentTheme.card}`}>
+      {/* SEARCH + PAGE SIZE */}
+      <Card className={`mb-4 ${currentTheme.card}`}>
         <CardContent className="p-4 flex gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <Input
               placeholder="Search items…"
-              className="pl-10"
+              className="pl-10 rounded-full"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -257,80 +375,163 @@ export default function ItemsPage() {
         </CardContent>
       </Card>
 
-      {/* TABLE */}
+      {/* FILTER CHIPS */}
+      <div className="flex gap-2 overflow-x-auto pb-1 mb-4 no-scrollbar">
+        {allChips.map((chip) => {
+          const active = isChipActive(chip);
+          const Icon = chip.icon;
+          return (
+            <button
+              key={chip.kind === "category" ? `cat-${chip.label}` : `${chip.kind}-${chip.label}`}
+              onClick={() => handleChipClick(chip)}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap border transition-colors ${
+                active
+                  ? "bg-emerald-50 text-emerald-600 border-emerald-200"
+                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              {active && chip.kind === "all" && <span>✓</span>}
+              {Icon && <Icon className="w-3.5 h-3.5" />}
+              {chip.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ITEMS LIST — card design (RN app er moto) */}
       <Card className={`${currentTheme.card} overflow-hidden`}>
         <CardHeader className={currentTheme.surfaceVariant}>
-          <CardTitle Items />
+          <CardTitle>Items</CardTitle>
           <CardDescription>
-            Showing {filteredItems.length} of {total} items
+            Showing {orderedItems.length} of {total} items
           </CardDescription>
         </CardHeader>
 
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Item</TableHead>
-                  <TableHead>Unit</TableHead>
-                  <TableHead>SKU</TableHead>
-                  <TableHead>HSN</TableHead>
-                  <TableHead>Selling Price</TableHead>
-                  <TableHead>GST</TableHead>
-                  <TableHead>Stock</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
+        <CardContent className="p-4">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-16 text-slate-400">
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+              Loading items...
+            </div>
+          ) : orderedItems.length === 0 ? (
+            <p className="text-center text-sm text-slate-400 py-16">
+              No items found
+            </p>
+          ) : (
+            <div className="space-y-3">
+              <AnimatePresence>
+                {orderedItems.map((item, index) => {
+                  const isTopSelling =
+                    topSellingProduct &&
+                    item._id === topSellingProduct._id &&
+                    (item.sellCount || 0) > 0;
 
-              <TableBody>
-                <AnimatePresence>
-                  {filteredItems.map((item, index) => (
-                    <motion.tr
+                  const displayPrice =
+                    item.discountPrice > 0
+                      ? item.sellingPrice - item.discountPrice
+                      : item.sellingPrice;
+
+                  const stock = item.currentStock ?? 0;
+                  const stockColor =
+                    stock <= 5
+                      ? "bg-rose-50 text-rose-600 border-rose-200"
+                      : stock <= 20
+                      ? "bg-orange-50 text-orange-600 border-orange-200"
+                      : "bg-emerald-50 text-emerald-600 border-emerald-200";
+
+                  return (
+                    <motion.div
                       key={item._id}
-                      initial={{ opacity: 0, y: 20 }}
+                      initial={{ opacity: 0, y: 12 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.02 }}
-                      className="border-b"
+                      className={`relative bg-white rounded-2xl border overflow-hidden ${
+                        isTopSelling
+                          ? "border-blue-400 ring-1 ring-blue-100"
+                          : "border-slate-200"
+                      }`}
                     >
-                      <TableCell className="font-medium">{item.name}</TableCell>
-                      <TableCell>{item.unit}</TableCell>
-                      <TableCell>{item.sku || "-"}</TableCell>
-                      <TableCell>{item.hsn || "-"}</TableCell>
-                      <TableCell className="font-medium">
-                        ₹{item.sellingPrice}
-                      </TableCell>
-                      <TableCell>{item.gstRate}%</TableCell>
-                      <TableCell>{item.currentStock ?? 0}</TableCell>
+                      {isTopSelling && (
+                        <div className="flex items-center gap-1 bg-blue-600 text-white text-[11px] font-semibold px-3 py-1.5 rounded-br-lg w-fit">
+                          <Trophy className="w-3 h-3" /> Top selling Product
+                        </div>
+                      )}
 
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger>
-                            <Button variant="ghost" size="sm">
-                              <MoreVertical />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleEdit(item)}>
-                              <Edit className="w-4 h-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
+                      <div className="p-4 flex items-start justify-between gap-3">
+                        {/* LEFT */}
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-slate-800 capitalize truncate">
+                            {item.name}
+                          </p>
+                          <p className="text-xs text-slate-400 mt-0.5 capitalize truncate">
+                            {(item.category?.name || item.category || "No Category")} · {item.unit}
+                          </p>
 
-                            <DropdownMenuItem
-                              onClick={() => handleDelete(item)}
-                              className="text-red-600"
+                          <div className="flex items-center gap-2 flex-wrap mt-2">
+                            {item.hsn && (
+                              <span className="text-[11px] text-slate-500 font-medium">
+                                HSN {item.hsn}
+                              </span>
+                            )}
+                            <span
+                              className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${stockColor}`}
                             >
-                              <Trash className="w-4 h-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </motion.tr>
-                  ))}
-                </AnimatePresence>
-              </TableBody>
-            </Table>
-          </div>
+                              {stock} in stock
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* RIGHT */}
+                        <div className="flex flex-col items-end gap-2 shrink-0">
+                          <div className="text-right">
+                            {item.discountPrice > 0 ? (
+                              <>
+                                <p className="text-blue-600 font-bold text-base leading-tight">
+                                  {formatCurrency(displayPrice)}
+                                </p>
+                                <p className="text-xs text-slate-400 line-through">
+                                  {formatCurrency(item.sellingPrice)}
+                                </p>
+                              </>
+                            ) : (
+                              <p className="text-blue-600 font-bold text-base">
+                                {formatCurrency(item.sellingPrice)}
+                              </p>
+                            )}
+                            <p className="flex items-center justify-end gap-1 text-xs text-slate-400 mt-1">
+                              <ShoppingCart className="w-3 h-3" />
+                              {item.sellCount || 0} sold
+                            </p>
+                          </div>
+
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleEdit(item)}>
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleDelete(item)}
+                                className="text-red-600"
+                              >
+                                <Trash className="w-4 h-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -370,6 +571,7 @@ export default function ItemsPage() {
           <Formik
             initialValues={initialValues}
             validationSchema={itemSchema}
+            enableReinitialize
             onSubmit={async (values, { setSubmitting }) => {
               const payload = {
                 name: values.name,
@@ -395,53 +597,30 @@ export default function ItemsPage() {
           >
             {({ values, handleChange, isSubmitting }) => (
               <Form className="space-y-4">
-                {/* Fields */}
                 <div>
                   <Label>Item Name *</Label>
-                  <Input
-                    name="name"
-                    value={values.name}
-                    onChange={handleChange}
-                  />
+                  <Input name="name" value={values.name} onChange={handleChange} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Unit *</Label>
-                    <Input
-                      name="unit"
-                      value={values.unit}
-                      onChange={handleChange}
-                    />
+                    <Input name="unit" value={values.unit} onChange={handleChange} />
                   </div>
-
                   <div>
                     <Label>Category</Label>
-                    <Input
-                      name="category"
-                      value={values.category}
-                      onChange={handleChange}
-                    />
+                    <Input name="category" value={values.category} onChange={handleChange} />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>SKU</Label>
-                    <Input
-                      name="sku"
-                      value={values.sku}
-                      onChange={handleChange}
-                    />
+                    <Input name="sku" value={values.sku} onChange={handleChange} />
                   </div>
-
                   <div>
                     <Label>HSN</Label>
-                    <Input
-                      name="hsn"
-                      value={values.hsn}
-                      onChange={handleChange}
-                    />
+                    <Input name="hsn" value={values.hsn} onChange={handleChange} />
                   </div>
                 </div>
 
@@ -454,7 +633,6 @@ export default function ItemsPage() {
                       onChange={handleChange}
                     />
                   </div>
-
                   <div>
                     <Label>Cost Price</Label>
                     <Input
@@ -463,7 +641,6 @@ export default function ItemsPage() {
                       onChange={handleChange}
                     />
                   </div>
-
                   <div>
                     <Label>Discount</Label>
                     <Input
@@ -477,23 +654,15 @@ export default function ItemsPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>GST %</Label>
-                    <Input
-                      name="gstRate"
-                      value={values.gstRate}
-                      onChange={handleChange}
-                    />
+                    <Input name="gstRate" value={values.gstRate} onChange={handleChange} />
                   </div>
-
                   <div>
                     <Label>Tax Inclusive?</Label>
                     <Select
                       value={values.isTaxInclusive ? "yes" : "no"}
                       onValueChange={(val) =>
                         handleChange({
-                          target: {
-                            name: "isTaxInclusive",
-                            value: val === "yes",
-                          },
+                          target: { name: "isTaxInclusive", value: val === "yes" },
                         })
                       }
                     >
@@ -528,10 +697,7 @@ export default function ItemsPage() {
       </Dialog>
 
       {/* DELETE CONFIRMATION */}
-      <AlertDialog
-        open={isDeleteDialogOpen}
-        onOpenChange={setIsDeleteDialogOpen}
-      >
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <h2 className="text-lg font-bold">Delete Item</h2>
