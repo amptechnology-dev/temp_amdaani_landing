@@ -1,22 +1,14 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { format } from "date-fns";
+import React, { useState, useEffect, useMemo } from "react";
+import { format, isToday, isYesterday, startOfWeek, isWithinInterval } from "date-fns";
 import { toast } from "sonner";
-import { Phone, Calendar, Pencil, FileText, Receipt } from "lucide-react";
+import { Search, Phone, Calendar, Pencil, Plus, FileText, ReceiptText } from "lucide-react";
 
 import api from "../../utils/api";
-import { generateInvoiceHTML } from "../../utils/invoiceTemplate";
-
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 const statusStyles = {
   paid: "bg-green-600 text-white",
@@ -24,208 +16,164 @@ const statusStyles = {
   unpaid: "bg-red-500 text-white",
 };
 
-export default function RecentInvoicesPanel({ limit = 8, refreshKey }) {
-  const router = useRouter();
+const FilterChip = ({ active, onClick, children }) => (
+  <button
+    onClick={onClick}
+    className={`px-4 py-1.5 rounded-full text-sm font-medium border whitespace-nowrap transition-colors ${
+      active
+        ? "bg-emerald-50 border-emerald-400 text-emerald-700"
+        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+    }`}
+  >
+    {active && <span className="mr-1">✓</span>}
+    {children}
+  </button>
+);
 
+export default function InvoiceListPage({ refreshKey, onCreateNew, onEditInvoice }) {
   const [invoices, setInvoices] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewHtml, setPreviewHtml] = useState("");
-  const [previewLoading, setPreviewLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [dateFilter, setDateFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
-    fetchRecentInvoices();
+    fetchInvoices();
   }, [refreshKey]);
 
-  const fetchRecentInvoices = async () => {
+  const fetchInvoices = async () => {
     setIsLoading(true);
     try {
-      const res = await api.get(`/invoice?limit=${limit}&sort=-createdAt`);
+      const res = await api.get("/invoice?limit=200&sort=-createdAt");
       setInvoices(res?.data?.docs || res?.data || []);
     } catch {
-      toast.error("Failed to load recent invoices");
+      toast.error("Failed to load invoices");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleCardClick = async (invoice) => {
-    setPreviewLoading(true);
-    setPreviewOpen(true);
-    try {
-      const res = await api.get(`/invoice/id/${invoice._id}`);
-      const fullInvoice = res?.data;
+  const filteredInvoices = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return invoices.filter((inv) => {
+      const matchesSearch =
+        !q ||
+        inv.customerName?.toLowerCase().includes(q) ||
+        inv.customerMobile?.includes(q) ||
+        inv.invoiceNumber?.toLowerCase().includes(q);
+      if (!matchesSearch) return false;
 
-      if (!fullInvoice) {
-        toast.error("Failed to load invoice details");
-        setPreviewOpen(false);
-        return;
+      if (dateFilter !== "all") {
+        const createdAt = new Date(inv.createdAt || inv.invoiceDate);
+        if (dateFilter === "today" && !isToday(createdAt)) return false;
+        if (dateFilter === "yesterday" && !isYesterday(createdAt)) return false;
+        if (dateFilter === "thisWeek") {
+          const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+          if (!isWithinInterval(createdAt, { start: weekStart, end: new Date() })) return false;
+        }
       }
-
-      const normalizedItems = (fullInvoice.items || []).map((item) => ({
-        ...item,
-        qty: Number(item.quantity ?? item.qty ?? 0),
-        price: Number(item.sellingPrice ?? item.price ?? 0),
-        baseRate: Number(item.sellingPrice ?? item.price ?? 0),
-        gstRate: Number(item.gstRate ?? 0),
-        isTaxInclusive: item.isTaxInclusive ?? false,
-        discount: Number(item.discount ?? 0),
-        hsn: item.hsn ?? "",
-        unit: item.unit ?? "pcs",
-        total: Number(item.total ?? 0),
-        taxableValue: Number(item.taxableValue ?? item.total ?? 0),
-        gstAmount: Number(item.gstAmount ?? 0),
-      }));
-
-      const html = generateInvoiceHTML({
-        preview: false,
-        createdInvoice: true,
-        invoiceData: fullInvoice,
-        formValues: {
-          contactNumber: fullInvoice.customerMobile,
-          customerName: fullInvoice.customerName,
-          customerAddress: fullInvoice.customerAddress,
-          customerState: fullInvoice.customerState,
-          customerGstNumber: fullInvoice.customerGstNumber,
-        },
-        cartItems: normalizedItems,
-        invoiceCalculations: {
-          subtotal: fullInvoice.subTotal,
-          grandTotalRaw: fullInvoice.subTotal,
-          discountTotal: fullInvoice.discountTotal || 0,
-          grandTotal: fullInvoice.grandTotal,
-          netTotal: fullInvoice.grandTotal,
-          totalTax: fullInvoice.gstTotal || 0,
-          roundOff: fullInvoice.roundOff || 0,
-          gstBreakdown: fullInvoice.gstBreakdown || {},
-        },
-        invoiceNumber: fullInvoice.invoiceNumber,
-        storedata: fullInvoice.storeSnapshot || {},
-        invoiceDate: new Date(fullInvoice.createdAt || fullInvoice.invoiceDate),
-        isGstInvoice: fullInvoice.type === "gst",
-        payment: {
-          paid: fullInvoice.amountPaid || 0,
-          due: fullInvoice.amountDue || 0,
-          status: fullInvoice.paymentStatus || "unpaid",
-        },
-      });
-
-      setPreviewHtml(html);
-    } catch {
-      toast.error("Failed to load invoice preview");
-      setPreviewOpen(false);
-    } finally {
-      setPreviewLoading(false);
-    }
-  };
-
-  const handleEditClick = (e, invoice) => {
-    e.stopPropagation();
-    router.push(`/dashboard/sales?edit=${invoice._id}`);
-  };
+      if (statusFilter !== "all" && inv.paymentStatus !== statusFilter) return false;
+      return true;
+    });
+  }, [invoices, searchQuery, dateFilter, statusFilter]);
 
   return (
-    <>
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Receipt className="w-4 h-4 text-blue-600" />
-            Recent Invoices
-          </CardTitle>
-        </CardHeader>
+    <div className="min-h-screen bg-slate-50">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+        {/* Header */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-4 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <ReceiptText className="w-5 h-5 text-blue-600" />
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Invoices</h1>
+          </div>
+          <Button onClick={onCreateNew} className="rounded-full gap-2">
+            <Plus className="w-4 h-4" />
+            New Invoice
+          </Button>
+        </div>
 
-        <CardContent className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
-          {isLoading ? (
-            <p className="text-center text-sm text-slate-400 py-6">
-              Loading...
-            </p>
-          ) : invoices.length === 0 ? (
-            <p className="text-center text-sm text-slate-400 py-6">
-              No invoices yet
-            </p>
-          ) : (
-            invoices.map((inv) => (
+        {/* Search + filters */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Input
+              placeholder="Search by name, phone, or invoice number..."
+              className="pl-9 h-11 rounded-xl bg-slate-50 border-slate-200"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            <FilterChip active={dateFilter === "all"} onClick={() => setDateFilter("all")}>All</FilterChip>
+            <FilterChip active={dateFilter === "today"} onClick={() => setDateFilter("today")}>Today</FilterChip>
+            <FilterChip active={dateFilter === "yesterday"} onClick={() => setDateFilter("yesterday")}>Yesterday</FilterChip>
+            <FilterChip active={dateFilter === "thisWeek"} onClick={() => setDateFilter("thisWeek")}>This Week</FilterChip>
+          </div>
+          <div className="flex gap-2 overflow-x-auto">
+            <FilterChip active={statusFilter === "all"} onClick={() => setStatusFilter("all")}>All</FilterChip>
+            <FilterChip active={statusFilter === "paid"} onClick={() => setStatusFilter("paid")}>Paid</FilterChip>
+            <FilterChip active={statusFilter === "partial"} onClick={() => setStatusFilter("partial")}>Partial</FilterChip>
+            <FilterChip active={statusFilter === "unpaid"} onClick={() => setStatusFilter("unpaid")}>Unpaid</FilterChip>
+          </div>
+        </div>
+
+        {/* Grid of invoice cards — full width, multi-column on wide screens */}
+        {isLoading ? (
+          <p className="text-center text-slate-400 py-16">Loading...</p>
+        ) : filteredInvoices.length === 0 ? (
+          <div className="flex flex-col items-center py-20 text-slate-400">
+            <FileText className="w-10 h-10 mb-3 opacity-40" />
+            No invoices found
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {filteredInvoices.map((inv) => (
               <div
                 key={inv._id}
-                onClick={() => handleCardClick(inv)}
-                className="bg-white border border-slate-200 rounded-xl p-3 cursor-pointer hover:shadow-sm hover:border-blue-200 transition-all relative group"
+                className="bg-white border border-slate-200 rounded-2xl p-4 relative hover:shadow-md transition-shadow"
               >
                 <div className="flex justify-between items-start gap-2">
                   <div className="min-w-0">
-                    <p className="font-medium text-sm text-slate-800 truncate">
-                      {inv.customerName || "No Customer"}
+                    <p className="font-semibold text-slate-800 truncate">
+                      {inv.customerName || "No Customer Found"}
                     </p>
-                    <div className="flex items-center gap-1 text-xs text-slate-500 mt-0.5">
-                      <Phone className="w-3 h-3" />
+                    <div className="flex items-center gap-1.5 text-sm text-slate-500 mt-0.5">
+                      <Phone className="w-3.5 h-3.5 shrink-0" />
                       {inv.customerMobile || "-"}
                     </div>
                   </div>
-
                   <div className="text-right shrink-0">
-                    <p className="italic text-xs font-semibold text-slate-700">
-                      #{inv.invoiceNumber}
-                    </p>
-                    <Badge
-                      className={`text-[10px] mt-1 capitalize ${
-                        statusStyles[inv.paymentStatus] || statusStyles.unpaid
-                      }`}
-                    >
-                      {inv.paymentStatus}
-                    </Badge>
+                    <p className="italic font-semibold text-slate-800 text-sm">#{inv.invoiceNumber}</p>
+                    <div className="flex items-center gap-1.5 justify-end mt-1">
+                      <Badge variant="outline" className="text-xs">{inv.type === "gst" ? "GST" : "Non-GST"}</Badge>
+                      <Badge className={`text-xs capitalize ${statusStyles[inv.paymentStatus] || statusStyles.unpaid}`}>
+                        {inv.paymentStatus}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex justify-between items-center mt-2">
-                  <div className="flex items-center gap-1 text-xs text-slate-400">
-                    <Calendar className="w-3 h-3" />
-                    {format(
-                      new Date(inv.createdAt || inv.invoiceDate),
-                      "dd MMM, hh:mm a"
-                    )}
+                <div className="flex justify-between items-center mt-3">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                    <Calendar className="w-3.5 h-3.5" />
+                    {format(new Date(inv.createdAt || inv.invoiceDate), "dd MMM yyyy, hh:mm a")}
                   </div>
-                  <p className="text-blue-600 font-bold text-sm">
-                    ₹{Number(inv.grandTotal || 0).toFixed(2)}
-                  </p>
+                  <p className="text-blue-600 font-bold text-lg">₹{Number(inv.grandTotal || 0).toFixed(2)}</p>
                 </div>
 
-                {/* Edit button - shows on hover */}
                 <button
-                  onClick={(e) => handleEditClick(e, inv)}
-                  className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={() => onEditInvoice(inv._id)}
+                  className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100"
                   title="Edit invoice"
                 >
-                  <Pencil className="w-3 h-3" />
+                  <Pencil className="w-4 h-4" />
                 </button>
               </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Preview Modal */}
-      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-3xl w-full h-[85vh] p-0 flex flex-col overflow-hidden">
-          <DialogHeader className="px-4 py-2 border-b shrink-0 flex-row items-center justify-between">
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="w-4 h-4" />
-              Invoice Preview
-            </DialogTitle>
-          </DialogHeader>
-
-          {previewLoading ? (
-            <div className="flex-1 flex items-center justify-center text-slate-400">
-              Loading preview...
-            </div>
-          ) : (
-            <iframe
-              title="invoice-preview"
-              srcDoc={previewHtml}
-              className="flex-1 w-full border-0 bg-white"
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-    </>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
