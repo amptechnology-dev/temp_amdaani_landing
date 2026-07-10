@@ -46,11 +46,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -101,7 +97,7 @@ const customerSchema = Yup.object().shape({
   gstin: Yup.string()
     .matches(
       /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/,
-      "Invalid GSTIN format"
+      "Invalid GSTIN format",
     )
     .nullable(),
   address: Yup.string(),
@@ -149,9 +145,26 @@ const extractErrorMessage = (error) => {
 // Due severity helper — RN app er getDueSeverity() logic
 // -----------------------------------------
 const getDueSeverity = (amount) => {
-  if (amount >= 10000) return { level: "critical", color: "#DC2626", bg: "#FEF2F2", border: "#FCA5A5" };
-  if (amount >= 5000) return { level: "warning", color: "#F57C00", bg: "#FFF7ED", border: "#FDBA74" };
-  return { level: "normal", color: "#2563EB", bg: "#EFF6FF", border: "#93C5FD" };
+  if (amount >= 10000)
+    return {
+      level: "critical",
+      color: "#DC2626",
+      bg: "#FEF2F2",
+      border: "#FCA5A5",
+    };
+  if (amount >= 5000)
+    return {
+      level: "warning",
+      color: "#F57C00",
+      bg: "#FFF7ED",
+      border: "#FDBA74",
+    };
+  return {
+    level: "normal",
+    color: "#2563EB",
+    bg: "#EFF6FF",
+    border: "#93C5FD",
+  };
 };
 
 export default function CustomersPage() {
@@ -199,7 +212,9 @@ export default function CustomersPage() {
         const allData = await fetchAllCustomers({ page, pageSize });
         setAllCustomersData(allData);
       } catch (error) {
-        toast.error(`Failed to load all customers: ${extractErrorMessage(error)}`);
+        toast.error(
+          `Failed to load all customers: ${extractErrorMessage(error)}`,
+        );
       } finally {
         setIsLoadingAll(false);
       }
@@ -211,7 +226,9 @@ export default function CustomersPage() {
         const dueData = await fetchDueCustomers({ page, pageSize });
         setDueCustomersData(dueData);
       } catch (error) {
-        toast.error(`Failed to load due customers: ${extractErrorMessage(error)}`);
+        toast.error(
+          `Failed to load due customers: ${extractErrorMessage(error)}`,
+        );
       } finally {
         setIsLoadingDue(false);
       }
@@ -293,13 +310,20 @@ export default function CustomersPage() {
 
       let response;
       if (isUpdate && selectedCustomer) {
-        response = await api.put(`/customer/id/${selectedCustomer._id}`, requestBody);
+        response = await api.put(
+          `/customer/id/${selectedCustomer._id}`,
+          requestBody,
+        );
       } else {
         response = await api.post("/customer", requestBody);
       }
 
       if (response.data?.success || response.success) {
-        toast.success(isUpdate ? "Customer updated successfully!" : "Customer added successfully!");
+        toast.success(
+          isUpdate
+            ? "Customer updated successfully!"
+            : "Customer added successfully!",
+        );
         resetForm();
         setIsCustomerDialogOpen(false);
         setSelectedCustomer(null);
@@ -312,7 +336,9 @@ export default function CustomersPage() {
         setAllCustomersData(allData);
         setDueCustomersData(dueData);
       } else {
-        throw new Error(response.data?.message || response.message || "Operation failed");
+        throw new Error(
+          response.data?.message || response.message || "Operation failed",
+        );
       }
     } catch (error) {
       toast.error(extractErrorMessage(error) || "Failed to save customer.");
@@ -361,13 +387,13 @@ export default function CustomersPage() {
   const totalCustomers = allCustomersData.total;
   const totalDueFromAll = allCustomersData.items.reduce(
     (sum, c) => sum + (c.totalDue || c.dueAmount || 0),
-    0
+    0,
   );
   const activeCustomers = allCustomersData.items.filter(
-    (c) => !c.status || c.status === "active"
+    (c) => !c.status || c.status === "active",
   ).length;
   const customersWithDue = allCustomersData.items.filter(
-    (c) => (c.totalDue || c.dueAmount || 0) > 0
+    (c) => (c.totalDue || c.dueAmount || 0) > 0,
   ).length;
   const totalDueCustomers = dueCustomersData.total;
 
@@ -384,7 +410,7 @@ export default function CustomersPage() {
 
   const totalDueAmount = dueCustomersData.items.reduce(
     (sum, c) => sum + (c.totalDue || c.dueAmount || 0),
-    0
+    0,
   );
 
   return (
@@ -399,7 +425,9 @@ export default function CustomersPage() {
         >
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
-              <h1 className={`text-2xl md:text-3xl font-bold ${currentTheme.text}`}>
+              <h1
+                className={`text-2xl md:text-3xl font-bold ${currentTheme.text}`}
+              >
                 My Customers
               </h1>
               <p className={`mt-1 text-sm ${currentTheme.textSecondary}`}>
@@ -414,7 +442,9 @@ export default function CustomersPage() {
                 onClick={refreshData}
                 disabled={isRefreshing}
               >
-                <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
+                <RefreshCw
+                  className={`w-4 h-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`}
+                />
                 Refresh
               </Button>
               <Button onClick={handleAddCustomer}>
@@ -427,22 +457,55 @@ export default function CustomersPage() {
           {/* Stats strip */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { label: "Total Customers", value: totalCustomers, icon: Users, loading: isLoadingAll, color: "text-blue-600 bg-blue-50" },
-              { label: "Total Due", value: `₹${totalDueFromAll.toLocaleString("en-IN")}`, icon: Wallet, loading: isLoadingAll, color: "text-rose-600 bg-rose-50" },
-              { label: "Active", value: activeCustomers, icon: CheckCircle, loading: isLoadingAll, color: "text-emerald-600 bg-emerald-50" },
-              { label: "With Due", value: activeTab === "due" ? totalDueCustomers : customersWithDue, icon: AlertCircle, loading: isLoadingAll, color: "text-orange-600 bg-orange-50" },
+              {
+                label: "Total Customers",
+                value: totalCustomers,
+                icon: Users,
+                loading: isLoadingAll,
+                color: "text-blue-600 bg-blue-50",
+              },
+              {
+                label: "Total Due",
+                value: `₹${totalDueFromAll.toLocaleString("en-IN")}`,
+                icon: Wallet,
+                loading: isLoadingAll,
+                color: "text-rose-600 bg-rose-50",
+              },
+              {
+                label: "Active",
+                value: activeCustomers,
+                icon: CheckCircle,
+                loading: isLoadingAll,
+                color: "text-emerald-600 bg-emerald-50",
+              },
+              {
+                label: "With Due",
+                value:
+                  activeTab === "due" ? totalDueCustomers : customersWithDue,
+                icon: AlertCircle,
+                loading: isLoadingAll,
+                color: "text-orange-600 bg-orange-50",
+              },
             ].map((stat, i) => (
               <div
                 key={i}
                 className="bg-white rounded-2xl border border-slate-200 p-3.5 flex items-center gap-3"
               >
-                <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${stat.color}`}>
+                <div
+                  className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${stat.color}`}
+                >
                   <stat.icon className="w-4 h-4" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[11px] text-slate-400 font-medium truncate">{stat.label}</p>
+                  <p className="text-[11px] text-slate-400 font-medium truncate">
+                    {stat.label}
+                  </p>
                   <p className="text-base font-bold text-slate-800 truncate">
-                    {stat.loading ? <Loader2 className="w-4 h-4 animate-spin" /> : stat.value}
+                    {stat.loading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      stat.value
+                    )}
                   </p>
                 </div>
               </div>
@@ -479,7 +542,11 @@ export default function CustomersPage() {
               <Users className="w-4 h-4" />
               All Customers
               <Badge variant="secondary" className="ml-1">
-                {isLoadingAll ? <Loader2 className="w-3 h-3 animate-spin" /> : totalCustomers}
+                {isLoadingAll ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  totalCustomers
+                )}
               </Badge>
             </TabsTrigger>
             <TabsTrigger
@@ -490,7 +557,11 @@ export default function CustomersPage() {
               Due Customers
               {totalDueCustomers > 0 && (
                 <Badge className="ml-1 bg-red-500 hover:bg-red-500">
-                  {isLoadingDue ? <Loader2 className="w-3 h-3 animate-spin" /> : totalDueCustomers}
+                  {isLoadingDue ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    totalDueCustomers
+                  )}
                 </Badge>
               )}
             </TabsTrigger>
@@ -506,7 +577,9 @@ export default function CustomersPage() {
                   <IndianRupee className="w-4 h-4 text-rose-600" />
                 </div>
                 <div>
-                  <p className="text-[11px] font-medium text-slate-500">Total Due</p>
+                  <p className="text-[11px] font-medium text-slate-500">
+                    Total Due
+                  </p>
                   <p className="text-lg font-bold text-rose-600">
                     ₹{totalDueAmount.toLocaleString("en-IN")}
                   </p>
@@ -514,8 +587,12 @@ export default function CustomersPage() {
               </div>
               <div className="flex items-center gap-3">
                 <div className="text-right">
-                  <p className="text-[11px] font-medium text-slate-500">Due Accounts</p>
-                  <p className="text-lg font-bold text-blue-600">{totalDueCustomers}</p>
+                  <p className="text-[11px] font-medium text-slate-500">
+                    Due Accounts
+                  </p>
+                  <p className="text-lg font-bold text-blue-600">
+                    {totalDueCustomers}
+                  </p>
                 </div>
                 <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center">
                   <User className="w-4 h-4 text-blue-600" />
@@ -571,7 +648,9 @@ export default function CustomersPage() {
                 const isDueTab = activeTab === "due";
                 const dueAmount = customer.totalDue || customer.dueAmount || 0;
                 const showDueBadge = isDueTab && dueAmount > 0;
-                const severity = showDueBadge ? getDueSeverity(dueAmount) : null;
+                const severity = showDueBadge
+                  ? getDueSeverity(dueAmount)
+                  : null;
                 const rank = getCustomerRank(customer._id);
 
                 return (
@@ -584,13 +663,24 @@ export default function CustomersPage() {
                     className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
                     style={
                       showDueBadge
-                        ? { borderLeftWidth: 4, borderLeftColor: severity.color }
+                        ? {
+                            borderLeftWidth: 4,
+                            borderLeftColor: severity.color,
+                          }
                         : undefined
                     }
                   >
-                    <button
+                    <div
+                      role="button"
+                      tabIndex={0}
                       onClick={() => handleEditCustomer(customer)}
-                      className="w-full text-left p-4 hover:bg-slate-50/60 transition-colors"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handleEditCustomer(customer);
+                        }
+                      }}
+                      className="w-full text-left p-4 hover:bg-slate-50/60 transition-colors cursor-pointer"
                     >
                       {/* Top row — name + rank + actions */}
                       <div className="flex items-center justify-between gap-2">
@@ -612,12 +702,18 @@ export default function CustomersPage() {
                         >
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                              >
                                 <MoreVertical className="w-4 h-4" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleEditCustomer(customer)}>
+                              <DropdownMenuItem
+                                onClick={() => handleEditCustomer(customer)}
+                              >
                                 <Edit className="w-4 h-4 mr-2" />
                                 Edit
                               </DropdownMenuItem>
@@ -658,7 +754,10 @@ export default function CustomersPage() {
                       {showDueBadge && (
                         <div
                           className="flex items-center justify-between mt-3 p-2.5 rounded-xl border border-dashed"
-                          style={{ borderColor: severity.border, backgroundColor: severity.bg }}
+                          style={{
+                            borderColor: severity.border,
+                            backgroundColor: severity.bg,
+                          }}
                         >
                           <div>
                             <p className="text-[10px] font-bold tracking-wide text-slate-500">
@@ -675,7 +774,10 @@ export default function CustomersPage() {
                             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg"
                             style={{ backgroundColor: `${severity.color}15` }}
                           >
-                            <FileText className="w-3.5 h-3.5" style={{ color: severity.color }} />
+                            <FileText
+                              className="w-3.5 h-3.5"
+                              style={{ color: severity.color }}
+                            />
                             <span
                               className="text-xs font-bold"
                               style={{ color: severity.color }}
@@ -696,8 +798,8 @@ export default function CustomersPage() {
 
                         {!showDueBadge && dueAmount > 0 && (
                           <div className="flex items-center gap-1 text-xs text-orange-600 font-medium">
-                            <AlertCircle className="w-3.5 h-3.5" />
-                            ₹{dueAmount.toLocaleString("en-IN")} due
+                            <AlertCircle className="w-3.5 h-3.5" />₹
+                            {dueAmount.toLocaleString("en-IN")} due
                           </div>
                         )}
 
@@ -708,7 +810,7 @@ export default function CustomersPage() {
                           </div>
                         )}
                       </div>
-                    </button>
+                    </div>
                   </motion.div>
                 );
               })}
@@ -736,9 +838,13 @@ export default function CustomersPage() {
       >
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>{isUpdate ? "Edit Customer" : "Add New Customer"}</DialogTitle>
+            <DialogTitle>
+              {isUpdate ? "Edit Customer" : "Add New Customer"}
+            </DialogTitle>
             <DialogDescription>
-              {isUpdate ? "Update customer details below." : "Enter customer details to add to your list."}
+              {isUpdate
+                ? "Update customer details below."
+                : "Enter customer details to add to your list."}
             </DialogDescription>
           </DialogHeader>
 
@@ -748,7 +854,14 @@ export default function CustomersPage() {
             onSubmit={handleSubmit}
             enableReinitialize
           >
-            {({ isSubmitting, handleChange, handleBlur, values, errors, touched }) => (
+            {({
+              isSubmitting,
+              handleChange,
+              handleBlur,
+              values,
+              errors,
+              touched,
+            }) => (
               <Form className="space-y-4">
                 <div className="space-y-4">
                   <div>
@@ -762,7 +875,11 @@ export default function CustomersPage() {
                       placeholder="Enter party name"
                       className={`mt-1 ${errors.partyName && touched.partyName ? "border-red-500" : ""}`}
                     />
-                    <ErrorMessage name="partyName" component="div" className="text-red-500 text-sm mt-1" />
+                    <ErrorMessage
+                      name="partyName"
+                      component="div"
+                      className="text-red-500 text-sm mt-1"
+                    />
                   </div>
 
                   <div>
@@ -777,7 +894,11 @@ export default function CustomersPage() {
                       maxLength={10}
                       className={`mt-1 ${errors.contactNumber && touched.contactNumber ? "border-red-500" : ""}`}
                     />
-                    <ErrorMessage name="contactNumber" component="div" className="text-red-500 text-sm mt-1" />
+                    <ErrorMessage
+                      name="contactNumber"
+                      component="div"
+                      className="text-red-500 text-sm mt-1"
+                    />
                   </div>
 
                   <div>
@@ -791,7 +912,11 @@ export default function CustomersPage() {
                       placeholder="Enter GSTIN (optional)"
                       className={`mt-1 ${errors.gstin && touched.gstin ? "border-red-500" : ""}`}
                     />
-                    <ErrorMessage name="gstin" component="div" className="text-red-500 text-sm mt-1" />
+                    <ErrorMessage
+                      name="gstin"
+                      component="div"
+                      className="text-red-500 text-sm mt-1"
+                    />
                   </div>
 
                   <div>
@@ -846,7 +971,11 @@ export default function CustomersPage() {
                       maxLength={6}
                       className={`mt-1 ${errors.postalCode && touched.postalCode ? "border-red-500" : ""}`}
                     />
-                    <ErrorMessage name="postalCode" component="div" className="text-red-500 text-sm mt-1" />
+                    <ErrorMessage
+                      name="postalCode"
+                      component="div"
+                      className="text-red-500 text-sm mt-1"
+                    />
                   </div>
                 </div>
 
@@ -876,13 +1005,17 @@ export default function CustomersPage() {
       </Dialog>
 
       {/* ---------------- Delete Confirmation Dialog ---------------- */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Customer</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete{" "}
-              <strong>{selectedCustomer?.name}</strong>? This action cannot be undone.
+              <strong>{selectedCustomer?.name}</strong>? This action cannot be
+              undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -890,7 +1023,9 @@ export default function CustomersPage() {
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => selectedCustomer && deleteMutation.mutate(selectedCustomer._id)}
+              onClick={() =>
+                selectedCustomer && deleteMutation.mutate(selectedCustomer._id)
+              }
               className="bg-red-600 hover:bg-red-700 text-white"
               disabled={deleteMutation.isLoading}
             >

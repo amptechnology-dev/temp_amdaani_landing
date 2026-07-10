@@ -21,6 +21,7 @@ import PurchaseCartItems from "./PurchaseCartItems";
 import PurchaseSummary from "./PurchaseSummary";
 import PurchaseProductSearch from "./PurchaseProductSearch";
 import RecentPurchasesPanel from "./RecentPurchasesPanel";
+import AddPurchaseItemsPage from "./AddPurchaseItemsPage";
 
 const openInPrintWindow = (html) => {
   const w = window.open("", "_blank");
@@ -67,6 +68,7 @@ export default function NewPurchase() {
   // State
   // -------------------------------
   const [purchaseNumber, setPurchaseNumber] = useState("");
+  const [step, setStep] = useState("form"); 
   const [isGstInvoice, setIsGstInvoice] = useState(true);
 
   const [vendorSearch, setVendorSearch] = useState("");
@@ -636,11 +638,20 @@ export default function NewPurchase() {
           </div>
         </div>
 
-        {isEditDataLoading ? (
+       {isEditDataLoading ? (
           <div className="flex flex-col items-center justify-center py-24 text-slate-400 bg-white rounded-2xl border border-slate-200">
             <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-3" />
             Loading purchase details...
           </div>
+        ) : step === "items" ? (
+          <AddPurchaseItemsPage
+            products={allProducts}
+            cartItems={cartItems}
+            onAdd={addToCart}
+            onRemove={removeFromCart}
+            onCancel={() => setStep("form")}
+            onConfirm={() => setStep("form")}
+          />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
             {/* LEFT */}
@@ -669,32 +680,41 @@ export default function NewPurchase() {
 
               <Card className="rounded-2xl border-slate-200 shadow-sm overflow-hidden">
                 <CardHeader className="bg-slate-50/60 border-b border-slate-100 py-3.5">
-                  <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-800">
-                    <ShoppingBag className="w-4.5 h-4.5 text-blue-600" />
-                    Items
+                  <CardTitle className="flex items-center justify-between text-base font-semibold text-slate-800">
+                    <span className="flex items-center gap-2">
+                      <ShoppingBag className="w-4.5 h-4.5 text-blue-600" />
+                      Items
+                      {cartItems.length > 0 && (
+                        <Badge className="ml-1 bg-blue-600 hover:bg-blue-600">
+                          {invoiceCalculations.totalQuantity} items
+                        </Badge>
+                      )}
+                    </span>
                     {cartItems.length > 0 && (
-                      <Badge className="ml-1 bg-blue-600 hover:bg-blue-600">
-                        {invoiceCalculations.totalQuantity} items
-                      </Badge>
+                      <Button size="sm" onClick={() => setStep("items")} className="rounded-full">
+                        Edit Items
+                      </Button>
                     )}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4 pt-4">
-                  <PurchaseProductSearch
-                    products={allProducts}
-                    cartItems={cartItems}
-                    productSearch={productSearch}
-                    setProductSearch={setProductSearch}
-                    onAdd={addToCart}
-                    onRemove={removeFromCart}
-                  />
-
-                  <PurchaseCartItems
-                    cartItems={cartItems}
-                    handleUpdateQuantity={handleUpdateQuantity}
-                    handleRemoveItem={handleRemoveItem}
-                    handleClearCart={handleClearCart}
-                  />
+                <CardContent className="pt-4">
+                  {cartItems.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-14 text-center">
+                      <p className="text-slate-400 mb-4">
+                        Start by adding items to this purchase
+                      </p>
+                      <Button onClick={() => setStep("items")} className="rounded-full px-8">
+                        + Add Items
+                      </Button>
+                    </div>
+                  ) : (
+                    <PurchaseCartItems
+                      cartItems={cartItems}
+                      handleUpdateQuantity={handleUpdateQuantity}
+                      handleRemoveItem={handleRemoveItem}
+                      handleClearCart={handleClearCart}
+                    />
+                  )}
                 </CardContent>
               </Card>
             </div>
