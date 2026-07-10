@@ -1,80 +1,45 @@
 "use client";
 
-import { Package, TrendingUp } from "lucide-react";
-import { formatCurrency } from "@/lib/DashboardUtils";
+import { Package } from "lucide-react";
 
-export default function TopProducts({ products, theme }) {
-  const filteredProducts = products.filter((p) => p.revenue > 0);
+const formatCurrency = (value) =>
+  `₹${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(
+    value || 0
+  )}`;
+
+export default function TopProducts({ products = [] }) {
+  const filtered = products.filter((p) => p.revenue > 0);
 
   return (
-    <div
-      onClick={() => (window.location.href = "/products")}
-      className={`${theme.card} rounded-xl p-5 shadow-md cursor-pointer hover:shadow-lg transition-shadow`}
+    <a
+      href="/dashboard/items"
+      className="block bg-white rounded-2xl border border-slate-200 p-5 hover:shadow-md hover:border-blue-200 transition-all"
     >
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-3">
-          <div className={`p-2 rounded-lg ${theme.accentLight}`}>
-            <Package size={20} className={theme.accent} />
-          </div>
-          <div>
-            <h3 className={`${theme.text} text-lg font-semibold`}>
-              Top 5 Products / Items
-            </h3>
-            <p className={`${theme.textSecondary} text-sm mt-1`}>By revenue</p>
-          </div>
-        </div>
-        <div
-          className={`text-sm px-3 py-1 rounded-full ${theme.accentLight} ${theme.accent}`}
-        >
-          Top Sellers
-        </div>
-      </div>
+      <h3 className="font-bold text-slate-900 mb-3">Top 5 Products / Items</h3>
+      <div className="h-px bg-slate-100 mb-2" />
 
-      {filteredProducts.length > 0 ? (
-        <div className="space-y-4">
-          {filteredProducts.map((product, index) => (
-            <div
-              key={index}
-              className="flex items-center justify-between py-3 border-b last:border-b-0"
-            >
-              <div className="flex items-center space-x-4">
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center ${theme.surfaceVariant}`}
-                >
-                  <span className={`${theme.text} font-medium`}>
-                    {index + 1}
-                  </span>
-                </div>
-                <div>
-                  <p className={`${theme.text} font-medium`}>{product.name}</p>
-                  <span className={`${theme.textSecondary} text-xs`}>
-                    {product.category}
-                  </span>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="flex items-center justify-end space-x-2">
-                  <TrendingUp size={14} className={theme.success} />
-                  <span className={`${theme.text} font-medium`}>
-                    {formatCurrency(product.revenue)}
-                  </span>
-                </div>
-                <p className={`${theme.textSecondary} text-sm mt-1`}>
-                  {product.qty} sold
+      {filtered.length > 0 ? (
+        <div className="divide-y divide-slate-100">
+          {filtered.map((p, i) => (
+            <div key={i} className="flex items-center justify-between py-2.5">
+              <p className="text-sm font-medium text-slate-800 truncate pr-2">
+                {i + 1}. {p.name}
+              </p>
+              <div className="text-right shrink-0">
+                <p className="text-sm font-bold text-teal-600">
+                  {formatCurrency(p.revenue)}
                 </p>
+                <p className="text-xs text-slate-400">{p.qty} sold</p>
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <div className="text-center py-10">
-          <Package
-            size={48}
-            className={`${theme.textSecondary} mx-auto mb-4 opacity-50`}
-          />
-          <p className={`${theme.textSecondary}`}>No product data available</p>
+        <div className="flex flex-col items-center py-10 text-slate-400">
+          <Package className="w-10 h-10 mb-2 opacity-40" />
+          <p className="text-sm">No product data available</p>
         </div>
       )}
-    </div>
+    </a>
   );
 }

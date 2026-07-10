@@ -1,74 +1,69 @@
 "use client";
 
-import { AlertCircle, DollarSign } from "lucide-react";
-import { formatCurrency } from "@/lib/DashboardUtils";
+import { AlertCircle, Wallet, Users } from "lucide-react";
+import { format } from "date-fns";
 
-export default function SummaryPanel({ dueSummary, receivedSummary, theme }) {
+const formatCurrency = (value) =>
+  `₹${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(
+    value || 0
+  )}`;
+
+export default function SummaryPanel({ dueSummary = {}, receivedSummary = {} }) {
   return (
-    <div className={`${theme.card} rounded-xl p-6 shadow-md`}>
-      <div className="flex items-center justify-between mb-6">
+    <div className="bg-white rounded-2xl border border-slate-200 p-5">
+      <div className="flex items-start justify-between mb-4">
         <div>
-          <h3 className={`${theme.text} text-lg font-semibold`}>
-            Customer Due & Received Summary
+          <h3 className="font-bold text-slate-900">
+            Customer Due &amp; Received Summary
           </h3>
-          <p className={`${theme.textSecondary} text-sm mt-1`}>
-            Current Month Overview
+          <p className="text-xs text-slate-400 mt-0.5">
+            Current Month Overview · {format(new Date(), "MMMM yyyy")}
           </p>
         </div>
-        <div className={`p-3 rounded-lg ${theme.accentLight}`}>
-          <DollarSign size={24} className={theme.accent} />
+        <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+          <Users className="w-5 h-5 text-blue-600" />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Due Section */}
-        <div
-          onClick={() => (window.location.href = "/customers?tab=due")}
-          className={`${theme.surfaceVariant} rounded-lg p-5 cursor-pointer hover:shadow-md transition-shadow`}
-        >
-          <div className="flex items-center space-x-2 mb-4">
-            <div className={`p-2 rounded-lg ${theme.error} bg-opacity-10`}>
-              <AlertCircle size={20} className={theme.error} />
-            </div>
-            <span className={`${theme.error} font-medium`}>
-              Total Outstanding
-            </span>
-          </div>
-          <div className={`${theme.text} text-2xl font-bold mb-2`}>
-            {formatCurrency(dueSummary?.totalDue || 0)}
-          </div>
-          <div className="space-y-1">
-            {dueSummary?.totalCustomers > 0 && (
-              <p className={`${theme.textSecondary} text-sm`}>
-                {dueSummary.totalCustomers} customers
-              </p>
-            )}
-            {dueSummary?.totalPendingInvoices > 0 && (
-              <p className={`${theme.textSecondary} text-sm`}>
-                {dueSummary.totalPendingInvoices} invoices
-              </p>
-            )}
-          </div>
-        </div>
+      <div className="h-px bg-slate-100 mb-4" />
 
-        {/* Received Section */}
-        <div
-          onClick={() => (window.location.href = "/transactions")}
-          className={`${theme.surfaceVariant} rounded-lg p-5 cursor-pointer hover:shadow-md transition-shadow`}
+      <div className="grid grid-cols-2 divide-x divide-slate-100">
+        {/* Due */}
+        <a
+          href="/dashboard/customers?tab=due"
+          className="flex flex-col items-center text-center px-2 hover:opacity-80 transition-opacity"
         >
-          <div className="flex items-center space-x-2 mb-4">
-            <div className={`p-2 rounded-lg ${theme.accent} bg-opacity-10`}>
-              <DollarSign size={20} className={theme.accent} />
-            </div>
-            <span className={`${theme.accent} font-medium`}>Received</span>
-          </div>
-          <div className={`${theme.text} text-2xl font-bold mb-2`}>
-            {formatCurrency(receivedSummary?.totalReceived || 0)}
-          </div>
-          <p className={`${theme.textSecondary} text-sm`}>
-            Received this month
+          <span className="inline-flex items-center gap-1.5 bg-rose-50 text-rose-600 text-xs font-semibold px-3 py-1 rounded-full border border-rose-200 mb-2">
+            <AlertCircle className="w-3.5 h-3.5" />
+            Total Outstanding
+          </span>
+          <p className="text-xl font-extrabold text-rose-600">
+            {formatCurrency(dueSummary.totalDue)}
           </p>
-        </div>
+          <div className="mt-1 text-xs text-slate-400">
+            {dueSummary.totalCustomers > 0 && (
+              <p>{dueSummary.totalCustomers} customers</p>
+            )}
+            {dueSummary.totalPendingInvoices > 0 && (
+              <p>{dueSummary.totalPendingInvoices} invoices</p>
+            )}
+          </div>
+        </a>
+
+        {/* Received */}
+        <a
+          href="/dashboard/transactions"
+          className="flex flex-col items-center text-center px-2 hover:opacity-80 transition-opacity"
+        >
+          <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-600 text-xs font-semibold px-3 py-1 rounded-full border border-blue-200 mb-2">
+            <Wallet className="w-3.5 h-3.5" />
+            Received
+          </span>
+          <p className="text-xl font-extrabold text-blue-600">
+            {formatCurrency(receivedSummary.totalReceived)}
+          </p>
+          <p className="mt-1 text-xs text-slate-400">Received this month</p>
+        </a>
       </div>
     </div>
   );

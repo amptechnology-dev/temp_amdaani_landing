@@ -147,8 +147,7 @@ export default function NewSalePage() {
   const [storedata, setStoredata] = useState({});
   const [afterStoredata, setAfterStoredata] = useState({});
 
-  // ✅ নতুন invoice তৈরি হলে RecentInvoices/InvoiceList কে refresh করাতে
-  const [invoiceRefreshKey, setInvoiceRefreshKey] = useState(0);
+    const [invoiceRefreshKey, setInvoiceRefreshKey] = useState(0);
 
   const [isLoading, setIsLoading] = useState({
     customers: false,

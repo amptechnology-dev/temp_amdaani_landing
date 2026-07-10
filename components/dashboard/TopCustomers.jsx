@@ -1,87 +1,68 @@
 "use client";
 
-import { Users, Phone, FileText } from "lucide-react";
-import { formatCurrency } from "@/lib/DashboardUtils";
+import { Users } from "lucide-react";
 
-export default function TopCustomers({ customers, percentage, theme }) {
+const formatCurrency = (value) =>
+  `₹${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(
+    value || 0
+  )}`;
+
+export default function TopCustomers({ customers = [], percentage = 0 }) {
   return (
-    <div
-      onClick={() => (window.location.href = "/customers")}
-      className={`${theme.card} rounded-xl p-5 shadow-md cursor-pointer hover:shadow-lg transition-shadow`}
+    <a
+      href="/dashboard/customers"
+      className="block bg-white rounded-2xl border border-slate-200 p-5 hover:shadow-md hover:border-blue-200 transition-all"
     >
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-3">
-          <div className={`p-2 rounded-lg ${theme.accentLight}`}>
-            <Users size={20} className={theme.accent} />
-          </div>
-          <div>
-            <h3 className={`${theme.text} text-lg font-semibold`}>
-              Top 5 Customers
-            </h3>
-            <p className={`${theme.textSecondary} text-sm mt-1`}>
-              By invoice count
-            </p>
-          </div>
-        </div>
-        <div
-          className={`text-sm px-3 py-1 rounded-full ${theme.accentLight} ${theme.accent}`}
-        >
-          {percentage.toFixed(1)}%
-        </div>
-      </div>
+      <h3 className="font-bold text-slate-900 mb-3">Top 5 Customers</h3>
+      <div className="h-px bg-slate-100 mb-2" />
 
       {customers.length > 0 ? (
-        <div className="space-y-4">
-          {customers.map((customer, index) => (
-            <div
-              key={index}
-              className="flex items-center justify-between py-3 border-b last:border-b-0"
-            >
-              <div className="flex items-center space-x-4">
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center ${theme.surfaceVariant}`}
-                >
-                  <span className={`${theme.text} font-medium`}>
-                    {index + 1}
+        <>
+          <div className="divide-y divide-slate-100">
+            {customers.map((c, i) => (
+              <div key={i} className="flex items-center justify-between py-2.5">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-sm font-semibold text-slate-400 w-4 shrink-0">
+                    {i + 1}.
                   </span>
+                  <div className="min-w-0">
+                    {c.customer ? (
+                      <>
+                        <p className="text-sm font-medium text-slate-800 truncate">
+                          {c.customer}
+                        </p>
+                        <p className="text-xs text-slate-400 truncate">
+                          {c.mobile}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-sm font-medium text-slate-800">
+                        {c.mobile || "Unknown Customer"}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <p className={`${theme.text} font-medium`}>
-                    {customer.customer || customer.mobile || "Unknown Customer"}
+                <div className="text-right shrink-0 ml-2">
+                  <p className="text-sm font-bold text-blue-600">
+                    {c.count} invoices
                   </p>
-                  {customer.mobile && (
-                    <div className="flex items-center space-x-1 mt-1">
-                      <Phone size={12} className={theme.textSecondary} />
-                      <span className={`${theme.textSecondary} text-xs`}>
-                        {customer.mobile}
-                      </span>
-                    </div>
-                  )}
+                  <p className="text-xs text-slate-400">
+                    {formatCurrency(c.total)}
+                  </p>
                 </div>
               </div>
-              <div className="text-right">
-                <div className="flex items-center space-x-2">
-                  <FileText size={14} className={theme.textSecondary} />
-                  <span className={`${theme.text} font-medium`}>
-                    {customer.count} invoices
-                  </span>
-                </div>
-                <p className={`${theme.textSecondary} text-sm mt-1`}>
-                  {formatCurrency(customer.total)}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+          <p className="text-xs text-center text-slate-400 mt-3">
+            Top 5 customers = {percentage.toFixed(1)}% of invoices
+          </p>
+        </>
       ) : (
-        <div className="text-center py-10">
-          <Users
-            size={48}
-            className={`${theme.textSecondary} mx-auto mb-4 opacity-50`}
-          />
-          <p className={`${theme.textSecondary}`}>No customer data available</p>
+        <div className="flex flex-col items-center py-10 text-slate-400">
+          <Users className="w-10 h-10 mb-2 opacity-40" />
+          <p className="text-sm">No customer data available</p>
         </div>
       )}
-    </div>
+    </a>
   );
 }
