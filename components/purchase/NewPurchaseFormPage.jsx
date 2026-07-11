@@ -3,18 +3,18 @@
 import { useState, useRef, useEffect } from "react";
 import {
   ArrowLeft, Phone, User, Calendar, Hash, ShoppingBag,
-  UserCircle2, Sparkles, Search, Trash2, ChevronDown, FileText, MapPin, Building2, Locate, Plus, Percent,
+  Truck, Sparkles, Search, Trash2, ChevronDown, FileText, MapPin, Building2, Locate, Plus, Percent,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 
-import InvoiceSummary from "./InvoiceSummary";
-import AddItemFormModal from "./AddItemFormModal";
+import PurchaseSummary from "./PurchaseSummary";
+import AddItemFormModal from "../../components/invoice/AddItemFormModal";
 
 // -------------------------------
-// Small inline product-combobox — used in the "add row" row of the table
+// Small inline product-combobox — "add row" row-e use hoy
 // -------------------------------
 function ProductPicker({ products, onSelect }) {
   const [query, setQuery] = useState("");
@@ -80,7 +80,7 @@ function ProductPicker({ products, onSelect }) {
                   </p>
                 </div>
                 <span className="text-blue-600 font-semibold text-xs shrink-0 ml-2">
-                  ₹{Number(p.sellingPrice ?? 0).toFixed(2)}
+                  ₹{Number(p.costPrice ?? 0).toFixed(2)}
                 </span>
               </div>
             ))
@@ -91,7 +91,7 @@ function ProductPicker({ products, onSelect }) {
   );
 }
 
-const emptyCustomerForm = {
+const emptyVendorForm = {
   name: "",
   mobile: "",
   address: "",
@@ -101,31 +101,24 @@ const emptyCustomerForm = {
   gstNumber: "",
 };
 
-export default function NewInvoiceFormPage({
+export default function NewPurchaseFormPage({
   isLoading,
   isEditMode,
-  invoiceNumber,
-  customers,
-  selectedCustomer,
-  setSelectedCustomer,
+  purchaseNumber,
+  setPurchaseNumber,
+  vendors,
+  selectedVendor,
+  setSelectedVendor,
   cartItems,
   products = [],
   addToCart,
   setAllProducts,
   onBack,
-  discount,
-  setDiscount,
   invoiceCalculations,
   paymentMethod,
-  setPaymentMethod,
-  paidAmount,
-  setPaidAmount,
   paymentNote,
-  setPaymentNote,
-  remarks,
-  setRemarks,
   payment,
-  handleCreateInvoice,
+  handleCreatePurchase,
   isSubmitting,
   formValues,
   storedata,
@@ -136,24 +129,24 @@ export default function NewInvoiceFormPage({
   handleClearCart,
 }) {
   // -------------------------------
-  // Customer form state — mirrors DB schema exactly
+  // Vendor form state — vendor schema er sathe consistent (customer form er moto)
   // -------------------------------
-  const [customerForm, setCustomerForm] = useState(() => ({
-    ...emptyCustomerForm,
-    ...(selectedCustomer
+  const [vendorForm, setVendorForm] = useState(() => ({
+    ...emptyVendorForm,
+    ...(selectedVendor
       ? {
-          name: selectedCustomer.name || "",
-          mobile: selectedCustomer.mobile || "",
-          address: selectedCustomer.address || "",
-          city: selectedCustomer.city || "",
-          state: selectedCustomer.state || "",
-          postalCode: selectedCustomer.postalCode || "",
-          gstNumber: selectedCustomer.gstNumber || "",
+          name: selectedVendor.name || "",
+          mobile: selectedVendor.mobile || "",
+          address: selectedVendor.address || "",
+          city: selectedVendor.city || "",
+          state: selectedVendor.state || "",
+          postalCode: selectedVendor.postalCode || "",
+          gstNumber: selectedVendor.gstNumber || "",
         }
       : {}),
   }));
 
-  const [selectedCustomerId, setSelectedCustomerId] = useState(selectedCustomer?._id || "");
+  const [selectedVendorId, setSelectedVendorId] = useState(selectedVendor?._id || "");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddItemModal, setShowAddItemModal] = useState(false);
@@ -169,16 +162,16 @@ export default function NewInvoiceFormPage({
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
-  // ✅ EDIT MODE — customers list loaded pore, existing customer ke mobile diye match kore
-  // dropdown-e select + lock kore dao (jehetu edit-e _id thake na loaded invoice-e)
+  // ✅ EDIT MODE — vendors list loaded hobar por mobile diye match kore
+  // dropdown-e select + lock kore dao
   useEffect(() => {
-    if (!isEditMode || selectedCustomerId || customers.length === 0) return;
-    if (!selectedCustomer?.mobile) return;
+    if (!isEditMode || selectedVendorId || vendors.length === 0) return;
+    if (!selectedVendor?.mobile) return;
 
-    const matched = customers.find((c) => c.mobile === selectedCustomer.mobile);
+    const matched = vendors.find((v) => v.mobile === selectedVendor.mobile);
     if (matched) {
-      setSelectedCustomerId(matched._id);
-      setCustomerForm({
+      setSelectedVendorId(matched._id);
+      setVendorForm({
         name: matched.name || "",
         mobile: matched.mobile || "",
         address: matched.address || "",
@@ -189,54 +182,54 @@ export default function NewInvoiceFormPage({
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditMode, customers]);
+  }, [isEditMode, vendors]);
 
-  // ✅ Push customerForm up to parent as selectedCustomer whenever it changes
+  // ✅ Push vendorForm up to parent as selectedVendor whenever it changes
   useEffect(() => {
-    const hasData = customerForm.name || customerForm.mobile;
-    setSelectedCustomer(hasData ? { _id: selectedCustomerId || undefined, ...customerForm } : null);
+    const hasData = vendorForm.name || vendorForm.mobile;
+    setSelectedVendor(hasData ? { _id: selectedVendorId || undefined, ...vendorForm } : null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customerForm, selectedCustomerId]);
+  }, [vendorForm, selectedVendorId]);
 
-  const isLocked = !!selectedCustomerId;
+  const isLocked = !!selectedVendorId;
 
-  const filteredCustomers = (() => {
+  const filteredVendors = (() => {
     const q = searchTerm.trim().toLowerCase();
-    if (!q) return customers.slice(0, 20);
-    return customers.filter(
-      (c) => c.name?.toLowerCase().includes(q) || c.mobile?.includes(q)
+    if (!q) return vendors.slice(0, 20);
+    return vendors.filter(
+      (v) => v.name?.toLowerCase().includes(q) || v.mobile?.includes(q)
     );
   })();
 
-  const pickCustomer = (c) => {
-    setSelectedCustomerId(c._id);
-    setCustomerForm({
-      name: c.name || "",
-      mobile: c.mobile || "",
-      address: c.address || "",
-      city: c.city || "",
-      state: c.state || "",
-      postalCode: c.postalCode || "",
-      gstNumber: c.gstNumber || "",
+  const pickVendor = (v) => {
+    setSelectedVendorId(v._id);
+    setVendorForm({
+      name: v.name || "",
+      mobile: v.mobile || "",
+      address: v.address || "",
+      city: v.city || "",
+      state: v.state || "",
+      postalCode: v.postalCode || "",
+      gstNumber: v.gstNumber || "",
     });
     setDropdownOpen(false);
     setSearchTerm("");
   };
 
-  const handleNewCustomer = () => {
-    setSelectedCustomerId("");
-    setCustomerForm(emptyCustomerForm);
+  const handleNewVendor = () => {
+    setSelectedVendorId("");
+    setVendorForm(emptyVendorForm);
     setDropdownOpen(false);
     setSearchTerm("");
   };
 
-  const handleChangeCustomer = () => {
-    setSelectedCustomerId("");
-    setCustomerForm(emptyCustomerForm);
+  const handleChangeVendor = () => {
+    setSelectedVendorId("");
+    setVendorForm(emptyVendorForm);
   };
 
   const updateField = (field) => (e) => {
-    setCustomerForm((prev) => ({ ...prev, [field]: e.target.value }));
+    setVendorForm((prev) => ({ ...prev, [field]: e.target.value }));
   };
 
   const handleAddRow = (product) => {
@@ -268,7 +261,7 @@ export default function NewInvoiceFormPage({
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
-                  {isEditMode ? "Edit Invoice" : "New Invoice"}
+                  {isEditMode ? "Edit Purchase" : "New Purchase"}
                 </h1>
                 {isEditMode && (
                   <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Editing</Badge>
@@ -276,7 +269,7 @@ export default function NewInvoiceFormPage({
               </div>
               <p className="text-sm text-slate-400 flex items-center gap-1 mt-0.5">
                 <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-                Add a customer and items to {isEditMode ? "update" : "generate"} the invoice
+                Add a vendor and items to {isEditMode ? "update" : "record"} the purchase
               </p>
             </div>
           </div>
@@ -288,22 +281,30 @@ export default function NewInvoiceFormPage({
             </div>
             <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-full text-sm text-blue-700 font-medium">
               <Hash className="w-3.5 h-3.5" />
-              {invoiceNumber || "Loading..."}
+              {isEditMode ? (
+                purchaseNumber || "Loading..."
+              ) : (
+                <input
+                  value={purchaseNumber}
+                  onChange={(e) => setPurchaseNumber(e.target.value)}
+                  className="bg-transparent outline-none w-28"
+                />
+              )}
             </div>
           </div>
         </div>
 
-        {/* Customer */}
+        {/* Vendor */}
         <Card className="rounded-xl border-slate-200 shadow-sm overflow-visible relative">
           <CardHeader className="bg-slate-50 border-b border-slate-100 py-2.5 px-4">
             <CardTitle className="flex items-center justify-between text-sm font-semibold text-slate-700">
               <span className="flex items-center gap-2">
-                <UserCircle2 className="w-4 h-4 text-blue-600" />
-                Customer
+                <Truck className="w-4 h-4 text-blue-600" />
+                Vendor
               </span>
               {isLocked && (
                 <button
-                  onClick={handleChangeCustomer}
+                  onClick={handleChangeVendor}
                   className="text-xs text-blue-600 hover:underline font-medium"
                 >
                   Change
@@ -312,22 +313,22 @@ export default function NewInvoiceFormPage({
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 space-y-4">
-            {/* ── Select Customer dropdown ── */}
+            {/* ── Select Vendor dropdown ── */}
             <div ref={wrapperRef} className="relative">
               <label className="text-xs font-medium text-slate-500 mb-1 block">
-                Select Customer
+                Select Vendor
               </label>
               <button
                 type="button"
                 onClick={() => setDropdownOpen((v) => !v)}
                 className="w-full h-10 px-3 rounded-md border border-slate-200 bg-white flex items-center justify-between text-sm hover:bg-slate-50"
               >
-                <span className={customerForm.name || customerForm.mobile ? "text-slate-800" : "text-slate-400"}>
+                <span className={vendorForm.name || vendorForm.mobile ? "text-slate-800" : "text-slate-400"}>
                   {isLocked
-                    ? `${customerForm.name || "Unnamed"} — ${customerForm.mobile || "-"}`
-                    : customerForm.name || customerForm.mobile
-                    ? "New customer (typed manually)"
-                    : "Select existing customer or type new below"}
+                    ? `${vendorForm.name || "Unnamed"} — ${vendorForm.mobile || "-"}`
+                    : vendorForm.name || vendorForm.mobile
+                    ? "New vendor (typed manually)"
+                    : "Select existing vendor or type new below"}
                 </span>
                 <ChevronDown className="w-4 h-4 text-slate-400" />
               </button>
@@ -349,28 +350,28 @@ export default function NewInvoiceFormPage({
 
                   <button
                     type="button"
-                    onClick={handleNewCustomer}
+                    onClick={handleNewVendor}
                     className="w-full text-left px-3 py-2.5 text-sm font-medium text-blue-600 hover:bg-blue-50 border-b border-slate-100"
                   >
-                    + New Customer (type details manually)
+                    + New Vendor (type details manually)
                   </button>
 
                   <div className="max-h-56 overflow-y-auto">
-                    {filteredCustomers.length === 0 ? (
-                      <p className="text-xs text-slate-400 text-center py-4">No customers found</p>
+                    {filteredVendors.length === 0 ? (
+                      <p className="text-xs text-slate-400 text-center py-4">No vendors found</p>
                     ) : (
-                      filteredCustomers.map((c) => (
+                      filteredVendors.map((v) => (
                         <div
-                          key={c._id}
-                          onClick={() => pickCustomer(c)}
+                          key={v._id}
+                          onClick={() => pickVendor(v)}
                           className={`flex items-center justify-between px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0 ${
-                            selectedCustomerId === c._id ? "bg-blue-50" : ""
+                            selectedVendorId === v._id ? "bg-blue-50" : ""
                           }`}
                         >
                           <div className="min-w-0">
-                            <p className="font-medium text-slate-800 truncate">{c.name}</p>
+                            <p className="font-medium text-slate-800 truncate">{v.name}</p>
                             <p className="text-[11px] text-slate-400">
-                              {c.mobile} {c.gstNumber ? `· ${c.gstNumber}` : ""}
+                              {v.mobile} {v.gstNumber ? `· ${v.gstNumber}` : ""}
                             </p>
                           </div>
                         </div>
@@ -381,12 +382,12 @@ export default function NewInvoiceFormPage({
               )}
             </div>
 
-            {/* ── Field grid — mirrors DB schema exactly ── */}
+            {/* ── Field grid — mirrors vendor schema exactly ── */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                 <input
-                  value={customerForm.mobile}
+                  value={vendorForm.mobile}
                   onChange={updateField("mobile")}
                   disabled={isLocked}
                   maxLength={10}
@@ -398,7 +399,7 @@ export default function NewInvoiceFormPage({
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                 <input
-                  value={customerForm.name}
+                  value={vendorForm.name}
                   onChange={updateField("name")}
                   disabled={isLocked}
                   placeholder="Name"
@@ -409,9 +410,9 @@ export default function NewInvoiceFormPage({
               <div className="relative">
                 <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                 <input
-                  value={customerForm.gstNumber}
+                  value={vendorForm.gstNumber}
                   onChange={(e) =>
-                    setCustomerForm((prev) => ({ ...prev, gstNumber: e.target.value.toUpperCase() }))
+                    setVendorForm((prev) => ({ ...prev, gstNumber: e.target.value.toUpperCase() }))
                   }
                   disabled={isLocked}
                   placeholder="GSTIN (optional)"
@@ -422,7 +423,7 @@ export default function NewInvoiceFormPage({
               <div className="relative sm:col-span-2 lg:col-span-1">
                 <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                 <input
-                  value={customerForm.address}
+                  value={vendorForm.address}
                   onChange={updateField("address")}
                   disabled={isLocked}
                   placeholder="Address"
@@ -433,7 +434,7 @@ export default function NewInvoiceFormPage({
               <div className="relative">
                 <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                 <input
-                  value={customerForm.city}
+                  value={vendorForm.city}
                   onChange={updateField("city")}
                   disabled={isLocked}
                   placeholder="City"
@@ -443,7 +444,7 @@ export default function NewInvoiceFormPage({
 
               <div className="grid grid-cols-2 gap-3">
                 <input
-                  value={customerForm.state}
+                  value={vendorForm.state}
                   onChange={updateField("state")}
                   disabled={isLocked}
                   placeholder="State"
@@ -452,7 +453,7 @@ export default function NewInvoiceFormPage({
                 <div className="relative">
                   <Locate className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                   <input
-                    value={customerForm.postalCode}
+                    value={vendorForm.postalCode}
                     onChange={updateField("postalCode")}
                     disabled={isLocked}
                     maxLength={6}
@@ -498,7 +499,7 @@ export default function NewInvoiceFormPage({
                   <th className="text-left font-medium px-3 py-2 border-b border-slate-100 w-20">HSN</th>
                   <th className="text-left font-medium px-3 py-2 border-b border-slate-100 w-16">Unit</th>
                   <th className="text-center font-medium px-3 py-2 border-b border-slate-100 w-20">Qty</th>
-                  <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-24">Price</th>
+                  <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-24">Cost Price</th>
                   <th className="text-center font-medium px-3 py-2 border-b border-slate-100 w-32">Discount</th>
                   <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-16">GST%</th>
                   <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-28">Total</th>
@@ -528,9 +529,9 @@ export default function NewInvoiceFormPage({
                         type="number"
                         min={0}
                         step="0.01"
-                        value={item.price ?? item.sellingPrice ?? 0}
+                        value={item.costPrice ?? 0}
                         onChange={(e) =>
-                          handleUpdateItemField(item._id, "sellingPrice", Number(e.target.value) || 0)
+                          handleUpdateItemField(item._id, "costPrice", Number(e.target.value) || 0)
                         }
                         className="w-20 h-8 text-right px-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                       />
@@ -541,9 +542,9 @@ export default function NewInvoiceFormPage({
                           type="number"
                           min={0}
                           step="0.01"
-                          value={item.discount ?? 0}
+                          value={item.purchaseDiscount ?? 0}
                           onChange={(e) =>
-                            handleUpdateItemField(item._id, "discount", Number(e.target.value) || 0)
+                            handleUpdateItemField(item._id, "purchaseDiscount", Number(e.target.value) || 0)
                           }
                           className="w-16 h-8 text-right px-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
@@ -552,14 +553,14 @@ export default function NewInvoiceFormPage({
                           onClick={() =>
                             handleUpdateItemField(
                               item._id,
-                              "discountType",
-                              (item.discountType || "amount") === "amount" ? "percent" : "amount"
+                              "purchaseDiscountType",
+                              (item.purchaseDiscountType || "amount") === "amount" ? "percent" : "amount"
                             )
                           }
                           title="Toggle discount type"
                           className="w-8 h-8 shrink-0 flex items-center justify-center rounded-md border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
                         >
-                          {(item.discountType || "amount") === "percent" ? (
+                          {(item.purchaseDiscountType || "amount") === "percent" ? (
                             <Percent className="w-3.5 h-3.5" />
                           ) : (
                             "₹"
@@ -610,37 +611,29 @@ export default function NewInvoiceFormPage({
           </CardContent>
         </Card>
 
-        {/* Invoice Summary — Preview + Create only */}
+        {/* Purchase Summary — Preview + Create only */}
         <Card className="rounded-xl border-slate-200 shadow-sm overflow-hidden">
           <CardContent className="pt-4">
-            <InvoiceSummary
-              discount={discount}
-              setDiscount={setDiscount}
+            <PurchaseSummary
               invoiceCalculations={invoiceCalculations}
               paymentMethod={paymentMethod}
-              setPaymentMethod={setPaymentMethod}
-              paidAmount={paidAmount}
-              setPaidAmount={setPaidAmount}
               paymentNote={paymentNote}
-              setPaymentNote={setPaymentNote}
-              remarks={remarks}
-              setRemarks={setRemarks}
-              handleCreateInvoice={handleCreateInvoice}
+              handleCreatePurchase={handleCreatePurchase}
               isLoading={isSubmitting}
-              disabled={!(customerForm.name || customerForm.mobile) || cartItems.length === 0}
+              disabled={!(vendorForm.name || vendorForm.mobile) || cartItems.length === 0}
               payment={payment}
               cartItems={cartItems}
               formValues={formValues}
               storedata={storedata}
-              invoiceNumber={invoiceNumber}
+              purchaseNumber={purchaseNumber}
               isGstInvoice={isGstInvoice}
-              submitLabel={isEditMode ? "Update Invoice" : "Create Invoice"}
+              submitLabel={isEditMode ? "Update Purchase" : "Create Purchase"}
             />
           </CardContent>
         </Card>
       </div>
 
-      {/* নতুন item add করার modal — "+" button থেকে */}
+      {/* নতুন item add করার modal — "+ New Product" থেকে */}
       <AddItemFormModal
         open={showAddItemModal}
         onOpenChange={setShowAddItemModal}

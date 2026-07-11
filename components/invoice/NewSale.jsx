@@ -116,7 +116,12 @@ export default function SalesFlow() {
       const gstRate = Number(item.gstRate || 0);
       const qty = Number(item.qty || 0);
       const sellingPriceRaw = Number(item.sellingPrice ?? item.price ?? 0);
-      const itemDiscount = Number(item.discount || 0);
+      const discountType = item.discountType || "amount";
+      const rawDiscountInput = Number(item.discount || 0);
+      const itemDiscount =
+        discountType === "percent"
+          ? (sellingPriceRaw * rawDiscountInput) / 100
+          : rawDiscountInput;
       const isTaxInclusive = Boolean(item.isTaxInclusive);
       const sellingPrice = Math.max(0, sellingPriceRaw - itemDiscount);
 
@@ -168,7 +173,8 @@ export default function SalesFlow() {
       return {
         ...item,
         baseRate,
-        discount: itemDiscount,
+        discount: rawDiscountInput,
+        discountType,
         taxableValue,
         gstAmount,
         total: Number(totalAmount),
@@ -458,12 +464,19 @@ export default function SalesFlow() {
   };
 
   // ✅ CartItems component er jonno full handlers (+/- ebong remove)
-  const handleUpdateQuantity = (id, qty) => {
+  const handleUpdateQuantities = (id, qty) => {
     if (qty < 1) {
       setCartItems((p) => p.filter((i) => i._id !== id));
       return;
     }
     setCartItems((p) => p.map((i) => (i._id === id ? { ...i, qty } : i)));
+    hasUserEditedPaid.current = false;
+  };
+
+  const handleUpdateItemField = (id, field, value) => {
+    setCartItems((prev) =>
+      prev.map((i) => (i._id === id ? { ...i, [field]: value } : i)),
+    );
     hasUserEditedPaid.current = false;
   };
 
@@ -616,6 +629,8 @@ export default function SalesFlow() {
       selectedCustomer={selectedCustomer}
       setSelectedCustomer={setSelectedCustomer}
       cartItems={invoiceCalculations.computedItems}
+      products={allProducts}
+      addToCart={addToCart}
       onOpenAddItems={() => setStep("items")}
       onBack={handleBackToList}
       discount={discount}
@@ -642,9 +657,11 @@ export default function SalesFlow() {
       }
       isGstInvoice={isGstInvoice}
       // ✅ CartItems component er jonno full handlers
-      handleUpdateQuantity={handleUpdateQuantity}
+      handleUpdateQuantity={handleUpdateQuantities}
+      handleUpdateItemField={handleUpdateItemField}
       handleRemoveItem={handleRemoveItem}
       handleClearCart={handleClearCart}
+      setAllProducts={setAllProducts}
     />
   );
 }
