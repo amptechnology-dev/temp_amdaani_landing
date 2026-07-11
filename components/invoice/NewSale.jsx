@@ -312,26 +312,27 @@ export default function SalesFlow() {
   }, []);
 
   // ✅ Reconcile cart item IDs with actual product IDs after products load (edit mode)
-// Mirrors RN AddItems.jsx behavior — matches by name+hsn if _id doesn't match any loaded product
-useEffect(() => {
-  if (!isEditMode || allProducts.length === 0 || cartItems.length === 0) return;
+  // Mirrors RN AddItems.jsx behavior — matches by name+hsn if _id doesn't match any loaded product
+  useEffect(() => {
+    if (!isEditMode || allProducts.length === 0 || cartItems.length === 0)
+      return;
 
-  setCartItems((prev) =>
-    prev.map((item) => {
-      const alreadyMatched = allProducts.some((p) => p._id === item._id);
-      if (alreadyMatched) return item;
+    setCartItems((prev) =>
+      prev.map((item) => {
+        const alreadyMatched = allProducts.some((p) => p._id === item._id);
+        if (alreadyMatched) return item;
 
-      const matchedProduct = allProducts.find(
-        (p) =>
-          p.name?.toLowerCase().trim() === item.name?.toLowerCase().trim() &&
-          (p.hsn || "") === (item.hsn || "")
-      );
+        const matchedProduct = allProducts.find(
+          (p) =>
+            p.name?.toLowerCase().trim() === item.name?.toLowerCase().trim() &&
+            (p.hsn || "") === (item.hsn || ""),
+        );
 
-      return matchedProduct ? { ...item, _id: matchedProduct._id } : item;
-    })
-  );
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [allProducts, isEditMode]);
+        return matchedProduct ? { ...item, _id: matchedProduct._id } : item;
+      }),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allProducts, isEditMode]);
 
   // -------------------------------
   // Reset form to blank state (for a brand-new invoice)
@@ -598,6 +599,9 @@ useEffect(() => {
         onRemove={removeFromCart}
         onCancel={() => setStep("form")}
         onConfirm={() => setStep("form")}
+        onProductCreated={(newItem) => {
+          setAllProducts((prev) => [newItem, ...prev]);
+        }}
       />
     );
   }

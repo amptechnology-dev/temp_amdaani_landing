@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { Search, Plus, Minus, ArrowLeft, Check, ShoppingCart } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import AddItemFormModal from "./AddItemFormModal";
 
 export default function AddItemsPage({
   products,
@@ -12,8 +13,10 @@ export default function AddItemsPage({
   onRemove,
   onCancel,
   onConfirm,
+  onProductCreated,
 }) {
   const [search, setSearch] = useState("");
+  const [showAddItemModal, setShowAddItemModal] = useState(false);
 
   const getQty = (productId) => cartItems.find((c) => c._id === productId)?.qty || 0;
 
@@ -50,15 +53,26 @@ export default function AddItemsPage({
           <h1 className="text-xl font-bold text-slate-900">Add Items</h1>
         </div>
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input
-            placeholder="Search by name, HSN, or SKU..."
-            className="pl-11 h-12 rounded-full bg-white border-slate-200 focus-visible:ring-2 focus-visible:ring-blue-500 text-sm shadow-sm"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        {/* Search + "+" (নতুন item তৈরি করার বাটন) */}
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Input
+              placeholder="Search by name, HSN, or SKU..."
+              className="pl-11 h-12 rounded-full bg-white border-slate-200 focus-visible:ring-2 focus-visible:ring-blue-500 text-sm shadow-sm"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          <Button
+            size="icon"
+            onClick={() => setShowAddItemModal(true)}
+            className="w-12 h-12 shrink-0 rounded-full bg-blue-600 hover:bg-blue-700 shadow-sm"
+            title="Add new item"
+          >
+            <Plus className="w-5 h-5" />
+          </Button>
         </div>
 
         {/* Product list */}
@@ -70,42 +84,55 @@ export default function AddItemsPage({
             const outOfStock = stock <= 0;
             const price = Number(product.sellingPrice ?? 0);
             const discountPrice = Number(product.discountPrice ?? 0);
-            const finalPrice = discountPrice > 0 ? Math.max(0, price - discountPrice) : price;
+            const finalPrice =
+              discountPrice > 0 ? Math.max(0, price - discountPrice) : price;
 
             return (
               <div
                 key={product._id}
                 className={`bg-white rounded-2xl border p-4 transition-all ${
-                  inCart ? "border-blue-300 bg-blue-50/30 ring-1 ring-blue-100" : "border-slate-100"
+                  inCart
+                    ? "border-blue-300 bg-blue-50/30 ring-1 ring-blue-100"
+                    : "border-slate-100"
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className={`font-semibold truncate ${inCart ? "text-blue-700" : "text-slate-800"}`}>
+                    <p
+                      className={`font-semibold truncate ${inCart ? "text-blue-700" : "text-slate-800"}`}
+                    >
                       {product.name}
                     </p>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      {product.category?.name || product.category || "No Category"} · {product.unit || "Pcs"}
+                      {product.category?.name ||
+                        product.category ||
+                        "No Category"}{" "}
+                      · {product.unit || "Pcs"}
                     </p>
 
                     <div className="flex items-center gap-2 mt-2 flex-wrap">
                       {discountPrice > 0 ? (
                         <>
-                          <span className="text-blue-600 font-bold">₹{finalPrice.toFixed(2)}</span>
-                          <span className="text-xs text-slate-400 line-through">₹{price.toFixed(2)}</span>
+                          <span className="text-blue-600 font-bold">
+                            ₹{finalPrice.toFixed(2)}
+                          </span>
+                          <span className="text-xs text-slate-400 line-through">
+                            ₹{price.toFixed(2)}
+                          </span>
                         </>
                       ) : (
-                        <span className="text-blue-600 font-bold">₹{price.toFixed(2)}</span>
+                        <span className="text-blue-600 font-bold">
+                          ₹{price.toFixed(2)}
+                        </span>
                       )}
 
-                      {/* ✅ Stock badge — now reads currentStock/stock/quantity with fallback */}
                       <span
                         className={`text-[11px] font-medium px-2.5 py-1 rounded-full border ${
                           outOfStock
                             ? "bg-rose-50 text-rose-500 border-rose-200"
                             : stock <= 5
-                            ? "bg-orange-50 text-orange-600 border-orange-200"
-                            : "bg-emerald-50 text-emerald-600 border-emerald-200"
+                              ? "bg-orange-50 text-orange-600 border-orange-200"
+                              : "bg-emerald-50 text-emerald-600 border-emerald-200"
                         }`}
                       >
                         {stock} in stock
@@ -142,7 +169,9 @@ export default function AddItemsPage({
                       >
                         <Minus className="w-4 h-4 text-blue-600" />
                       </Button>
-                      <span className="w-6 text-center text-sm font-semibold text-blue-700">{qty}</span>
+                      <span className="w-6 text-center text-sm font-semibold text-blue-700">
+                        {qty}
+                      </span>
                       <Button
                         size="icon"
                         variant="ghost"
@@ -160,7 +189,9 @@ export default function AddItemsPage({
           })}
 
           {filteredProducts.length === 0 && (
-            <p className="text-center text-sm text-slate-400 py-12">No products found</p>
+            <p className="text-center text-sm text-slate-400 py-12">
+              No products found
+            </p>
           )}
         </div>
       </div>
@@ -171,19 +202,39 @@ export default function AddItemsPage({
           <div className="flex items-center gap-2 text-sm text-slate-600">
             <ShoppingCart className="w-4 h-4 text-blue-600" />
             <span className="font-medium">{totalQty} items</span>
-            <span className="text-blue-600 font-bold">₹{totalAmount.toFixed(2)}</span>
+            <span className="text-blue-600 font-bold">
+              ₹{totalAmount.toFixed(2)}
+            </span>
           </div>
 
           <div className="flex gap-2">
-            <Button variant="outline" onClick={onCancel} className="rounded-full">
+            <Button
+              variant="outline"
+              onClick={onCancel}
+              className="rounded-full"
+            >
               Cancel
             </Button>
-            <Button onClick={onConfirm} disabled={cartItems.length === 0} className="rounded-full px-6">
+            <Button
+              onClick={onConfirm}
+              disabled={cartItems.length === 0}
+              className="rounded-full px-6"
+            >
               Done ({cartItems.length})
             </Button>
           </div>
         </div>
       </div>
+
+      {/* নতুন item add করার modal */}
+      <AddItemFormModal
+        open={showAddItemModal}
+        onOpenChange={setShowAddItemModal}
+        onItemCreated={(newItem) => {
+          onProductCreated?.(newItem);
+          onAdd?.(newItem);
+        }}
+      />
     </div>
   );
 }
