@@ -1,9 +1,26 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
-  ArrowLeft, Phone, User, Calendar, Hash, ShoppingBag,
-  Truck, Sparkles, Search, Trash2, ChevronDown, FileText, MapPin, Building2, Locate, Plus, Percent,
+  ArrowLeft,
+  Phone,
+  User,
+  Calendar,
+  Hash,
+  ShoppingBag,
+  Truck,
+  Sparkles,
+  Trash2,
+  Pencil,
+  Loader2,
+  FileText,
+  MapPin,
+  Building2,
+  Locate,
+  Plus,
+  Percent,
+  X,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,18 +29,47 @@ import { format } from "date-fns";
 
 import PurchaseSummary from "./PurchaseSummary";
 import AddItemFormModal from "../../components/invoice/AddItemFormModal";
+import api from "../../utils/api";
 
 // -------------------------------
-// Small inline product-combobox — "add row" row-e use hoy
+// Inline product combobox for the "add row" — uses a PORTAL so its dropdown
+// is never clipped by any ancestor's overflow-hidden/overflow-x-auto.
 // -------------------------------
-function ProductPicker({ products, onSelect }) {
+function InlineProductCombobox({ products, onSelect, onCreateNew }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const updateCoords = () => {
+    if (!inputRef.current) return;
+    const rect = inputRef.current.getBoundingClientRect();
+    setCoords({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    updateCoords();
+    const handle = () => updateCoords();
+    window.addEventListener("scroll", handle, true);
+    window.addEventListener("resize", handle);
+    return () => {
+      window.removeEventListener("scroll", handle, true);
+      window.removeEventListener("resize", handle);
+    };
+  }, [open]);
 
   useEffect(() => {
     const onClickOutside = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      if (
+        inputRef.current &&
+        !inputRef.current.contains(e.target) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target)
+      ) {
+        setOpen(false);
+      }
     };
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
@@ -31,14 +77,20 @@ function ProductPicker({ products, onSelect }) {
 
   const filtered = (() => {
     const q = query.trim().toLowerCase();
-    if (!q) return products.slice(0, 20);
-    return products.filter(
-      (p) =>
-        p.name?.toLowerCase().includes(q) ||
-        p.hsn?.toLowerCase().includes(q) ||
-        p.sku?.toLowerCase().includes(q)
-    );
+    if (!q) return products.slice(0, 15);
+    return products
+      .filter(
+        (p) =>
+          p.name?.toLowerCase().includes(q) ||
+          p.hsn?.toLowerCase().includes(q) ||
+          p.sku?.toLowerCase().includes(q),
+      )
+      .slice(0, 15);
   })();
+
+  const exactMatch = products.some(
+    (p) => p.name?.toLowerCase().trim() === query.trim().toLowerCase(),
+  );
 
   const pick = (product) => {
     onSelect(product);
@@ -46,35 +98,51 @@ function ProductPicker({ products, onSelect }) {
     setOpen(false);
   };
 
+  const handleCreateNew = () => {
+    onCreateNew(query.trim());
+    setQuery("");
+    setOpen(false);
+  };
+
   return (
-    <div ref={ref} className="relative w-full">
+    <div className="relative w-full">
       <div className="relative">
-        <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
         <input
+          ref={inputRef}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          placeholder="Search product to add..."
-          className="w-full h-9 pl-7 pr-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+          className="w-full max-w-[220px] h-8 px-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
         />
       </div>
 
-      {open && (
-        <div className="absolute z-30 left-0 right-0 top-10 bg-white border border-slate-200 rounded-md shadow-lg max-h-64 overflow-y-auto">
-          {filtered.length === 0 ? (
-            <p className="text-xs text-slate-400 text-center py-4">No products found</p>
-          ) : (
-            filtered.map((p) => (
+      {open &&
+        typeof window !== "undefined" &&
+        createPortal(
+          <div
+            ref={dropdownRef}
+            style={{
+              position: "fixed",
+              top: coords.top,
+              left: coords.left,
+              width: coords.width,
+              zIndex: 9999,
+            }}
+            className="bg-white border border-slate-200 rounded-md shadow-lg max-h-72 overflow-y-auto"
+          >
+            {filtered.map((p) => (
               <div
                 key={p._id}
                 onClick={() => pick(p)}
                 className="flex items-center justify-between px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0"
               >
                 <div className="min-w-0">
-                  <p className="font-medium text-slate-800 truncate">{p.name}</p>
+                  <p className="font-medium text-slate-800 truncate">
+                    {p.name}
+                  </p>
                   <p className="text-[11px] text-slate-400">
                     HSN: {p.hsn || "-"} · {p.unit || "Pcs"}
                   </p>
@@ -83,10 +151,27 @@ function ProductPicker({ products, onSelect }) {
                   ₹{Number(p.costPrice ?? 0).toFixed(2)}
                 </span>
               </div>
-            ))
-          )}
-        </div>
-      )}
+            ))}
+
+            {filtered.length === 0 && !query.trim() && (
+              <p className="text-xs text-slate-400 text-center py-4">
+                Start typing to search products
+              </p>
+            )}
+
+            {query.trim() && !exactMatch && (
+              <button
+                type="button"
+                onClick={handleCreateNew}
+                className="w-full flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-blue-600 hover:bg-blue-50 border-t border-slate-100"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Create "{query.trim()}" as new product
+              </button>
+            )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -128,9 +213,7 @@ export default function NewPurchaseFormPage({
   handleRemoveItem,
   handleClearCart,
 }) {
-  // -------------------------------
-  // Vendor form state — vendor schema er sathe consistent (customer form er moto)
-  // -------------------------------
+  console.log("NewPurchaseFormPage received storedata:", storedata);
   const [vendorForm, setVendorForm] = useState(() => ({
     ...emptyVendorForm,
     ...(selectedVendor
@@ -146,62 +229,79 @@ export default function NewPurchaseFormPage({
       : {}),
   }));
 
-  const [selectedVendorId, setSelectedVendorId] = useState(selectedVendor?._id || "");
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedVendorId, setSelectedVendorId] = useState(
+    selectedVendor?._id || "",
+  );
+  // ✅ which field's typeahead dropdown is currently open: "name" | "mobile" | null
+  const [activeField, setActiveField] = useState(null);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
-  const wrapperRef = useRef(null);
+  const [newItemPrefillName, setNewItemPrefillName] = useState("");
+  const vendorGridRef = useRef(null);
+  const [editingCartItem, setEditingCartItem] = useState(null);
+  const [fetchingItemId, setFetchingItemId] = useState(null);
 
   useEffect(() => {
     const onClickOutside = (e) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
-        setDropdownOpen(false);
+      if (vendorGridRef.current && !vendorGridRef.current.contains(e.target)) {
+        setActiveField(null);
       }
     };
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
-  // ✅ EDIT MODE — vendors list loaded hobar por mobile diye match kore
-  // dropdown-e select + lock kore dao
-  useEffect(() => {
-    if (!isEditMode || selectedVendorId || vendors.length === 0) return;
-    if (!selectedVendor?.mobile) return;
+  // ✅ EDIT MODE — jokhon vendor data load complete hoy (isLoading false hoy),
+  // selectedVendor prop theke vendorForm sorasori bhore dao — vendors list-e
+  // mobile match paoya jak ba na jak, form-e data thik e dekhabe.
+  const editSeededRef = useRef(false);
 
-    const matched = vendors.find((v) => v.mobile === selectedVendor.mobile);
-    if (matched) {
-      setSelectedVendorId(matched._id);
+  useEffect(() => {
+    if (isLoading) {
+      editSeededRef.current = false; // next load-er jonno reset
+      return;
+    }
+
+    if (isEditMode && !editSeededRef.current && selectedVendor) {
+      editSeededRef.current = true;
+
       setVendorForm({
-        name: matched.name || "",
-        mobile: matched.mobile || "",
-        address: matched.address || "",
-        city: matched.city || "",
-        state: matched.state || "",
-        postalCode: matched.postalCode || "",
-        gstNumber: matched.gstNumber || "",
+        name: selectedVendor.name || "",
+        mobile: selectedVendor.mobile || "",
+        address: selectedVendor.address || "",
+        city: selectedVendor.city || "",
+        state: selectedVendor.state || "",
+        postalCode: selectedVendor.postalCode || "",
+        gstNumber: selectedVendor.gstNumber || "",
       });
+
+      const matched = vendors.find((v) => v.mobile === selectedVendor.mobile);
+      if (matched) setSelectedVendorId(matched._id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditMode, vendors]);
+  }, [isLoading, isEditMode, selectedVendor, vendors]);
 
   // ✅ Push vendorForm up to parent as selectedVendor whenever it changes
   useEffect(() => {
     const hasData = vendorForm.name || vendorForm.mobile;
-    setSelectedVendor(hasData ? { _id: selectedVendorId || undefined, ...vendorForm } : null);
+    setSelectedVendor(
+      hasData ? { _id: selectedVendorId || undefined, ...vendorForm } : null,
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendorForm, selectedVendorId]);
 
-  const isLocked = !!selectedVendorId;
-
-  const filteredVendors = (() => {
-    const q = searchTerm.trim().toLowerCase();
-    if (!q) return vendors.slice(0, 20);
-    return vendors.filter(
-      (v) => v.name?.toLowerCase().includes(q) || v.mobile?.includes(q)
-    );
+  // ✅ Typeahead suggestions — filtered live by whichever field (name/mobile) is active
+  const vendorSuggestions = (() => {
+    if (!activeField) return [];
+    const q = (activeField === "mobile" ? vendorForm.mobile : vendorForm.name)
+      .trim()
+      .toLowerCase();
+    if (!q) return vendors.slice(0, 8);
+    return vendors
+      .filter((v) => v.name?.toLowerCase().includes(q) || v.mobile?.includes(q))
+      .slice(0, 8);
   })();
 
-  const pickVendor = (v) => {
+  const pickVendorSuggestion = (v) => {
     setSelectedVendorId(v._id);
     setVendorForm({
       name: v.name || "",
@@ -212,33 +312,128 @@ export default function NewPurchaseFormPage({
       postalCode: v.postalCode || "",
       gstNumber: v.gstNumber || "",
     });
-    setDropdownOpen(false);
-    setSearchTerm("");
+    setActiveField(null);
   };
 
-  const handleNewVendor = () => {
-    setSelectedVendorId("");
-    setVendorForm(emptyVendorForm);
-    setDropdownOpen(false);
-    setSearchTerm("");
-  };
-
-  const handleChangeVendor = () => {
+  const handleClearVendor = () => {
     setSelectedVendorId("");
     setVendorForm(emptyVendorForm);
   };
 
   const updateField = (field) => (e) => {
-    setVendorForm((prev) => ({ ...prev, [field]: e.target.value }));
+    const v = e.target.value;
+    setVendorForm((prev) => ({ ...prev, [field]: v }));
+
+    // ✅ jodi user select kora vendor-er field change kore, detach kore dao
+    if (selectedVendorId) {
+      const matched = vendors.find((vd) => vd._id === selectedVendorId);
+      if (matched && matched[field] !== v) setSelectedVendorId("");
+    }
   };
 
   const handleAddRow = (product) => {
     addToCart(product);
   };
 
+  const handleCreateNewProduct = (typedName) => {
+    setNewItemPrefillName(typedName);
+    setShowAddItemModal(true);
+  };
+
+ const handleEditItem = async (item) => {
+  const productId = item.product || item._id;
+  const isValidObjectId = (id) => /^[0-9a-fA-F]{24}$/.test(String(id || ""));
+
+  if (!isValidObjectId(productId)) {
+    setEditingCartItem({ ...item, cartItemId: item._id });
+    setNewItemPrefillName("");
+    setShowAddItemModal(true);
+    return;
+  }
+
+  try {
+    setFetchingItemId(item._id);
+    const res = await api.get(`/product/id/${productId}`);
+    const freshProduct = res?.data?.data || res?.data;
+
+    if (freshProduct) {
+      // ✅ freshProduct-er nijer real _id ke overwrite na kore rekhe dao —
+      // eta diyei AddItemFormModal PUT call korbe
+      setEditingCartItem({
+        ...freshProduct,
+        cartItemId: item._id, // ✅ cart row track korar jonno alada field
+      });
+    } else {
+      setEditingCartItem({ ...item, cartItemId: item._id });
+    }
+  } catch (err) {
+    console.warn("Failed to fetch fresh product data for edit:", err);
+    setEditingCartItem({ ...item, cartItemId: item._id });
+  } finally {
+    setFetchingItemId(null);
+    setNewItemPrefillName("");
+    setShowAddItemModal(true);
+  }
+};
+
   const handleNewProductCreated = (newItem) => {
+  if (editingCartItem) {
+    const targetId = editingCartItem.cartItemId || editingCartItem._id;
+
+    // ✅ edit mode — existing cart item field-gulo update kore dao
+    handleUpdateItemField(targetId, "name", newItem.name);
+    handleUpdateItemField(targetId, "hsn", newItem.hsn || "");
+    handleUpdateItemField(targetId, "unit", newItem.unit || "PCS");
+    handleUpdateItemField(
+      targetId,
+      "costPrice",
+      Number(newItem.costPrice || 0),
+    );
+    handleUpdateItemField(
+      targetId,
+      "gstRate",
+      Number(newItem.purchaseGstRate ?? newItem.gstRate ?? 0),
+    );
+    handleUpdateItemField(
+      targetId,
+      "isPurchaseTaxInclusive",
+      Boolean(newItem.isPurchaseTaxInclusive),
+    );
+    handleUpdateItemField(targetId, "mrp", Number(newItem.mrp || 0));
+
+    setAllProducts?.((prev) => [
+      newItem,
+      ...prev.filter((p) => p._id !== newItem._id),
+    ]);
+    setEditingCartItem(null);
+  } else {
     setAllProducts?.((prev) => [newItem, ...prev]);
     addToCart(newItem);
+  }
+  setNewItemPrefillName("");
+};
+
+  // -------------------------------
+  // ✅ Number field helpers — free typing (0, 1, 10, decimals etc.)
+  // -------------------------------
+  const handleQtyChange = (id) => (e) => {
+    const v = e.target.value.replace(/[^\d]/g, "");
+    handleUpdateItemField(id, "qty", v);
+  };
+  const handleQtyBlur = (id) => (e) => {
+    const n = parseInt(e.target.value, 10);
+    handleUpdateItemField(id, "qty", isNaN(n) || n < 1 ? 1 : n);
+  };
+
+  const handleDecimalChange = (id, field) => (e) => {
+    let v = e.target.value.replace(/[^\d.]/g, "");
+    const parts = v.split(".");
+    if (parts.length > 2) v = parts[0] + "." + parts.slice(1).join("");
+    handleUpdateItemField(id, field, v);
+  };
+  const handleDecimalBlur = (id, field) => (e) => {
+    const n = parseFloat(e.target.value);
+    handleUpdateItemField(id, field, isNaN(n) ? 0 : n);
   };
 
   if (isLoading) {
@@ -255,7 +450,12 @@ export default function NewPurchaseFormPage({
         {/* Header */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-4 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={onBack} className="rounded-full hover:bg-slate-100">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onBack}
+              className="rounded-full hover:bg-slate-100"
+            >
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <div>
@@ -264,12 +464,15 @@ export default function NewPurchaseFormPage({
                   {isEditMode ? "Edit Purchase" : "New Purchase"}
                 </h1>
                 {isEditMode && (
-                  <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Editing</Badge>
+                  <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">
+                    Editing
+                  </Badge>
                 )}
               </div>
               <p className="text-sm text-slate-400 flex items-center gap-1 mt-0.5">
                 <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-                Add a vendor and items to {isEditMode ? "update" : "record"} the purchase
+                Add a vendor and items to {isEditMode ? "update" : "record"} the
+                purchase
               </p>
             </div>
           </div>
@@ -296,115 +499,91 @@ export default function NewPurchaseFormPage({
 
         {/* Vendor */}
         <Card className="rounded-xl border-slate-200 shadow-sm overflow-visible relative">
-          <CardHeader className="bg-slate-50 border-b border-slate-100 py-2.5 px-4">
+          <CardHeader className="bg-slate-50 border-b border-slate-100 py-2.5 px-4 rounded-t-xl">
             <CardTitle className="flex items-center justify-between text-sm font-semibold text-slate-700">
               <span className="flex items-center gap-2">
                 <Truck className="w-4 h-4 text-blue-600" />
                 Vendor
               </span>
-              {isLocked && (
+              {(vendorForm.name || vendorForm.mobile) && (
                 <button
-                  onClick={handleChangeVendor}
-                  className="text-xs text-blue-600 hover:underline font-medium"
+                  onClick={handleClearVendor}
+                  className="flex items-center gap-1 text-xs text-rose-500 hover:underline font-medium"
                 >
-                  Change
+                  <X className="w-3 h-3" />
+                  Clear
                 </button>
               )}
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-4 space-y-4">
-            {/* ── Select Vendor dropdown ── */}
-            <div ref={wrapperRef} className="relative">
-              <label className="text-xs font-medium text-slate-500 mb-1 block">
-                Select Vendor
-              </label>
-              <button
-                type="button"
-                onClick={() => setDropdownOpen((v) => !v)}
-                className="w-full h-10 px-3 rounded-md border border-slate-200 bg-white flex items-center justify-between text-sm hover:bg-slate-50"
-              >
-                <span className={vendorForm.name || vendorForm.mobile ? "text-slate-800" : "text-slate-400"}>
-                  {isLocked
-                    ? `${vendorForm.name || "Unnamed"} — ${vendorForm.mobile || "-"}`
-                    : vendorForm.name || vendorForm.mobile
-                    ? "New vendor (typed manually)"
-                    : "Select existing vendor or type new below"}
-                </span>
-                <ChevronDown className="w-4 h-4 text-slate-400" />
-              </button>
-
-              {dropdownOpen && (
-                <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg overflow-hidden">
-                  <div className="p-2 border-b border-slate-100">
-                    <div className="relative">
-                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                      <input
-                        autoFocus
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Search by name or mobile..."
-                        className="w-full h-9 pl-8 pr-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleNewVendor}
-                    className="w-full text-left px-3 py-2.5 text-sm font-medium text-blue-600 hover:bg-blue-50 border-b border-slate-100"
-                  >
-                    + New Vendor (type details manually)
-                  </button>
-
-                  <div className="max-h-56 overflow-y-auto">
-                    {filteredVendors.length === 0 ? (
-                      <p className="text-xs text-slate-400 text-center py-4">No vendors found</p>
-                    ) : (
-                      filteredVendors.map((v) => (
-                        <div
-                          key={v._id}
-                          onClick={() => pickVendor(v)}
-                          className={`flex items-center justify-between px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0 ${
-                            selectedVendorId === v._id ? "bg-blue-50" : ""
-                          }`}
-                        >
-                          <div className="min-w-0">
-                            <p className="font-medium text-slate-800 truncate">{v.name}</p>
-                            <p className="text-[11px] text-slate-400">
-                              {v.mobile} {v.gstNumber ? `· ${v.gstNumber}` : ""}
-                            </p>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* ── Field grid — mirrors vendor schema exactly ── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <CardContent className="p-4">
+            <div
+              ref={vendorGridRef}
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
+            >
+              {/* Mobile — typeahead */}
               <div className="relative">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 z-10" />
                 <input
                   value={vendorForm.mobile}
                   onChange={updateField("mobile")}
-                  disabled={isLocked}
+                  onFocus={() => setActiveField("mobile")}
                   maxLength={10}
                   placeholder="Mobile *"
-                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-500"
+                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
+                {activeField === "mobile" && vendorSuggestions.length > 0 && (
+                  <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-56 overflow-y-auto">
+                    {vendorSuggestions.map((v) => (
+                      <div
+                        key={v._id}
+                        onClick={() => pickVendorSuggestion(v)}
+                        className="flex items-center justify-between px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-medium text-slate-800 truncate">
+                            {v.name || "Unnamed"}
+                          </p>
+                          <p className="text-[11px] text-slate-400">
+                            {v.mobile}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
+              {/* Name — typeahead */}
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 z-10" />
                 <input
                   value={vendorForm.name}
                   onChange={updateField("name")}
-                  disabled={isLocked}
+                  onFocus={() => setActiveField("name")}
                   placeholder="Name"
-                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-500"
+                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
+                {activeField === "name" && vendorSuggestions.length > 0 && (
+                  <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-56 overflow-y-auto">
+                    {vendorSuggestions.map((v) => (
+                      <div
+                        key={v._id}
+                        onClick={() => pickVendorSuggestion(v)}
+                        className="flex items-center justify-between px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-medium text-slate-800 truncate">
+                            {v.name || "Unnamed"}
+                          </p>
+                          <p className="text-[11px] text-slate-400">
+                            {v.mobile}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="relative">
@@ -412,11 +591,13 @@ export default function NewPurchaseFormPage({
                 <input
                   value={vendorForm.gstNumber}
                   onChange={(e) =>
-                    setVendorForm((prev) => ({ ...prev, gstNumber: e.target.value.toUpperCase() }))
+                    setVendorForm((prev) => ({
+                      ...prev,
+                      gstNumber: e.target.value.toUpperCase(),
+                    }))
                   }
-                  disabled={isLocked}
                   placeholder="GSTIN (optional)"
-                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-500"
+                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
               </div>
 
@@ -425,9 +606,8 @@ export default function NewPurchaseFormPage({
                 <input
                   value={vendorForm.address}
                   onChange={updateField("address")}
-                  disabled={isLocked}
                   placeholder="Address"
-                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-500"
+                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
               </div>
 
@@ -436,9 +616,8 @@ export default function NewPurchaseFormPage({
                 <input
                   value={vendorForm.city}
                   onChange={updateField("city")}
-                  disabled={isLocked}
                   placeholder="City"
-                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-500"
+                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
               </div>
 
@@ -446,19 +625,17 @@ export default function NewPurchaseFormPage({
                 <input
                   value={vendorForm.state}
                   onChange={updateField("state")}
-                  disabled={isLocked}
                   placeholder="State"
-                  className="w-full h-10 px-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-500"
+                  className="w-full h-10 px-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
                 <div className="relative">
                   <Locate className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                   <input
                     value={vendorForm.postalCode}
                     onChange={updateField("postalCode")}
-                    disabled={isLocked}
                     maxLength={6}
                     placeholder="Postal Code"
-                    className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-500"
+                    className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
               </div>
@@ -482,7 +659,10 @@ export default function NewPurchaseFormPage({
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => setShowAddItemModal(true)}
+                onClick={() => {
+                  setNewItemPrefillName("");
+                  setShowAddItemModal(true);
+                }}
                 className="h-7 rounded-full text-xs gap-1"
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -494,58 +674,85 @@ export default function NewPurchaseFormPage({
             <table className="w-full text-sm border-collapse min-w-[900px]">
               <thead>
                 <tr className="bg-slate-50 text-slate-500 text-xs">
-                  <th className="text-left font-medium px-3 py-2 border-b border-slate-100 w-10">#</th>
-                  <th className="text-left font-medium px-3 py-2 border-b border-slate-100">Product</th>
-                  <th className="text-left font-medium px-3 py-2 border-b border-slate-100 w-20">HSN</th>
-                  <th className="text-left font-medium px-3 py-2 border-b border-slate-100 w-16">Unit</th>
-                  <th className="text-center font-medium px-3 py-2 border-b border-slate-100 w-20">Qty</th>
-                  <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-24">Cost Price</th>
-                  <th className="text-center font-medium px-3 py-2 border-b border-slate-100 w-32">Discount</th>
-                  <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-16">GST%</th>
-                  <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-28">Total</th>
+                  <th className="text-left font-medium px-3 py-2 border-b border-slate-100 w-10">
+                    #
+                  </th>
+                  <th className="text-left font-medium px-3 py-2 border-b border-slate-100">
+                    Product
+                  </th>
+                  <th className="text-left font-medium px-3 py-2 border-b border-slate-100 w-20">
+                    HSN
+                  </th>
+                  <th className="text-left font-medium px-3 py-2 border-b border-slate-100 w-16">
+                    Unit
+                  </th>
+                  <th className="text-center font-medium px-3 py-2 border-b border-slate-100 w-20">
+                    Qty
+                  </th>
+                  <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-24">
+                    Cost Price
+                  </th>
+                  <th className="text-center font-medium px-3 py-2 border-b border-slate-100 w-32">
+                    Discount
+                  </th>
+                  <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-16">
+                    GST%
+                  </th>
+                  <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-28">
+                    Total
+                  </th>
                   <th className="w-10 border-b border-slate-100"></th>
                 </tr>
               </thead>
               <tbody>
                 {cartItems.map((item, i) => (
                   <tr key={item._id} className="hover:bg-slate-50/60">
-                    <td className="px-3 py-1.5 border-b border-slate-100 text-slate-400">{i + 1}</td>
+                    <td className="px-3 py-1.5 border-b border-slate-100 text-slate-400">
+                      {i + 1}
+                    </td>
                     <td className="px-3 py-1.5 border-b border-slate-100 font-medium text-slate-800">
                       {item.name}
                     </td>
-                    <td className="px-3 py-1.5 border-b border-slate-100 text-slate-500">{item.hsn || "-"}</td>
-                    <td className="px-3 py-1.5 border-b border-slate-100 text-slate-500">{item.unit || "Pcs"}</td>
+                    <td className="px-3 py-1.5 border-b border-slate-100 text-slate-500">
+                      {item.hsn || "-"}
+                    </td>
+                    <td className="px-3 py-1.5 border-b border-slate-100 text-slate-500">
+                      {item.unit || "Pcs"}
+                    </td>
                     <td className="px-2 py-1.5 border-b border-slate-100">
                       <input
-                        type="number"
-                        min={1}
+                        type="text"
+                        inputMode="numeric"
                         value={item.qty}
-                        onChange={(e) => handleUpdateQuantity(item._id, Number(e.target.value) || 0)}
+                        onChange={handleQtyChange(item._id)}
+                        onBlur={handleQtyBlur(item._id)}
                         className="w-16 h-8 text-center border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 mx-auto block"
                       />
                     </td>
                     <td className="px-2 py-1.5 border-b border-slate-100">
                       <input
-                        type="number"
-                        min={0}
-                        step="0.01"
+                        type="text"
+                        inputMode="decimal"
                         value={item.costPrice ?? 0}
-                        onChange={(e) =>
-                          handleUpdateItemField(item._id, "costPrice", Number(e.target.value) || 0)
-                        }
+                        onChange={handleDecimalChange(item._id, "costPrice")}
+                        onBlur={handleDecimalBlur(item._id, "costPrice")}
                         className="w-20 h-8 text-right px-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                       />
                     </td>
                     <td className="px-2 py-1.5 border-b border-slate-100">
                       <div className="flex items-center gap-1">
                         <input
-                          type="number"
-                          min={0}
-                          step="0.01"
+                          type="text"
+                          inputMode="decimal"
                           value={item.purchaseDiscount ?? 0}
-                          onChange={(e) =>
-                            handleUpdateItemField(item._id, "purchaseDiscount", Number(e.target.value) || 0)
-                          }
+                          onChange={handleDecimalChange(
+                            item._id,
+                            "purchaseDiscount",
+                          )}
+                          onBlur={handleDecimalBlur(
+                            item._id,
+                            "purchaseDiscount",
+                          )}
                           className="w-16 h-8 text-right px-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
                         <button
@@ -554,13 +761,17 @@ export default function NewPurchaseFormPage({
                             handleUpdateItemField(
                               item._id,
                               "purchaseDiscountType",
-                              (item.purchaseDiscountType || "amount") === "amount" ? "percent" : "amount"
+                              (item.purchaseDiscountType || "amount") ===
+                                "amount"
+                                ? "percent"
+                                : "amount",
                             )
                           }
                           title="Toggle discount type"
                           className="w-8 h-8 shrink-0 flex items-center justify-center rounded-md border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
                         >
-                          {(item.purchaseDiscountType || "amount") === "percent" ? (
+                          {(item.purchaseDiscountType || "amount") ===
+                          "percent" ? (
                             <Percent className="w-3.5 h-3.5" />
                           ) : (
                             "₹"
@@ -576,6 +787,18 @@ export default function NewPurchaseFormPage({
                     </td>
                     <td className="px-2 py-1.5 border-b border-slate-100 text-center">
                       <button
+                        onClick={() => handleEditItem(item)}
+                        disabled={fetchingItemId === item._id}
+                        className="w-7 h-7 flex items-center justify-center rounded-full text-blue-500 hover:bg-blue-50 hover:text-blue-600 disabled:opacity-50"
+                        title="Edit item"
+                      >
+                        {fetchingItemId === item._id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Pencil className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                      <button
                         onClick={() => handleRemoveItem(item._id)}
                         className="w-7 h-7 flex items-center justify-center rounded-full text-rose-400 hover:bg-rose-50 hover:text-rose-500"
                       >
@@ -587,13 +810,17 @@ export default function NewPurchaseFormPage({
 
                 {/* Add-row */}
                 <tr>
-                  <td className="px-3 py-2 text-slate-300">{cartItems.length + 1}</td>
-                  <td colSpan={2} className="px-2 py-2">
-                    <ProductPicker products={products} onSelect={handleAddRow} />
+                  <td className="px-3 py-2 text-slate-300">
+                    {cartItems.length + 1}
                   </td>
-                  <td colSpan={7} className="px-3 py-2 text-xs text-slate-400">
-                    Select an existing product above, or click "New Product" to create one
+                  <td className="px-2 py-2">
+                    <InlineProductCombobox
+                      products={products}
+                      onSelect={handleAddRow}
+                      onCreateNew={handleCreateNewProduct}
+                    />
                   </td>
+                  <td colSpan={8} className="px-3 py-2"></td>
                 </tr>
               </tbody>
             </table>
@@ -620,7 +847,10 @@ export default function NewPurchaseFormPage({
               paymentNote={paymentNote}
               handleCreatePurchase={handleCreatePurchase}
               isLoading={isSubmitting}
-              disabled={!(vendorForm.name || vendorForm.mobile) || cartItems.length === 0}
+              disabled={
+                !(vendorForm.name || vendorForm.mobile) ||
+                cartItems.length === 0
+              }
               payment={payment}
               cartItems={cartItems}
               formValues={formValues}
@@ -633,11 +863,15 @@ export default function NewPurchaseFormPage({
         </Card>
       </div>
 
-      {/* নতুন item add করার modal — "+ New Product" থেকে */}
       <AddItemFormModal
         open={showAddItemModal}
-        onOpenChange={setShowAddItemModal}
+        onOpenChange={(open) => {
+          setShowAddItemModal(open);
+          if (!open) setEditingCartItem(null);
+        }}
         onItemCreated={handleNewProductCreated}
+        initialItemName={newItemPrefillName}
+        editItem={editingCartItem}
       />
     </div>
   );

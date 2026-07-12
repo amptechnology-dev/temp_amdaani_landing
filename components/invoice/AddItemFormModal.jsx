@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Formik, Form } from "formik";
 import * as Yup from "yup";
 import { toast } from "sonner";
@@ -15,6 +15,8 @@ import {
   Trash2,
   Pencil,
   ChevronDown,
+  Warehouse,
+  Info,
 } from "lucide-react";
 
 import {
@@ -22,11 +24,13 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import {
   Select,
   SelectTrigger,
@@ -66,13 +70,8 @@ const UNITS = [
 
 const COMMON_GST_RATES = [0, 5, 12, 18, 28];
 
-// ✅ MongoDB ObjectId hard validator — kokhono raw text (jemon "medicine")
-// category/hsn field e boshte deoya jabe na
 const isValidObjectId = (id) => /^[0-9a-fA-F]{24}$/.test(String(id || ""));
 
-// ✅ RN er "newCategory.data || newCategory" fallback — backend response
-// kokhono ekta extra layer nested thake (res.data.data), kokhono thake na.
-// Ei helper dutoi case handle kore, ebong shob shomoy ekta array-e normalize kore.
 const unwrapDoc = (res) => {
   const raw = res?.data;
   if (raw && typeof raw === "object" && !Array.isArray(raw) && raw.data) {
@@ -89,6 +88,36 @@ const unwrapList = (res) => {
   return [];
 };
 
+// ✅ ItemsPage er moto opening stock validation
+function validateOpeningStockValues(stockStr, valueStr, isEdit = false) {
+  const errors = {};
+  const hasStock = stockStr !== "" && stockStr !== undefined && stockStr !== null;
+  const hasValue = valueStr !== "" && valueStr !== undefined && valueStr !== null;
+
+  if (hasValue && !hasStock) {
+    errors.openingStock = "Opening stock quantity is required when value is entered";
+  }
+
+  if (hasStock) {
+    const num = Number(stockStr);
+    if (isNaN(num)) {
+      errors.openingStock = "Opening stock must be a number";
+    } else if (isEdit) {
+      if (num < 0) errors.openingStock = "Opening stock cannot be negative";
+    } else if (num <= 0) {
+      errors.openingStock = "Opening stock must be greater than 0";
+    }
+  }
+
+  if (hasValue) {
+    const num = Number(valueStr);
+    if (isNaN(num)) errors.openingStockValue = "Value must be a number";
+    else if (num < 0) errors.openingStockValue = "Value cannot be negative";
+  }
+
+  return errors;
+}
+
 const validationSchema = Yup.object().shape({
   itemName: Yup.string().trim().required("Item name is required").min(2),
   hsnCode: Yup.string().trim(),
@@ -104,14 +133,10 @@ const validationSchema = Yup.object().shape({
     .nullable()
     .min(0, "Discount cannot be negative")
     .typeError("Must be a number"),
-  openingStock: Yup.number()
-    .nullable()
-    .min(0, "Cannot be negative")
-    .typeError("Must be a number"),
 });
 
 // =========================================================
-// Category inline creator — mirrors RN AddCategoryBottomSheet
+// Category inline creator
 // =========================================================
 function CategorySection({ value, onChange }) {
   const [categories, setCategories] = useState([]);
@@ -141,6 +166,11 @@ function CategorySection({ value, onChange }) {
     if (open) fetchCategories();
   }, [open]);
 
+  useEffect(() => {
+    if (value && categories.length === 0) fetchCategories();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
   const filtered = useMemo(() => {
     let list = categories;
     if (search.trim()) {
@@ -154,7 +184,7 @@ function CategorySection({ value, onChange }) {
 
   const handleSelect = (cat) => {
     if (value === cat._id) {
-      onChange(""); // toggle deselect — RN behavior
+      onChange("");
     } else {
       onChange(cat._id);
     }
@@ -170,8 +200,6 @@ function CategorySection({ value, onChange }) {
       const res = await api.post("/category", { name: nameTyped });
       const created = unwrapDoc(res);
 
-      // ✅ Guard: response structure jai hok na keno, sudhu bandho id thakle
-      // field e boshbe. Nahole raw text ("medicine") kokhono form field e jabe na.
       if (created && isValidObjectId(created._id)) {
         setCategories((prev) => [...prev, created]);
         onChange(created._id);
@@ -181,13 +209,11 @@ function CategorySection({ value, onChange }) {
         return;
       }
 
-      // ✅ Fallback — RN app er moto: response e valid _id na pele,
-      // category list abar fetch kore naam mile khuje ber kori
       const listRes = await api.get("/category");
       const freshList = unwrapList(listRes);
       setCategories(freshList);
       const matched = freshList.find(
-        (c) => c.name?.toLowerCase().trim() === nameTyped.toLowerCase()
+        (c) => c.name?.toLowerCase().trim() === nameTyped.toLowerCase(),
       );
 
       if (matched && isValidObjectId(matched._id)) {
@@ -197,7 +223,7 @@ function CategorySection({ value, onChange }) {
         toast.success("Category created and selected!");
       } else {
         toast.error(
-          "Category created but couldn't auto-select it. Please pick it from the list."
+          "Category created but couldn't auto-select it. Please pick it from the list.",
         );
       }
     } catch {
@@ -213,9 +239,12 @@ function CategorySection({ value, onChange }) {
       const res = await api.put(`/category/id/${editTarget._id}`, {
         name: editName.trim(),
       });
-      const updated = unwrapDoc(res) || { ...editTarget, name: editName.trim() };
+      const updated = unwrapDoc(res) || {
+        ...editTarget,
+        name: editName.trim(),
+      };
       setCategories((prev) =>
-        prev.map((c) => (c._id === editTarget._id ? updated : c))
+        prev.map((c) => (c._id === editTarget._id ? updated : c)),
       );
       toast.success("Category updated");
       setEditTarget(null);
@@ -248,7 +277,9 @@ function CategorySection({ value, onChange }) {
             type="button"
             className="mt-1 w-full h-10 px-3 rounded-md border border-slate-200 bg-white flex items-center justify-between text-sm hover:bg-slate-50"
           >
-            <span className={selectedCategory ? "text-slate-800" : "text-slate-400"}>
+            <span
+              className={selectedCategory ? "text-slate-800" : "text-slate-400"}
+            >
               {selectedCategory?.name || "Select category"}
             </span>
             <ChevronDown className="w-4 h-4 text-slate-400" />
@@ -385,7 +416,9 @@ function CategorySection({ value, onChange }) {
                   >
                     <span
                       className={`text-sm truncate ${
-                        selected ? "text-blue-700 font-medium" : "text-slate-700"
+                        selected
+                          ? "text-blue-700 font-medium"
+                          : "text-slate-700"
                       }`}
                     >
                       {cat.name}
@@ -421,7 +454,10 @@ function CategorySection({ value, onChange }) {
         </PopoverContent>
       </Popover>
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={() => setDeleteTarget(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Category</AlertDialogTitle>
@@ -445,8 +481,7 @@ function CategorySection({ value, onChange }) {
 }
 
 // =========================================================
-// HSN Code inline creator — mirrors RN HsnCodeSelectorBottomSheet
-// + AddHsnCodeBottomSheet exactly (code, description, GST rate chips)
+// HSN Code inline creator
 // =========================================================
 function HsnCodeSection({ value, gstRate, onHsnSelect }) {
   const [hsnCodes, setHsnCodes] = useState([]);
@@ -483,7 +518,7 @@ function HsnCodeSection({ value, gstRate, onHsnSelect }) {
     return hsnCodes.filter(
       (h) =>
         h.code?.toLowerCase().includes(q) ||
-        h.description?.toLowerCase().includes(q)
+        h.description?.toLowerCase().includes(q),
     );
   }, [hsnCodes, search]);
 
@@ -501,13 +536,15 @@ function HsnCodeSection({ value, gstRate, onHsnSelect }) {
   const validateNewHsn = () => {
     const errs = {};
     if (!newCode.trim()) errs.code = "HSN code is required";
-    else if (!/^\d+$/.test(newCode.trim())) errs.code = "HSN code must contain only numbers";
+    else if (!/^\d+$/.test(newCode.trim()))
+      errs.code = "HSN code must contain only numbers";
 
     if (newGstRate.trim() === "") errs.gstRate = "GST rate is required";
     else {
       const rate = parseFloat(newGstRate);
       if (isNaN(rate)) errs.gstRate = "GST rate must be a valid number";
-      else if (rate < 0 || rate > 100) errs.gstRate = "GST rate must be between 0 and 100";
+      else if (rate < 0 || rate > 100)
+        errs.gstRate = "GST rate must be between 0 and 100";
     }
     setFormErrors(errs);
     return Object.keys(errs).length === 0;
@@ -536,7 +573,6 @@ function HsnCodeSection({ value, gstRate, onHsnSelect }) {
         return;
       }
 
-      // ✅ Fallback — response e proper doc na pele list refetch kore code diye khuje ber kori
       const listRes = await api.get("/hsncode");
       const freshList = unwrapList(listRes);
       setHsnCodes(freshList);
@@ -552,7 +588,7 @@ function HsnCodeSection({ value, gstRate, onHsnSelect }) {
         toast.success("HSN code created and selected!");
       } else {
         toast.error(
-          "HSN code created but couldn't auto-select it. Please pick it from the list."
+          "HSN code created but couldn't auto-select it. Please pick it from the list.",
         );
       }
     } catch {
@@ -572,7 +608,9 @@ function HsnCodeSection({ value, gstRate, onHsnSelect }) {
             className="mt-1 w-full h-10 px-3 rounded-md border border-slate-200 bg-white flex items-center justify-between text-sm hover:bg-slate-50"
           >
             <span className={value ? "text-slate-800" : "text-slate-400"}>
-              {value ? `${value}${gstRate ? ` (${gstRate}% GST)` : ""}` : "Select HSN code"}
+              {value
+                ? `${value}${gstRate ? ` (${gstRate}% GST)` : ""}`
+                : "Select HSN code"}
             </span>
             <ChevronDown className="w-4 h-4 text-slate-400" />
           </button>
@@ -659,7 +697,9 @@ function HsnCodeSection({ value, gstRate, onHsnSelect }) {
           ) : (
             <div className="p-3 space-y-3">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-slate-800">Add HSN Code</p>
+                <p className="text-sm font-semibold text-slate-800">
+                  Add HSN Code
+                </p>
                 <button
                   type="button"
                   onClick={() => setIsAddingNew(false)}
@@ -697,7 +737,9 @@ function HsnCodeSection({ value, gstRate, onHsnSelect }) {
                   className="h-9"
                 />
                 {formErrors.gstRate && (
-                  <p className="text-xs text-red-500 mt-1">{formErrors.gstRate}</p>
+                  <p className="text-xs text-red-500 mt-1">
+                    {formErrors.gstRate}
+                  </p>
                 )}
               </div>
 
@@ -745,23 +787,144 @@ function HsnCodeSection({ value, gstRate, onHsnSelect }) {
 }
 
 // =========================================================
-// MAIN — Add Item Form Modal
+// MAIN — Add / Edit Item Form Modal (shared, ItemsPage-style design)
 // =========================================================
-export default function AddItemFormModal({ open, onOpenChange, onItemCreated }) {
-  const initialValues = {
-    itemName: "",
-    itemCode: "",
-    hsnCode: "",
-    unit: "",
-    category: "",
-    salesPrice: "",
-    purchasePrice: "",
-    isTaxInclusive: false,
-    gstRate: "",
-    discountType: "amount",
-    discountPrice: "",
-    openingStock: "",
-  };
+export default function AddItemFormModal({
+  open,
+  onOpenChange,
+  onItemCreated,
+  initialItemName = "",
+  editItem = null,
+}) {
+  const isEditMode = Boolean(editItem);
+
+  // ✅ Modal jekhan theke-i khola hok na keno, fresh full product data
+  // nijei fetch kore neyoya hoy — caller-er upor nirbhor kore na
+  const [resolvedItem, setResolvedItem] = useState(null);
+  const [isFetchingEditItem, setIsFetchingEditItem] = useState(false);
+  const [showOpeningStock, setShowOpeningStock] = useState(false);
+  const fetchedForIdRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) {
+      setResolvedItem(null);
+      setShowOpeningStock(false);
+      fetchedForIdRef.current = null;
+      return;
+    }
+    if (!editItem) {
+      setResolvedItem(null);
+      setShowOpeningStock(false);
+      return;
+    }
+
+    const targetId = editItem._id;
+
+    if (!isValidObjectId(targetId)) {
+      // temp/locally-added item — cart-er existing data e use koro
+      setResolvedItem(editItem);
+      return;
+    }
+
+    if (fetchedForIdRef.current === targetId) return;
+
+    const fetchFresh = async () => {
+      try {
+        setIsFetchingEditItem(true);
+        const res = await api.get(`/product/id/${targetId}`);
+        const fresh = res?.data?.data || res?.data;
+        fetchedForIdRef.current = targetId;
+        setResolvedItem(
+          fresh
+            ? {
+                ...fresh,
+                cartItemId: editItem.cartItemId,
+                qty: editItem.qty,
+                purchaseDiscount: editItem.purchaseDiscount,
+                purchaseDiscountType: editItem.purchaseDiscountType,
+              }
+            : editItem,
+        );
+        if (fresh?.financialYearStock?.stock > 0) setShowOpeningStock(true);
+      } catch (err) {
+        console.warn("Failed to fetch fresh item data:", err);
+        setResolvedItem(editItem);
+      } finally {
+        setIsFetchingEditItem(false);
+      }
+    };
+
+    fetchFresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editItem]);
+
+  const activeItem = resolvedItem || editItem;
+  const canUpdateExisting = isValidObjectId(activeItem?._id);
+
+  const initialValues = useMemo(() => {
+    if (!activeItem) {
+      return {
+        itemName: initialItemName,
+        itemCode: "",
+        hsnCode: "",
+        unit: "",
+        category: "",
+        salesPrice: "",
+        purchasePrice: "",
+        isTaxInclusive: false,
+        gstRate: "",
+        discountType: "amount",
+        discountPrice: "",
+        openingStock: "",
+        openingStockValue: "",
+      };
+    }
+
+    const rawUnit = String(activeItem.unit || "").toLowerCase();
+    const matchedUnit = UNITS.find(
+      (u) =>
+        u.symbol.toLowerCase() === rawUnit || u.name.toLowerCase() === rawUnit,
+    );
+
+    let categoryId = "";
+    if (activeItem.category && typeof activeItem.category === "object") {
+      categoryId = isValidObjectId(activeItem.category._id)
+        ? activeItem.category._id
+        : "";
+    } else if (isValidObjectId(activeItem.category)) {
+      categoryId = activeItem.category;
+    }
+
+    const savedDiscountType = activeItem.discountType ?? "amount";
+    const savedDiscountPercentage = Number(activeItem.discountPercentage ?? 0);
+    const savedDiscountPrice = Number(activeItem.discountPrice ?? 0);
+    const discountPriceDisplay =
+      savedDiscountType === "percentage"
+        ? savedDiscountPercentage > 0
+          ? String(savedDiscountPercentage)
+          : ""
+        : savedDiscountPrice > 0
+          ? String(savedDiscountPrice)
+          : "";
+
+    const fyStock = activeItem.financialYearStock;
+
+    return {
+      itemName: activeItem.name || "",
+      itemCode: activeItem.sku || "",
+      hsnCode: activeItem.hsn || "",
+      unit: matchedUnit ? matchedUnit.name : "",
+      category: categoryId,
+      salesPrice: activeItem.sellingPrice ? String(activeItem.sellingPrice) : "",
+      purchasePrice: activeItem.costPrice ? String(activeItem.costPrice) : "",
+      isTaxInclusive: !!activeItem.isTaxInclusive,
+      gstRate: activeItem.gstRate ? String(activeItem.gstRate) : "",
+      discountType: savedDiscountType,
+      discountPrice: discountPriceDisplay,
+      openingStock: fyStock?.stock > 0 ? String(fyStock.stock) : "",
+      openingStockValue: fyStock?.value > 0 ? String(fyStock.value) : "",
+    };
+  }, [activeItem, initialItemName]);
 
   const handleSubmit = async (values, { resetForm, setSubmitting }) => {
     try {
@@ -777,14 +940,26 @@ export default function AddItemFormModal({ open, onOpenChange, onItemCreated }) 
         values.discountType === "percentage"
           ? inputDiscount
           : salesPrice > 0
-          ? parseFloat(((inputDiscount / salesPrice) * 100).toFixed(4))
-          : 0;
+            ? parseFloat(((inputDiscount / salesPrice) * 100).toFixed(4))
+            : 0;
+
+      // ✅ Opening stock validation — ItemsPage er moto add e >0 baddhotamulok,
+      // edit e 0 o cholbe
+      const stockErrors = validateOpeningStockValues(
+        values.openingStock,
+        values.openingStockValue,
+        isEditMode && canUpdateExisting,
+      );
+      if (Object.keys(stockErrors).length > 0) {
+        toast.error(Object.values(stockErrors)[0]);
+        setShowOpeningStock(true);
+        setSubmitting(false);
+        return;
+      }
 
       const payload = {
         name: values.itemName,
         unit: values.unit,
-        // ✅ FINAL GUARD — kokhono raw text (jemon "medicine") backend e jabe na,
-        // sudhu bandho ObjectId thakle pathabo, nahole field ta khali pathabo
         category: isValidObjectId(values.category) ? values.category : "",
         sku: values.itemCode || "",
         hsn: values.hsnCode || "",
@@ -797,20 +972,36 @@ export default function AddItemFormModal({ open, onOpenChange, onItemCreated }) 
         discountPercentage,
       };
 
-      if (values.openingStock !== "" && values.openingStock != null) {
-        payload.openingStock = Number(values.openingStock);
+      const hasOpeningStock =
+        values.openingStock !== "" && values.openingStock != null;
+      const hasOpeningValue =
+        values.openingStockValue !== "" && values.openingStockValue != null;
+
+      if (hasOpeningStock || hasOpeningValue) {
+        payload.openingStock = hasOpeningStock
+          ? Number(values.openingStock)
+          : 0;
+        payload.value = hasOpeningValue ? Number(values.openingStockValue) : 0;
       }
 
-      const res = await api.post("/product", payload);
-      const newItem = unwrapDoc(res);
+      const res =
+        isEditMode && canUpdateExisting
+          ? await api.put(`/product/id/${activeItem._id}`, payload)
+          : await api.post("/product", payload);
 
-      toast.success("Item added successfully!");
+      const savedItem = unwrapDoc(res);
+
+      toast.success(
+        isEditMode && canUpdateExisting
+          ? "Item updated successfully!"
+          : "Item added successfully!",
+      );
       resetForm();
       onOpenChange(false);
-      onItemCreated?.(newItem);
+      onItemCreated?.(savedItem);
     } catch (err) {
       const message =
-        err?.response?.data?.message || "Failed to add item. Please try again.";
+        err?.response?.data?.message || "Failed to save item. Please try again.";
       toast.error(message);
     } finally {
       setSubmitting(false);
@@ -819,240 +1010,361 @@ export default function AddItemFormModal({ open, onOpenChange, onItemCreated }) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="w-5 h-5 text-blue-600" />
-            Add New Item
+            {isEditMode ? "Edit Item" : "Add New Item"}
           </DialogTitle>
+          <DialogDescription>Enter the item details below.</DialogDescription>
         </DialogHeader>
 
-        <Formik
-          initialValues={initialValues}
-          validationSchema={validationSchema}
-          onSubmit={handleSubmit}
-        >
-          {({ values, errors, touched, handleChange, setFieldValue, isSubmitting }) => (
-            <Form className="space-y-4">
-              <div>
-                <Label>Item Name *</Label>
-                <Input
-                  name="itemName"
-                  value={values.itemName}
-                  onChange={handleChange}
-                  placeholder="Enter item name"
-                  className="mt-1"
-                />
-                {touched.itemName && errors.itemName && (
-                  <p className="text-xs text-red-500 mt-1">{errors.itemName}</p>
-                )}
-              </div>
+        {isFetchingEditItem ? (
+          <div className="flex items-center justify-center py-16 text-slate-400">
+            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+            Loading item details...
+          </div>
+        ) : (
+          <Formik
+            key={
+              open
+                ? activeItem?._id || activeItem?.cartItemId || initialItemName
+                : "closed"
+            }
+            enableReinitialize
+            initialValues={initialValues}
+            validationSchema={validationSchema}
+            onSubmit={handleSubmit}
+          >
+            {({
+              values,
+              errors,
+              touched,
+              handleChange,
+              setFieldValue,
+              isSubmitting,
+            }) => {
+              const salesPriceNum = Number(values.salesPrice) || 0;
+              const discountNum = Number(values.discountPrice) || 0;
+              let finalPrice = salesPriceNum;
+              if (values.discountType === "percentage") {
+                finalPrice = salesPriceNum - (salesPriceNum * discountNum) / 100;
+              } else {
+                finalPrice = salesPriceNum - discountNum;
+              }
+              if (finalPrice < 0) finalPrice = 0;
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Unit *</Label>
-                  <Select
-                    value={values.unit}
-                    onValueChange={(v) => setFieldValue("unit", v)}
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select unit" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {UNITS.map((u) => (
-                        <SelectItem key={u.name} value={u.name}>
-                          {u.name} ({u.symbol})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {touched.unit && errors.unit && (
-                    <p className="text-xs text-red-500 mt-1">{errors.unit}</p>
-                  )}
-                </div>
-
-                <CategorySection
-                  value={values.category}
-                  onChange={(v) => setFieldValue("category", v)}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>SKU (optional)</Label>
-                  <Input
-                    name="itemCode"
-                    value={values.itemCode}
-                    onChange={handleChange}
-                    placeholder="Item code"
-                    className="mt-1"
-                  />
-                </div>
-
-                <HsnCodeSection
-                  value={values.hsnCode}
-                  gstRate={values.gstRate}
-                  onHsnSelect={(hsn) => {
-                    if (!hsn) {
-                      setFieldValue("hsnCode", "");
-                      setFieldValue("gstRate", "");
-                      setFieldValue("isTaxInclusive", false);
-                      return;
-                    }
-                    setFieldValue("hsnCode", hsn.code);
-                    if (hsn.gstRate && Number(hsn.gstRate) > 0) {
-                      setFieldValue("gstRate", String(hsn.gstRate));
-                      setFieldValue("isTaxInclusive", false);
-                    } else {
-                      setFieldValue("gstRate", "");
-                      setFieldValue("isTaxInclusive", false);
-                    }
-                  }}
-                />
-              </div>
-
-              <div className="border-t pt-4">
-                <p className="text-sm font-semibold text-slate-700 flex items-center gap-1.5 mb-3">
-                  <IndianRupee className="w-4 h-4 text-blue-600" />
-                  Price
-                </p>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Purchase Price</Label>
-                    <Input
-                      name="purchasePrice"
-                      value={values.purchasePrice}
-                      onChange={handleChange}
-                      placeholder="Optional"
-                      type="number"
-                      className="mt-1"
-                    />
+              return (
+                <Form className="space-y-5">
+                  {/* ---- Product Details ---- */}
+                  <div className="flex items-center gap-2 text-slate-700 font-semibold">
+                    <Package className="w-4 h-4 text-blue-600" />
+                    Product Details
                   </div>
+                  <Separator />
+
                   <div>
-                    <Label>Sales Price *</Label>
+                    <Label>Item Name *</Label>
                     <Input
-                      name="salesPrice"
-                      value={values.salesPrice}
+                      name="itemName"
+                      value={values.itemName}
                       onChange={handleChange}
-                      placeholder="Required"
-                      type="number"
+                      placeholder="Enter item name"
                       className="mt-1"
                     />
-                    {touched.salesPrice && errors.salesPrice && (
+                    {touched.itemName && errors.itemName && (
                       <p className="text-xs text-red-500 mt-1">
-                        {errors.salesPrice}
+                        {errors.itemName}
                       </p>
                     )}
                   </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-3 mt-3">
-                  <div>
-                    <Label>GST Rate</Label>
-                    <div className="mt-1 h-10 px-3 rounded-md border border-slate-200 bg-slate-50 flex items-center text-sm text-slate-600">
-                      {values.gstRate ? `${values.gstRate}% GST` : "Set via HSN code"}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Unit *</Label>
+                      <Select
+                        value={values.unit}
+                        onValueChange={(v) => setFieldValue("unit", v)}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Select unit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {UNITS.map((u) => (
+                            <SelectItem key={u.name} value={u.name}>
+                              {u.name} ({u.symbol})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {touched.unit && errors.unit && (
+                        <p className="text-xs text-red-500 mt-1">{errors.unit}</p>
+                      )}
                     </div>
-                  </div>
-                  <div>
-                    <Label>Tax Inclusive?</Label>
-                    <Select
-                      value={values.isTaxInclusive ? "yes" : "no"}
-                      onValueChange={(v) =>
-                        setFieldValue("isTaxInclusive", v === "yes")
-                      }
-                    >
-                      <SelectTrigger className="mt-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="no">
-                          Exclude Tax (add on top)
-                        </SelectItem>
-                        <SelectItem value="yes">
-                          Include Tax (price includes GST)
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-3 mt-3">
-                  <div>
-                    <Label>Discount on Sales</Label>
-                    <Input
-                      name="discountPrice"
-                      value={values.discountPrice}
-                      onChange={handleChange}
-                      placeholder="0"
-                      type="number"
-                      className="mt-1"
+                    <CategorySection
+                      value={values.category}
+                      onChange={(v) => setFieldValue("category", v)}
                     />
                   </div>
-                  <div>
-                    <Label>Discount Type</Label>
-                    <Select
-                      value={values.discountType}
-                      onValueChange={(v) => setFieldValue("discountType", v)}
-                    >
-                      <SelectTrigger className="mt-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="amount">Amount (₹)</SelectItem>
-                        <SelectItem value="percentage">Percentage (%)</SelectItem>
-                      </SelectContent>
-                    </Select>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>SKU (optional)</Label>
+                      <Input
+                        name="itemCode"
+                        value={values.itemCode}
+                        onChange={handleChange}
+                        placeholder="Item code"
+                        className="mt-1"
+                      />
+                    </div>
+
+                    <HsnCodeSection
+                      value={values.hsnCode}
+                      gstRate={values.gstRate}
+                      onHsnSelect={(hsn) => {
+                        if (!hsn) {
+                          setFieldValue("hsnCode", "");
+                          setFieldValue("gstRate", "");
+                          setFieldValue("isTaxInclusive", false);
+                          return;
+                        }
+                        setFieldValue("hsnCode", hsn.code);
+                        if (hsn.gstRate && Number(hsn.gstRate) > 0) {
+                          setFieldValue("gstRate", String(hsn.gstRate));
+                          setFieldValue("isTaxInclusive", false);
+                        } else {
+                          setFieldValue("gstRate", "");
+                          setFieldValue("isTaxInclusive", false);
+                        }
+                      }}
+                    />
                   </div>
-                </div>
 
-                {values.salesPrice && values.discountPrice ? (
-                  <p className="text-xs text-slate-500 mt-2 font-medium">
-                    {(() => {
-                      const sale = Number(values.salesPrice) || 0;
-                      const disc = Number(values.discountPrice) || 0;
-                      const final =
-                        values.discountType === "percentage"
-                          ? sale - (sale * disc) / 100
-                          : sale - disc;
-                      return `Price after discount: ₹${Math.max(0, final).toFixed(2)}`;
-                    })()}
-                  </p>
-                ) : null}
-              </div>
+                  {/* ---- Price ---- */}
+                  <div className="flex items-center gap-2 text-slate-700 font-semibold pt-2">
+                    <IndianRupee className="w-4 h-4 text-blue-600" />
+                    Price
+                  </div>
+                  <Separator />
 
-              <div className="border-t pt-4">
-                <Label>Opening Stock (optional)</Label>
-                <Input
-                  name="openingStock"
-                  value={values.openingStock}
-                  onChange={handleChange}
-                  placeholder="Starting quantity"
-                  type="number"
-                  className="mt-1"
-                />
-              </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Purchase Price (optional)</Label>
+                      <Input
+                        name="purchasePrice"
+                        value={values.purchasePrice}
+                        onChange={handleChange}
+                        placeholder="Enter purchase price"
+                        type="number"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label>Sales Price *</Label>
+                      <div className="flex gap-2 mt-1">
+                        <Input
+                          name="salesPrice"
+                          value={values.salesPrice}
+                          onChange={handleChange}
+                          placeholder="Enter sales price"
+                          type="number"
+                          className="flex-1"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFieldValue("isTaxInclusive", !values.isTaxInclusive)
+                          }
+                          className={`flex items-center gap-1 px-2.5 rounded-full text-[11px] font-semibold border shrink-0 ${
+                            values.isTaxInclusive
+                              ? "bg-blue-600 text-white border-blue-600"
+                              : "bg-slate-100 text-slate-600 border-slate-200"
+                          }`}
+                        >
+                          {values.isTaxInclusive ? "Incl. Tax" : "Excl. Tax"}
+                        </button>
+                      </div>
+                      {touched.salesPrice && errors.salesPrice && (
+                        <p className="text-xs text-red-500 mt-1">
+                          {errors.salesPrice}
+                        </p>
+                      )}
+                    </div>
+                  </div>
 
-              <DialogFooter className="pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => onOpenChange(false)}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Plus className="w-4 h-4 mr-2" />
-                  )}
-                  Add Item
-                </Button>
-              </DialogFooter>
-            </Form>
-          )}
-        </Formik>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Tax Rate (GST %)</Label>
+                      <div className="mt-1 h-10 px-3 rounded-md border border-slate-200 bg-slate-50 flex items-center text-sm text-slate-600">
+                        {values.gstRate
+                          ? `${values.gstRate}% GST`
+                          : "Set via HSN code"}
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Discount on Sales</Label>
+                      <div className="flex gap-2 mt-1">
+                        <Input
+                          name="discountPrice"
+                          value={values.discountPrice}
+                          onChange={handleChange}
+                          placeholder="0"
+                          type="number"
+                          className="flex-1"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newType =
+                              values.discountType === "amount"
+                                ? "percentage"
+                                : "amount";
+                            const currentInput = Number(values.discountPrice) || 0;
+                            let converted = currentInput;
+                            if (
+                              newType === "percentage" &&
+                              values.discountType === "amount"
+                            ) {
+                              converted =
+                                salesPriceNum > 0
+                                  ? parseFloat(
+                                      ((currentInput / salesPriceNum) * 100).toFixed(2),
+                                    )
+                                  : 0;
+                            } else if (
+                              newType === "amount" &&
+                              values.discountType === "percentage"
+                            ) {
+                              converted = parseFloat(
+                                ((salesPriceNum * currentInput) / 100).toFixed(2),
+                              );
+                            }
+                            setFieldValue("discountType", newType);
+                            setFieldValue(
+                              "discountPrice",
+                              converted > 0 ? String(converted) : "",
+                            );
+                          }}
+                          className="flex items-center gap-1 px-2.5 rounded-full text-[11px] font-semibold border shrink-0 bg-slate-100 text-slate-600 border-slate-200"
+                        >
+                          {values.discountType === "percentage" ? "%" : "₹"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {values.salesPrice && values.discountPrice ? (
+                    <p className="text-sm text-slate-600 font-medium">
+                      Sales Price (After Discount): ₹{finalPrice.toFixed(2)}
+                    </p>
+                  ) : null}
+
+                  {/* ---- Opening Stock — collapsible, ItemsPage-style ---- */}
+                  <div className="pt-2">
+                    <div className="flex items-center gap-2 text-slate-700 font-semibold mb-2">
+                      <Warehouse className="w-4 h-4 text-blue-600" />
+                      Opening Stock
+                    </div>
+                    <Separator className="mb-3" />
+
+                    {!showOpeningStock ? (
+                      <div className="space-y-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowOpeningStock(true)}
+                          className="text-xs font-medium text-blue-600 border border-blue-100 rounded-full px-3 py-1.5"
+                        >
+                          {values.openingStock
+                            ? "Edit Opening Stock"
+                            : "+ Add Opening Stock"}
+                        </button>
+
+                        {values.openingStock && values.openingStockValue && (
+                          <p className="text-sm text-slate-500">
+                            Opening Stock:{" "}
+                            <span className="font-medium text-slate-700">
+                              {values.openingStock}
+                            </span>
+                            {", "}Value:{" "}
+                            <span className="font-medium text-slate-700">
+                              ₹{values.openingStockValue}
+                            </span>
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-3 bg-slate-50 rounded-xl p-4 border border-slate-200">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label>Opening Stock Qty</Label>
+                            <Input
+                              name="openingStock"
+                              value={values.openingStock}
+                              onChange={handleChange}
+                              placeholder="Quantity"
+                              type="number"
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label>Opening Stock Value</Label>
+                            <Input
+                              name="openingStockValue"
+                              value={values.openingStockValue}
+                              onChange={handleChange}
+                              placeholder="Total value (₹)"
+                              type="number"
+                              className="mt-1"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                          <Info className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                          <p className="text-xs text-blue-700 italic">
+                            Opening stock value = Opening stock qty × Purchase rate
+                          </p>
+                        </div>
+
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowOpeningStock(false)}
+                          className="w-full"
+                        >
+                          Close
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  <DialogFooter className="pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => onOpenChange(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={isSubmitting}>
+                      {isSubmitting ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Plus className="w-4 h-4 mr-2" />
+                      )}
+                      {isEditMode && canUpdateExisting
+                        ? "Update Item"
+                        : "Add Item"}
+                    </Button>
+                  </DialogFooter>
+                </Form>
+              );
+            }}
+          </Formik>
+        )}
       </DialogContent>
     </Dialog>
   );
