@@ -23,6 +23,7 @@ export default function Home() {
   const testimonialsRef = useRef(null);
   const pricingRef = useRef(null);
   const faqRef = useRef(null);
+  const heroRef = useRef(null);
   const footerRef = useRef(null);
 
   useEffect(() => {
@@ -52,41 +53,63 @@ export default function Home() {
     };
   }, []);
 
+  // page.js — শুধু এই দুটো useEffect change করো
+
+ useEffect(() => {
+  const sectionMap = [
+    { id: "contact", ref: footerRef },   // ✅ contact সবার আগে check
+    { id: "faq", ref: faqRef },
+    { id: "pricing", ref: pricingRef },
+    { id: "testimonials", ref: testimonialsRef },
+    { id: "about", ref: aboutRef },
+    { id: "home", ref: heroRef },
+  ];
+
+  const handleScroll = () => {
+    // ✅ একদম top এ থাকলে home
+    if (window.scrollY < 80) {
+      setActiveSection("home");
+      return;
+    }
+
+    // ✅ একদম bottom এ থাকলে contact
+    const scrollBottom = window.scrollY + window.innerHeight;
+    const pageHeight = document.documentElement.scrollHeight;
+    if (scrollBottom >= pageHeight - 80) {
+      setActiveSection("contact");
+      return;
+    }
+
+    // ✅ বাকিগুলো viewport center দিয়ে detect
+    const viewportCenter = window.scrollY + window.innerHeight / 2;
+
+    for (const { id, ref } of sectionMap) {
+      if (!ref?.current) continue;
+      const el = ref.current;
+      const top = el.offsetTop;
+      const bottom = top + el.offsetHeight;
+
+      if (viewportCenter >= top && viewportCenter < bottom) {
+        setActiveSection(id);
+        return;
+      }
+    }
+  };
+
+  window.addEventListener("scroll", handleScroll, { passive: true });
+  handleScroll(); // initial call
+  return () => window.removeEventListener("scroll", handleScroll);
+}, []);
+
+  // 2. ✅ Scroll listener — একদম top এ গেলে force "home"
   useEffect(() => {
-    const sections = [
-      { id: "about", ref: aboutRef },
-      { id: "testimonials", ref: testimonialsRef },
-      { id: "pricing", ref: pricingRef },
-      { id: "faq", ref: faqRef },
-      { id: "contact", ref: footerRef },
-    ];
-
-    const observerOptions = {
-      root: null,
-      rootMargin: "-40% 0px -55% 0px",
-      threshold: [0, 0.1, 0.25, 0.5, 0.75, 1],
-    };
-
-    const handleIntersect = (entries) => {
-      const visibleEntries = entries
-        .filter((entry) => entry.isIntersecting)
-        .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
-
-      if (visibleEntries.length > 0) {
-        const activeId = visibleEntries[0].target.id || "home";
-        setActiveSection(activeId);
+    const handleScroll = () => {
+      if (window.scrollY < 80) {
+        setActiveSection("home");
       }
     };
-
-    const observer = new IntersectionObserver(handleIntersect, observerOptions);
-
-    sections.forEach(({ ref }) => {
-      if (ref.current) {
-        observer.observe(ref.current);
-      }
-    });
-
-    return () => observer.disconnect();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   const currentTheme = themeConfig[theme];
@@ -154,7 +177,9 @@ export default function Home() {
                 >
                   AMDAANI
                 </div>
-                <div className={`text-[11px] tracking-[0.16em] font-bold ${currentTheme.textTertiary} hidden sm:block`}>
+                <div
+                  className={`text-[11px] tracking-[0.16em] font-bold ${currentTheme.textTertiary} hidden sm:block`}
+                >
                   Smart Business Solutions
                 </div>
               </div>
@@ -174,14 +199,22 @@ export default function Home() {
         </div>
       )}
       <Navigation
+        heroRef={heroRef}
         pricingRef={pricingRef}
         aboutRef={aboutRef}
         testimonialsRef={testimonialsRef}
         faqRef={faqRef}
+        footerRef={footerRef}
         scrollToSection={scrollToSection}
         activeSection={activeSection}
       />
-      <HeroSection featuresRef={pricingRef} scrollToSection={scrollToSection} />
+
+      <div ref={heroRef} id="home">
+        <HeroSection
+          featuresRef={pricingRef}
+          scrollToSection={scrollToSection}
+        />
+      </div>
 
       <section ref={aboutRef} id="about">
         <AboutSection />
@@ -200,7 +233,7 @@ export default function Home() {
       </section>
 
       <CTASection />
-      <section ref={footerRef}>
+      <section ref={footerRef} id="contact">
         <Footer />
       </section>
       {/* <ChatBotWidget /> */}

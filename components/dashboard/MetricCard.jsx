@@ -1,115 +1,93 @@
 "use client";
 
-import { TrendingUp, TrendingDown } from "lucide-react";
-import { formatCurrency } from "@/lib/DashboardUtils";
+import {
+  CalendarRange,
+  CalendarDays,
+  Calendar,
+  CalendarClock,
+  ArrowUp,
+  ArrowDown,
+} from "lucide-react";
+
+const iconMap = {
+  calendar: CalendarRange,
+  calendarMonth: CalendarDays,
+  calendarWeek: Calendar,
+  calendarToday: CalendarClock,
+};
+
+const colorMap = {
+  blue: { bg: "bg-blue-50", text: "text-blue-600" },
+  teal: { bg: "bg-teal-50", text: "text-teal-600" },
+  amber: { bg: "bg-amber-50", text: "text-amber-600" },
+  rose: { bg: "bg-rose-50", text: "text-rose-600" },
+};
+
+const abbreviate = (value) => {
+  if (value >= 1e7) return (value / 1e7).toFixed(2).replace(/\.00$/, "") + " Cr";
+  if (value >= 1e5) return (value / 1e5).toFixed(2).replace(/\.00$/, "") + " L";
+  return new Intl.NumberFormat("en-IN").format(value);
+};
+
+const formatCurrency = (value) => `₹${abbreviate(value)}`;
+
 export default function MetricCard({
   title,
   value,
-  previousValue,
   growth,
   count,
-  period,
+  avg,
+  max,
+  subtitle,
   icon,
-  color,
-  theme,
+  color = "blue",
   onClick,
 }) {
-  const getIconColor = () => {
-    switch (color) {
-      case "primary":
-        return theme.accent;
-      case "secondary":
-        return theme.secondary;
-      case "tertiary":
-        return theme.tertiary;
-      case "error":
-        return theme.error;
-      default:
-        return theme.accent;
-    }
-  };
-
-  const getGrowthColor = () => {
-    if (growth > 0) return theme.success;
-    if (growth < 0) return theme.error;
-    return theme.textTertiary;
-  };
-
-  const getPeriodText = () => {
-    switch (period) {
-      case "year":
-        return "vs last year";
-      case "month":
-        return "vs last month";
-      case "week":
-        return "vs last week";
-      case "day":
-        return "vs yesterday";
-      default:
-        return "";
-    }
-  };
-
-  const iconColor = getIconColor() || "text-blue-500"; // fallback ALWAYS defined
-  const bgColor = iconColor.replace("text-", "bg-");
+  const Icon = iconMap[icon] || Calendar;
+  const c = colorMap[color] || colorMap.blue;
+  const hasGrowth = typeof growth === "number" && subtitle;
+  const isPositive = growth >= 0;
 
   return (
-    <div
+    <button
       onClick={onClick}
-      className={`
-        ${theme.card} rounded-xl p-5 shadow-md hover:shadow-lg
-        transition-all duration-200 cursor-pointer
-        border ${theme.outline}
-      `}
+      className="text-left bg-white rounded-2xl border border-slate-200 p-4 hover:shadow-md hover:border-blue-200 transition-all"
     >
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center space-x-2">
-          <div className={`p-2 rounded-lg ${bgColor} bg-opacity-10`}>
-            {/* Icon would go here - using Lucide icons */}
-          </div>
-          <span className={`${theme.textSecondary} text-sm font-medium`}>
-            {title}
-          </span>
+      <div className="flex items-center gap-2 mb-2.5">
+        <div className={`w-8 h-8 rounded-lg ${c.bg} flex items-center justify-center`}>
+          <Icon className={`w-4 h-4 ${c.text}`} />
         </div>
-        <div className="text-xs px-2 py-1 rounded-full bg-opacity-10 bg-gray-500">
-          {period}
-        </div>
+        <span className="text-xs font-medium text-slate-500">{title}</span>
       </div>
 
-      <div className="mb-3">
-        <div className={`${theme.text} text-2xl font-bold mb-1`}>
-          {formatCurrency(value)}
-        </div>
-        {growth !== undefined && (
-          <div className="flex items-center space-x-1">
-            {growth > 0 ? (
-              <TrendingUp size={16} className={theme.success} />
-            ) : growth < 0 ? (
-              <TrendingDown size={16} className={theme.error} />
-            ) : null}
-            <span className={`text-sm font-medium ${getGrowthColor()}`}>
-              {growth > 0 ? "+" : ""}
-              {growth?.toFixed(1)}%
-            </span>
-            <span className={`${theme.textTertiary} text-sm`}>
-              {getPeriodText()}
-            </span>
-          </div>
-        )}
-      </div>
+      <p className="text-2xl font-bold text-slate-900 mb-1.5 truncate">
+        {formatCurrency(value)}
+      </p>
 
-      <div className="pt-3 border-t border-opacity-20">
-        <div className="flex justify-between items-center">
-          <span className={`${theme.textTertiary} text-sm`}>
-            {count} invoices
-          </span>
-          {previousValue > 0 && (
-            <span className={`${theme.textSecondary} text-sm`}>
-              Prev: {formatCurrency(previousValue)}
-            </span>
+      {hasGrowth ? (
+        <p
+          className={`text-xs font-medium flex items-center gap-1 ${
+            isPositive ? "text-emerald-600" : "text-rose-500"
+          }`}
+        >
+          {isPositive ? (
+            <ArrowUp className="w-3 h-3" />
+          ) : (
+            <ArrowDown className="w-3 h-3" />
           )}
-        </div>
-      </div>
-    </div>
+          {Math.abs(growth).toFixed(1)}% {subtitle} · {count} invoices
+        </p>
+      ) : avg !== undefined ? (
+        <p className="text-xs font-medium text-amber-600">
+          Across {count} invoices · Avg {formatCurrency(avg)}
+        </p>
+      ) : max !== undefined ? (
+        <p className="text-xs font-medium text-rose-500">
+          {count} invoices · Max {formatCurrency(max)}
+        </p>
+      ) : (
+        <p className="text-xs font-medium text-slate-400">{count} invoices</p>
+      )}
+    </button>
   );
 }

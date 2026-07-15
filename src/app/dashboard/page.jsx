@@ -12,6 +12,7 @@ import {
   endOfWeek,
   eachDayOfInterval,
 } from "date-fns";
+import { RefreshCw } from "lucide-react";
 
 import MetricCard from "../../../components/dashboard/MetricCard";
 import ChartCard from "../../../components/dashboard/ChartCard";
@@ -27,7 +28,7 @@ import api from "../../../utils/api";
 
 export default function DashboardPage() {
   const { theme } = useTheme();
-  const { user } = useAuth(); // AuthContext se user aa raha hai
+  const { user } = useAuth();
   const [dateRange, setDateRange] = useState("month");
   const currentTheme = themeConfig[theme];
 
@@ -36,13 +37,10 @@ export default function DashboardPage() {
     isLoading,
     error,
     refetch,
+    isRefetching,
   } = useQuery({
     queryKey: ["dashboard"],
     queryFn: async () => {
-      console.log("⚡ DASHBOARD QUERY FN CALLED");
-      console.log("USER in dashboard:", user);
-
-      // 🔹 Transactions ke liye current month ka 1st date
       const startDate = format(startOfMonth(new Date()), "yyyy-MM-dd");
 
       const [invoiceRes, productRes, dueRes, transactionRes] =
@@ -53,14 +51,6 @@ export default function DashboardPage() {
           api.get("/invoice/transactions", { params: { startDate } }),
         ]);
 
-      console.log("📌 RAW RESPONSES:", {
-        invoiceRes,
-        productRes,
-        dueRes,
-        transactionRes,
-      });
-
-      // A) invoices = invoiceRes.data.docs
       const invoices = invoiceRes?.data?.docs || [];
       const products = productRes?.data?.docs || [];
       const dueCustomers = dueRes?.data?.docs || [];
@@ -74,7 +64,6 @@ export default function DashboardPage() {
       const sumByKey = (arr, key) =>
         arr.reduce((acc, item) => acc + (Number(item?.[key]) || 0), 0);
 
-      // ---------- FILTERS ----------
       const invoicesThisYear = invoices.filter(
         (inv) => new Date(inv.invoiceDate).getFullYear() === currentYear
       );
@@ -93,7 +82,6 @@ export default function DashboardPage() {
         );
       });
 
-      // Previous month
       const prevMonthDate = subMonths(now, 1);
       const prevMonthInvoices = invoices.filter((inv) => {
         const d = new Date(inv.invoiceDate);
@@ -103,8 +91,7 @@ export default function DashboardPage() {
         );
       });
 
-      // Weekly: current week Sun–Sat
-      const weekStart = startOfWeek(now, { weekStartsOn: 0 }); // 0 = Sunday
+      const weekStart = startOfWeek(now, { weekStartsOn: 0 });
       const weekEnd = endOfWeek(now, { weekStartsOn: 0 });
 
       const weeklyInvoices = invoices.filter((inv) => {
@@ -112,7 +99,6 @@ export default function DashboardPage() {
         return d >= weekStart && d <= weekEnd;
       });
 
-      // ---------- METRICS ----------
       const annualSale = sumByKey(invoicesThisYear, "grandTotal");
       const lastYearSale = sumByKey(invoicesLastYear, "grandTotal");
       const annualGrowth =
@@ -128,7 +114,13 @@ export default function DashboardPage() {
           : 0;
 
       const weeklySale = sumByKey(weeklyInvoices, "grandTotal");
+      const weeklyAvg =
+        weeklyInvoices.length > 0 ? weeklySale / weeklyInvoices.length : 0;
       const todaySale = sumByKey(todayInvoices, "grandTotal");
+      const todayMax =
+        todayInvoices.length > 0
+          ? Math.max(...todayInvoices.map((i) => Number(i.grandTotal || 0)))
+          : 0;
 
       const metrics = {
         annualSale,
@@ -143,14 +135,15 @@ export default function DashboardPage() {
 
         weeklySale,
         weeklyInvoices: weeklyInvoices.length,
+        weeklyAvg,
 
         todaySale,
         todayInvoices: todayInvoices.length,
+        todayMax,
       };
 
-      // ---------- TOP CUSTOMERS ----------
       const topCustomers = {
-        percentage: 100, // filhaal 100 rakhte hain
+        percentage: 100,
         sorted: dueCustomers
           .map((c) => ({
             customer: c.name || "Unknown",
@@ -162,7 +155,6 @@ export default function DashboardPage() {
           .slice(0, 5),
       };
 
-      // ---------- TOP PRODUCTS ----------
       const topProducts = products
         .map((p) => ({
           name: p.name,
@@ -173,7 +165,6 @@ export default function DashboardPage() {
         .sort((a, b) => b.revenue - a.revenue)
         .slice(0, 5);
 
-      // ---------- SUMMARY ----------
       const dueSummary = {
         totalDue: sumByKey(dueCustomers, "totalDue"),
         totalCustomers: dueCustomers.length,
@@ -187,9 +178,7 @@ export default function DashboardPage() {
         totalReceived: sumByKey(transactions, "amount"),
       };
 
-      // ---------- MONTHLY REVENUE (chart) ----------
-      const monthMap = new Map(); // "Nov 2025" -> total
-
+      const monthMap = new Map();
       invoices.forEach((inv) => {
         const d = new Date(inv.invoiceDate);
         const key = format(d, "MMM yyyy");
@@ -199,38 +188,27 @@ export default function DashboardPage() {
 
       const monthlyRevenueData = Array.from(monthMap.entries())
         .map(([name, value]) => ({ name, value }))
-        // sort by date again to keep order
-        .sort((a, b) => {
-          const da = new Date(a.name);
-          const db = new Date(b.name);
-          return da - db;
-        });
+        .sort((a, b) => new Date(a.name) - new Date(b.name))
+        .slice(-6);
 
       const monthlyRevenue = { data: monthlyRevenueData };
 
-      // ---------- WEEKLY TREND (current Sun–Sat) ----------
       const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
-
       const weeklyTrendData = weekDays.map((day) => {
         const dayKey = format(day, "yyyy-MM-dd");
         const totalForDay = invoices.reduce((acc, inv) => {
           const invDay = format(new Date(inv.invoiceDate), "yyyy-MM-dd");
           return invDay === dayKey ? acc + (inv.grandTotal || 0) : acc;
         }, 0);
-
-        return {
-          name: format(day, "dd MMM"),
-          value: totalForDay,
-        };
+        return { name: format(day, "EEE"), value: totalForDay };
       });
 
       const weeklyTrend = { data: weeklyTrendData };
 
-      // ---------- RECENT ACTIVITY ----------
       const recentActivity = invoices
         .filter((inv) => inv.invoiceDate && !isNaN(new Date(inv.invoiceDate)))
         .sort((a, b) => new Date(b.invoiceDate) - new Date(a.invoiceDate))
-        .slice(0, 10)
+        .slice(0, 5)
         .map((inv) => ({
           id: inv._id,
           invoiceNumber: inv.invoiceNumber,
@@ -253,26 +231,20 @@ export default function DashboardPage() {
     },
     staleTime: 5 * 60 * 1000,
     retry: 2,
-    enabled: !!user, // sirf jab user loaded ho
+    enabled: !!user,
   });
-
-  console.log("DASHBOARD DATA →", dashboardData);
-  console.log("ERROR →", error);
-  console.log("LOADING →", isLoading);
 
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
-        <div className={`${currentTheme.card} p-8 rounded-2xl shadow-lg`}>
-          <h2 className={`${currentTheme.text} text-xl font-semibold mb-4`}>
+        <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 text-center">
+          <h2 className="text-xl font-bold text-slate-800 mb-2">
             Error Loading Dashboard
           </h2>
-          <p className={`${currentTheme.textSecondary} mb-6`}>
-            {error.message}
-          </p>
+          <p className="text-slate-400 mb-6">{error.message}</p>
           <button
             onClick={() => refetch()}
-            className={`${currentTheme.buttonPrimary} px-4 py-2 rounded-lg font-medium`}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-medium transition-colors"
           >
             Retry
           </button>
@@ -282,154 +254,134 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      {/* Header with filters */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-        <div>
-          <h1 className={`${currentTheme.text} text-2xl md:text-3xl font-bold`}>
-            Dashboard Overview
-          </h1>
-          <p className={`${currentTheme.textSecondary} mt-1`}>
-            {format(new Date(), "MMMM dd, yyyy")}
-          </p>
+    <div className="min-h-screen bg-slate-50">
+      <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-5">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-slate-900">
+              Dashboard
+            </h1>
+            <p className="text-sm text-slate-400 mt-0.5">
+              {format(new Date(), "MMMM dd, yyyy")}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              value={dateRange}
+              onChange={(e) => setDateRange(e.target.value)}
+              className="bg-white border border-slate-200 text-slate-700 rounded-xl px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="today">Today</option>
+              <option value="week">This Week</option>
+              <option value="month">This Month</option>
+              <option value="year">This Year</option>
+            </select>
+            <button
+              onClick={() => refetch()}
+              disabled={isRefetching}
+              className="flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl px-3.5 py-2 text-sm font-medium transition-colors"
+            >
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${isRefetching ? "animate-spin" : ""}`}
+              />
+              Refresh
+            </button>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <select
-            value={dateRange}
-            onChange={(e) => setDateRange(e.target.value)}
-            className={`${currentTheme.card} ${currentTheme.text} ${currentTheme.outline} border rounded-lg px-3 py-2 text-sm`}
-          >
-            <option value="today">Today</option>
-            <option value="week">This Week</option>
-            <option value="month">This Month</option>
-            <option value="year">This Year</option>
-          </select>
-          <button
-            onClick={() => refetch()}
-            className={`${currentTheme.buttonSecondary} border rounded-lg px-4 py-2 text-sm font-medium`}
-          >
-            Refresh
-          </button>
-        </div>
+
+        {isLoading ? (
+          <SkeletonGrid />
+        ) : (
+          <>
+            {/* Key Metrics — 2x2 like mobile app */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <MetricCard
+                title="Annual Sales"
+                value={dashboardData?.metrics?.annualSale || 0}
+                growth={dashboardData?.metrics?.annualGrowth || 0}
+                count={dashboardData?.metrics?.annualInvoices || 0}
+                subtitle="vs last year"
+                icon="calendar"
+                color="blue"
+                onClick={() =>
+                  (window.location.href = "/reports/sales?period=annual")
+                }
+              />
+              <MetricCard
+                title="Monthly Sales"
+                value={dashboardData?.metrics?.monthlySale || 0}
+                growth={dashboardData?.metrics?.monthlyGrowth || 0}
+                count={dashboardData?.metrics?.monthlyInvoices || 0}
+                subtitle="vs last month"
+                icon="calendarMonth"
+                color="teal"
+                onClick={() =>
+                  (window.location.href = "/reports/sales?period=monthly")
+                }
+              />
+              <MetricCard
+                title="Weekly Sales"
+                value={dashboardData?.metrics?.weeklySale || 0}
+                count={dashboardData?.metrics?.weeklyInvoices || 0}
+                avg={dashboardData?.metrics?.weeklyAvg || 0}
+                icon="calendarWeek"
+                color="amber"
+                onClick={() =>
+                  (window.location.href = "/reports/sales?period=weekly")
+                }
+              />
+              <MetricCard
+                title="Today's Sales"
+                value={dashboardData?.metrics?.todaySale || 0}
+                count={dashboardData?.metrics?.todayInvoices || 0}
+                max={dashboardData?.metrics?.todayMax || 0}
+                icon="calendarToday"
+                color="rose"
+                onClick={() =>
+                  (window.location.href = "/reports/sales?period=today")
+                }
+              />
+            </div>
+
+            <CarouselSlider />
+
+            <SummaryPanel
+              dueSummary={dashboardData?.dueSummary}
+              receivedSummary={dashboardData?.receivedSummary}
+            />
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <ChartCard
+                title="Monthly Revenue Trend"
+                subtitle="Last 6 months"
+                type="bar"
+                data={dashboardData?.monthlyRevenue?.data || []}
+                height={260}
+              />
+              <ChartCard
+                title="Weekly Sales Trend"
+                subtitle="Current week (Sun–Sat)"
+                type="line"
+                data={dashboardData?.weeklyTrend?.data || []}
+                height={260}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <TopCustomers
+                customers={dashboardData?.topCustomers?.sorted || []}
+                percentage={dashboardData?.topCustomers?.percentage || 0}
+              />
+              <TopProducts products={dashboardData?.topProducts || []} />
+            </div>
+
+            <RecentActivity
+              activities={dashboardData?.recentActivity || []}
+            />
+          </>
+        )}
       </div>
-
-      {/* Loading State */}
-      {isLoading ? (
-        <SkeletonGrid />
-      ) : (
-        <>
-          {/* Key Metrics Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-            <MetricCard
-              title="Annual Sales"
-              value={dashboardData?.metrics?.annualSale || 0}
-              previousValue={dashboardData?.metrics?.lastYearSale || 0}
-              growth={dashboardData?.metrics?.annualGrowth || 0}
-              count={dashboardData?.metrics?.annualInvoices || 0}
-              period="year"
-              icon="calendar-multiselect"
-              color="primary"
-              theme={currentTheme}
-              onClick={() =>
-                (window.location.href = "/reports/sales?period=annual")
-              }
-            />
-            <MetricCard
-              title="Monthly Sales"
-              value={dashboardData?.metrics?.monthlySale || 0}
-              previousValue={dashboardData?.metrics?.lastMonthSale || 0}
-              growth={dashboardData?.metrics?.monthlyGrowth || 0}
-              count={dashboardData?.metrics?.monthlyInvoices || 0}
-              period="month"
-              icon="calendar-month"
-              color="secondary"
-              theme={currentTheme}
-              onClick={() =>
-                (window.location.href = "/reports/sales?period=monthly")
-              }
-            />
-            <MetricCard
-              title="Weekly Sales"
-              value={dashboardData?.metrics?.weeklySale || 0}
-              previousValue={0}
-              growth={0}
-              count={dashboardData?.metrics?.weeklyInvoices || 0}
-              period="week"
-              icon="calendar-week"
-              color="tertiary"
-              theme={currentTheme}
-              onClick={() =>
-                (window.location.href = "/reports/sales?period=weekly")
-              }
-            />
-            <MetricCard
-              title="Today's Sales"
-              value={dashboardData?.metrics?.todaySale || 0}
-              previousValue={0}
-              growth={0}
-              count={dashboardData?.metrics?.todayInvoices || 0}
-              period="day"
-              icon="calendar-today"
-              color="error"
-              theme={currentTheme}
-              onClick={() =>
-                (window.location.href = "/reports/sales?period=today")
-              }
-            />
-          </div>
-
-          {/* Carousel Banner */}
-          <CarouselSlider theme={currentTheme} />
-
-          {/* Due & Received Summary */}
-          <SummaryPanel
-            dueSummary={dashboardData?.dueSummary}
-            receivedSummary={dashboardData?.receivedSummary}
-            theme={currentTheme}
-          />
-
-          {/* Charts Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <ChartCard
-              title="Monthly Revenue Trend"
-              subtitle="Last few months"
-              type="bar"
-              data={dashboardData?.monthlyRevenue?.data || []}
-              theme={currentTheme}
-              height={300}
-            />
-
-            <ChartCard
-              title="Weekly Sales Trend"
-              subtitle="Current week (Sun–Sat)"
-              type="line"
-              data={dashboardData?.weeklyTrend?.data || []}
-              theme={currentTheme}
-              height={300}
-            />
-          </div>
-
-          {/* Top Lists Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <TopCustomers
-              customers={dashboardData?.topCustomers?.sorted || []}
-              percentage={dashboardData?.topCustomers?.percentage || 0}
-              theme={currentTheme}
-            />
-
-            <TopProducts
-              products={dashboardData?.topProducts || []}
-              theme={currentTheme}
-            />
-          </div>
-
-          {/* Recent Activity */}
-          <RecentActivity
-            activities={dashboardData?.recentActivity || []}
-            theme={currentTheme}
-          />
-        </>
-      )}
     </div>
   );
 }

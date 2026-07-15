@@ -192,15 +192,16 @@ export const generateInvoiceHTML = ({
     invoiceCalculations.grandTotal - (invoiceCalculations?.discountTotal || 0);
   const roundOffValue = (roundedGrandTotal - rawGrandTotal).toFixed(2);
 
-  const upiString = `upi://pay?pa=${
-    storedata.bankDetails.upiId
-  }&pn=${encodeURIComponent(
-    storedata?.name || "Merchant"
-  )}&am=${roundedGrandTotal}&cu=INR`;
+  // ✅ safe version
+const upiString = storedata?.bankDetails?.upiId
+  ? `upi://pay?pa=${storedata.bankDetails.upiId}&pn=${encodeURIComponent(
+      storedata?.name || "Merchant"
+    )}&am=${roundedGrandTotal}&cu=INR`
+  : "";
 
-  const qrURL = `https://quickchart.io/qr?text=${encodeURIComponent(
-    upiString
-  )}`;
+const qrURL = upiString
+  ? `https://quickchart.io/qr?text=${encodeURIComponent(upiString)}`
+  : "";
 
   // console.log('QR Code URL:', qrURL);
 

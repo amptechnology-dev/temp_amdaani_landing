@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import React, { useState, useMemo, useEffect } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { useTheme } from "../../context/ThemeContext";
 import { themeConfig } from "../../utils/ThemeConfig";
 import { useAuth } from "../../context/AuthContext";
 import api from "../../utils/api";
 import { motion, AnimatePresence } from "framer-motion";
-import { Formik, Form, Field, ErrorMessage } from "formik";
+import { Formik, Form, ErrorMessage } from "formik";
 import * as Yup from "yup";
 import { toast } from "sonner";
 
@@ -20,25 +20,22 @@ import {
   Search,
   User,
   Phone,
-  Building,
-  Mail,
+  PhoneCall,
   IndianRupee,
-  ChevronLeft,
-  ChevronRight,
   MoreVertical,
   RefreshCw,
   AlertCircle,
   CheckCircle,
   X,
-  Filter,
-  Calendar,
-  Clock,
   MapPin,
   Hash,
-  Globe,
+  Star,
+  FileText,
+  Users,
+  Wallet,
 } from "lucide-react";
 
-// shadcn components (make sure to install these)
+// shadcn components
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,28 +46,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -78,9 +54,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -122,7 +97,7 @@ const customerSchema = Yup.object().shape({
   gstin: Yup.string()
     .matches(
       /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/,
-      "Invalid GSTIN format"
+      "Invalid GSTIN format",
     )
     .nullable(),
   address: Yup.string(),
@@ -139,8 +114,6 @@ const fetchAllCustomers = async ({ page, pageSize }) => {
     params: { page, limit: pageSize },
   });
 
-  console.log("Fetched all customers:", res.data);
-
   return {
     items: res.data?.docs || res.data?.customers || [],
     total: res.data?.total || res.data?.totalDocs || 0,
@@ -154,8 +127,6 @@ const fetchDueCustomers = async ({ page, pageSize }) => {
     params: { page, limit: pageSize },
   });
 
-  console.log("Fetched due customers:", res.data);
-
   return {
     items: res.data?.docs || res.data?.customers || [],
     total: res.data?.total || res.data?.totalDocs || 0,
@@ -164,35 +135,54 @@ const fetchDueCustomers = async ({ page, pageSize }) => {
   };
 };
 
-// Extract error message helper
 const extractErrorMessage = (error) => {
-  if (error.response?.data?.message) {
-    return error.response.data.message;
-  }
-  if (error.message) {
-    return error.message;
-  }
+  if (error.response?.data?.message) return error.response.data.message;
+  if (error.message) return error.message;
   return "An unexpected error occurred";
+};
+
+// -----------------------------------------
+// Due severity helper — RN app er getDueSeverity() logic
+// -----------------------------------------
+const getDueSeverity = (amount) => {
+  if (amount >= 10000)
+    return {
+      level: "critical",
+      color: "#DC2626",
+      bg: "#FEF2F2",
+      border: "#FCA5A5",
+    };
+  if (amount >= 5000)
+    return {
+      level: "warning",
+      color: "#F57C00",
+      bg: "#FFF7ED",
+      border: "#FDBA74",
+    };
+  return {
+    level: "normal",
+    color: "#2563EB",
+    bg: "#EFF6FF",
+    border: "#93C5FD",
+  };
 };
 
 export default function CustomersPage() {
   const { theme } = useTheme();
   const currentTheme = themeConfig[theme];
   const { authState } = useAuth();
-  const queryClient = useQueryClient();
 
   // State management
   const [activeTab, setActiveTab] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize] = useState(100); // card view — বড় page size, scroll-based
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isCustomerDialogOpen, setIsCustomerDialogOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isUpdate, setIsUpdate] = useState(false);
 
-  // Separate states for all customers and due customers
   const [allCustomersData, setAllCustomersData] = useState({
     items: [],
     total: 0,
@@ -204,19 +194,15 @@ export default function CustomersPage() {
     totalPages: 0,
   });
 
-  // Loading states
   const [isLoadingAll, setIsLoadingAll] = useState(true);
   const [isLoadingDue, setIsLoadingDue] = useState(true);
 
-  // Use the useDebounce hook
   const debouncedSearch = useDebounce(searchTerm, 500);
 
-  // Reset page when search changes
   useEffect(() => {
     setPage(1);
   }, [debouncedSearch, activeTab]);
 
-  // Fetch both APIs together in useEffect
   useEffect(() => {
     if (!authState?.isAuthenticated) return;
 
@@ -227,9 +213,8 @@ export default function CustomersPage() {
         setAllCustomersData(allData);
       } catch (error) {
         toast.error(
-          `Failed to load all customers: ${extractErrorMessage(error)}`
+          `Failed to load all customers: ${extractErrorMessage(error)}`,
         );
-        console.error("Error fetching all customers:", error);
       } finally {
         setIsLoadingAll(false);
       }
@@ -242,20 +227,17 @@ export default function CustomersPage() {
         setDueCustomersData(dueData);
       } catch (error) {
         toast.error(
-          `Failed to load due customers: ${extractErrorMessage(error)}`
+          `Failed to load due customers: ${extractErrorMessage(error)}`,
         );
-        console.error("Error fetching due customers:", error);
       } finally {
         setIsLoadingDue(false);
       }
     };
 
-    // Fetch both APIs in parallel
     fetchAllData();
     fetchDueData();
   }, [page, pageSize, authState?.isAuthenticated]);
 
-  // Refresh function to fetch both APIs again
   const refreshData = async () => {
     setIsRefreshing(true);
     try {
@@ -263,37 +245,40 @@ export default function CustomersPage() {
         fetchAllCustomers({ page, pageSize }),
         fetchDueCustomers({ page, pageSize }),
       ]);
-
       setAllCustomersData(allData);
       setDueCustomersData(dueData);
       toast.success("Customers refreshed successfully!");
-    } catch (error) {
+    } catch {
       toast.error("Failed to refresh customers");
     } finally {
       setTimeout(() => setIsRefreshing(false), 500);
     }
   };
 
-  // Determine which data to use based on active tab
   const customersData = useMemo(() => {
-    if (activeTab === "due") {
-      return dueCustomersData;
-    }
-    return allCustomersData;
+    return activeTab === "due" ? dueCustomersData : allCustomersData;
   }, [activeTab, allCustomersData, dueCustomersData]);
 
-  const isLoading = useMemo(() => {
-    if (activeTab === "due") {
-      return isLoadingDue;
-    }
-    return isLoadingAll;
-  }, [activeTab, isLoadingAll, isLoadingDue]);
+  const isLoading = activeTab === "due" ? isLoadingDue : isLoadingAll;
+
+  // ✅ Top 5 customer IDs (RN app er top5CustomerIds logic) — sorted by totalInvoices
+  const top5CustomerIds = useMemo(() => {
+    return [...allCustomersData.items]
+      .filter((c) => (c.totalInvoices || 0) > 0)
+      .sort((a, b) => (b.totalInvoices || 0) - (a.totalInvoices || 0))
+      .slice(0, 5)
+      .map((c) => c._id);
+  }, [allCustomersData.items]);
+
+  const getCustomerRank = (customerId) => {
+    const index = top5CustomerIds.indexOf(customerId);
+    return index !== -1 ? index + 1 : 0;
+  };
 
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: (id) => api.delete(`/customer/id/${id}`),
     onSuccess: () => {
-      // Refresh both datasets after deletion
       Promise.all([
         fetchAllCustomers({ page, pageSize }),
         fetchDueCustomers({ page, pageSize }),
@@ -301,18 +286,15 @@ export default function CustomersPage() {
         setAllCustomersData(allData);
         setDueCustomersData(dueData);
       });
-
       setIsDeleteDialogOpen(false);
       setSelectedCustomer(null);
       toast.success("Customer deleted successfully!");
     },
     onError: (error) => {
-      const message = extractErrorMessage(error);
-      toast.error(message || "Failed to delete customer. Please try again.");
+      toast.error(extractErrorMessage(error) || "Failed to delete customer.");
     },
   });
 
-  // Form submit handler
   const handleSubmit = async (values, { setSubmitting, resetForm }) => {
     try {
       const requestBody = {
@@ -327,16 +309,12 @@ export default function CustomersPage() {
       };
 
       let response;
-
       if (isUpdate && selectedCustomer) {
-        // Update API
         response = await api.put(
           `/customer/id/${selectedCustomer._id}`,
-          requestBody
+          requestBody,
         );
-        console.log("Updating customer:", response);
       } else {
-        // Create API
         response = await api.post("/customer", requestBody);
       }
 
@@ -344,43 +322,33 @@ export default function CustomersPage() {
         toast.success(
           isUpdate
             ? "Customer updated successfully!"
-            : "Customer added successfully!"
+            : "Customer added successfully!",
         );
-
         resetForm();
         setIsCustomerDialogOpen(false);
         setSelectedCustomer(null);
         setIsUpdate(false);
 
-        // Refresh both datasets after adding/updating
         const [allData, dueData] = await Promise.all([
           fetchAllCustomers({ page, pageSize }),
           fetchDueCustomers({ page, pageSize }),
         ]);
-
         setAllCustomersData(allData);
         setDueCustomersData(dueData);
       } else {
         throw new Error(
-          response.data?.message || response.message || "Operation failed"
+          response.data?.message || response.message || "Operation failed",
         );
       }
     } catch (error) {
-      const message = extractErrorMessage(error);
-      toast.error(message || "Failed to save customer. Please try again.");
+      toast.error(extractErrorMessage(error) || "Failed to save customer.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Handlers
-  const handleSearchChange = (e) => {
-    setSearchTerm(e.target.value);
-  };
-
-  const handleClearSearch = () => {
-    setSearchTerm("");
-  };
+  const handleSearchChange = (e) => setSearchTerm(e.target.value);
+  const handleClearSearch = () => setSearchTerm("");
 
   const handleAddCustomer = () => {
     setSelectedCustomer(null);
@@ -399,7 +367,10 @@ export default function CustomersPage() {
     setIsDeleteDialogOpen(true);
   };
 
-  // Initial values for form
+  const handleCall = (mobile) => {
+    if (mobile) window.location.href = `tel:${mobile}`;
+  };
+
   const initialValues = {
     partyName: selectedCustomer?.name || "",
     contactNumber: selectedCustomer?.mobile || selectedCustomer?.phone || "",
@@ -410,43 +381,42 @@ export default function CustomersPage() {
     postalCode: selectedCustomer?.postalCode || selectedCustomer?.pincode || "",
   };
 
-  // Render logic
   const customers = customersData?.items || [];
   const total = customersData?.total || 0;
-  const totalPages = customersData?.totalPages || 1;
 
-  // Calculate stats from both datasets
   const totalCustomers = allCustomersData.total;
   const totalDueFromAll = allCustomersData.items.reduce(
-    (sum, customer) => sum + (customer.dueAmount || 0),
-    0
+    (sum, c) => sum + (c.totalDue || c.dueAmount || 0),
+    0,
   );
   const activeCustomers = allCustomersData.items.filter(
-    (customer) => !customer.status || customer.status === "active"
+    (c) => !c.status || c.status === "active",
   ).length;
   const customersWithDue = allCustomersData.items.filter(
-    (customer) => (customer.dueAmount || 0) > 0
+    (c) => (c.totalDue || c.dueAmount || 0) > 0,
   ).length;
   const totalDueCustomers = dueCustomersData.total;
 
-  // FRONTEND SEARCH FILTER
   const filteredCustomers = customers.filter((customer) => {
     if (!searchTerm) return true;
-
-    const searchLower = searchTerm.toLowerCase();
+    const q = searchTerm.toLowerCase();
     return (
-      customer.name?.toLowerCase().includes(searchLower) ||
-      customer.mobile?.toLowerCase().includes(searchLower) ||
-      customer.email?.toLowerCase().includes(searchLower) ||
-      customer.gstNumber?.toLowerCase().includes(searchLower) ||
-      customer.address?.toLowerCase().includes(searchLower)
+      customer.name?.toLowerCase().includes(q) ||
+      customer.mobile?.toLowerCase().includes(q) ||
+      customer.gstNumber?.toLowerCase().includes(q) ||
+      customer.address?.toLowerCase().includes(q)
     );
   });
 
+  const totalDueAmount = dueCustomersData.items.reduce(
+    (sum, c) => sum + (c.totalDue || c.dueAmount || 0),
+    0,
+  );
+
   return (
     <div className={`min-h-screen w-full ${currentTheme.background}`}>
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header Section */}
+      <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
+        {/* ---------------- HEADER ---------------- */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -458,10 +428,10 @@ export default function CustomersPage() {
               <h1
                 className={`text-2xl md:text-3xl font-bold ${currentTheme.text}`}
               >
-                Customers
+                My Customers
               </h1>
-              <p className={`mt-2 ${currentTheme.textSecondary}`}>
-                Manage your customers, track payments, and build relationships
+              <p className={`mt-1 text-sm ${currentTheme.textSecondary}`}>
+                Manage your customers and track outstanding payments
               </p>
             </div>
 
@@ -471,217 +441,107 @@ export default function CustomersPage() {
                 size="sm"
                 onClick={refreshData}
                 disabled={isRefreshing}
-                className={`${currentTheme.buttonTertiary}`}
               >
                 <RefreshCw
-                  className={`w-4 h-4 mr-2 ${
-                    isRefreshing ? "animate-spin" : ""
-                  }`}
+                  className={`w-4 h-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`}
                 />
                 Refresh
               </Button>
-
-              <Button
-                onClick={handleAddCustomer}
-                className={`${currentTheme.buttonPrimary}`}
-              >
+              <Button onClick={handleAddCustomer}>
                 <Plus className="w-4 h-4 mr-2" />
                 Add Customer
               </Button>
             </div>
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card
-              className={`${currentTheme.card} border ${currentTheme.outline}`}
-            >
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p
-                      className={`text-sm font-medium ${currentTheme.textSecondary}`}
-                    >
-                      Total Customers
-                    </p>
-                    <p
-                      className={`text-2xl font-bold mt-1 ${currentTheme.text}`}
-                    >
-                      {isLoadingAll ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        totalCustomers.toLocaleString()
-                      )}
-                    </p>
-                  </div>
-                  <div className={`p-2 rounded-lg ${currentTheme.accentLight}`}>
-                    <User
-                      className={`w-5 h-5 ${currentTheme.accent.replace(
-                        "bg-",
-                        "text-"
-                      )}`}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card
-              className={`${currentTheme.card} border ${currentTheme.outline}`}
-            >
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p
-                      className={`text-sm font-medium ${currentTheme.textSecondary}`}
-                    >
-                      Total Due
-                    </p>
-                    <p
-                      className={`text-2xl font-bold mt-1 ${currentTheme.text}`}
-                    >
-                      {isLoadingAll ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        `₹${totalDueFromAll.toLocaleString()}`
-                      )}
-                    </p>
-                  </div>
-                  <div className={`p-2 rounded-lg ${currentTheme.accentLight}`}>
-                    <IndianRupee
-                      className={`w-5 h-5 ${currentTheme.accent.replace(
-                        "bg-",
-                        "text-"
-                      )}`}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card
-              className={`${currentTheme.card} border ${currentTheme.outline}`}
-            >
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p
-                      className={`text-sm font-medium ${currentTheme.textSecondary}`}
-                    >
-                      Active
-                    </p>
-                    <p
-                      className={`text-2xl font-bold mt-1 ${currentTheme.text}`}
-                    >
-                      {isLoadingAll ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        activeCustomers
-                      )}
-                    </p>
-                  </div>
-                  <div className={`p-2 rounded-lg ${currentTheme.accentLight}`}>
-                    <CheckCircle
-                      className={`w-5 h-5 ${currentTheme.success}`}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card
-              className={`${currentTheme.card} border ${currentTheme.outline}`}
-            >
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p
-                      className={`text-sm font-medium ${currentTheme.textSecondary}`}
-                    >
-                      With Due
-                    </p>
-                    <p
-                      className={`text-2xl font-bold mt-1 ${currentTheme.text}`}
-                    >
-                      {isLoadingAll ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : activeTab === "due" ? (
-                        totalDueCustomers
-                      ) : (
-                        customersWithDue
-                      )}
-                    </p>
-                  </div>
-                  <div className={`p-2 rounded-lg ${currentTheme.accentLight}`}>
-                    <AlertCircle className={`w-5 h-5 ${currentTheme.error}`} />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </motion.div>
-
-        {/* Search and Filters */}
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
-          className={`${currentTheme.card} border ${currentTheme.outline} rounded-xl p-4`}
-        >
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search
-                  className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${currentTheme.textTertiary}`}
-                />
-                <Input
-                  placeholder="Search customers by name, phone, email, or company..."
-                  value={searchTerm}
-                  onChange={handleSearchChange}
-                  className={`pl-10 ${currentTheme.surface}`}
-                />
-                {searchTerm && (
-                  <button
-                    onClick={handleClearSearch}
-                    className={`absolute right-3 top-1/2 -translate-y-1/2 ${currentTheme.textTertiary} hover:${currentTheme.text}`}
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Select
-                value={pageSize.toString()}
-                onValueChange={(value) => setPageSize(Number(value))}
+          {/* Stats strip */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              {
+                label: "Total Customers",
+                value: totalCustomers,
+                icon: Users,
+                loading: isLoadingAll,
+                color: "text-blue-600 bg-blue-50",
+              },
+              {
+                label: "Total Due",
+                value: `₹${totalDueFromAll.toLocaleString("en-IN")}`,
+                icon: Wallet,
+                loading: isLoadingAll,
+                color: "text-rose-600 bg-rose-50",
+              },
+              {
+                label: "Active",
+                value: activeCustomers,
+                icon: CheckCircle,
+                loading: isLoadingAll,
+                color: "text-emerald-600 bg-emerald-50",
+              },
+              {
+                label: "With Due",
+                value:
+                  activeTab === "due" ? totalDueCustomers : customersWithDue,
+                icon: AlertCircle,
+                loading: isLoadingAll,
+                color: "text-orange-600 bg-orange-50",
+              },
+            ].map((stat, i) => (
+              <div
+                key={i}
+                className="bg-white rounded-2xl border border-slate-200 p-3.5 flex items-center gap-3"
               >
-                <SelectTrigger className="w-[130px]">
-                  <SelectValue placeholder="Rows per page" />
-                </SelectTrigger>
-                <SelectContent className={`${currentTheme.card}`}>
-                  <SelectItem value="10">10 per page</SelectItem>
-                  <SelectItem value="25">25 per page</SelectItem>
-                  <SelectItem value="50">50 per page</SelectItem>
-                  <SelectItem value="100">100 per page</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+                <div
+                  className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${stat.color}`}
+                >
+                  <stat.icon className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] text-slate-400 font-medium truncate">
+                    {stat.label}
+                  </p>
+                  <p className="text-base font-bold text-slate-800 truncate">
+                    {stat.loading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      stat.value
+                    )}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
         </motion.div>
 
-        {/* Tabs Section */}
-        <Tabs
-          value={activeTab}
-          onValueChange={setActiveTab}
-          className="space-y-6"
-        >
-          <TabsList
-            className={`grid w-full md:w-auto grid-cols-2 ${currentTheme.background} p-1`}
-          >
-            <TabsTrigger value="all">
+        {/* ---------------- SEARCH ---------------- */}
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Input
+            placeholder="Search by name or phone number..."
+            value={searchTerm}
+            onChange={handleSearchChange}
+            className="pl-11 h-12 rounded-full bg-slate-100 border-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          />
+          {searchTerm && (
+            <button
+              onClick={handleClearSearch}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {/* ---------------- TABS (segmented control, RN app er style) ---------------- */}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="w-full grid grid-cols-2 bg-slate-100 p-1 h-12 rounded-xl">
+            <TabsTrigger
+              value="all"
+              className="rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white flex items-center gap-2"
+            >
+              <Users className="w-4 h-4" />
               All Customers
-              <Badge variant="secondary" className="ml-2">
+              <Badge variant="secondary" className="ml-1">
                 {isLoadingAll ? (
                   <Loader2 className="w-3 h-3 animate-spin" />
                 ) : (
@@ -689,371 +549,283 @@ export default function CustomersPage() {
                 )}
               </Badge>
             </TabsTrigger>
-
             <TabsTrigger
               value="due"
-              className={`data-[state=active]:${currentTheme.onBackground}`}
+              className="rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white flex items-center gap-2 relative"
             >
-              With Due Amount
-              <Badge variant="secondary" className="ml-2">
-                {isLoadingDue ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                ) : (
-                  totalDueCustomers
-                )}
-              </Badge>
+              <Wallet className="w-4 h-4" />
+              Due Customers
+              {totalDueCustomers > 0 && (
+                <Badge className="ml-1 bg-red-500 hover:bg-red-500">
+                  {isLoadingDue ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    totalDueCustomers
+                  )}
+                </Badge>
+              )}
             </TabsTrigger>
           </TabsList>
+        </Tabs>
 
-          <TabsContent value={activeTab} className="space-y-6">
-            {/* Table Section */}
-            <Card
-              className={`${currentTheme.card} border ${currentTheme.outline} overflow-hidden`}
-            >
-              <CardHeader className={`${currentTheme.surfaceVariant}`}>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div>
-                    <CardTitle className={currentTheme.text}>
-                      Customer List
-                    </CardTitle>
-                    <CardDescription className={currentTheme.textSecondary}>
-                      {isLoading ? (
-                        "Loading customers..."
-                      ) : (
-                        <>
-                          Showing {(page - 1) * pageSize + 1} to{" "}
-                          {Math.min(page * pageSize, total)} of {total}{" "}
-                          customers
-                        </>
-                      )}
-                    </CardDescription>
-                  </div>
-                  {(isLoadingAll || isLoadingDue || isRefreshing) && (
-                    <div className="flex items-center text-sm">
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      <span className={currentTheme.textSecondary}>
-                        Loading...
-                      </span>
-                    </div>
-                  )}
+        {/* ---------------- DUE SUMMARY CARD (শুধু Due tab-এ) ---------------- */}
+        {activeTab === "due" && dueCustomersData.items.length > 0 && (
+          <Card className="rounded-2xl border-slate-200 bg-slate-50/60">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center">
+                  <IndianRupee className="w-4 h-4 text-rose-600" />
                 </div>
-              </CardHeader>
+                <div>
+                  <p className="text-[11px] font-medium text-slate-500">
+                    Total Due
+                  </p>
+                  <p className="text-lg font-bold text-rose-600">
+                    ₹{totalDueAmount.toLocaleString("en-IN")}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <p className="text-[11px] font-medium text-slate-500">
+                    Due Accounts
+                  </p>
+                  <p className="text-lg font-bold text-blue-600">
+                    {totalDueCustomers}
+                  </p>
+                </div>
+                <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center">
+                  <User className="w-4 h-4 text-blue-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-              <CardContent className="p-0">
-                {isLoading ? (
-                  <div className="space-y-3 p-6">
-                    {[...Array(5)].map((_, i) => (
-                      <Skeleton key={i} className="h-16 w-full" />
-                    ))}
-                  </div>
-                ) : filteredCustomers.length === 0 ? (
-                  <div className="p-12 text-center">
-                    <User className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                    <h3 className="text-lg font-semibold mb-2">
-                      No customers found
-                    </h3>
-                    <p className="text-gray-500 mb-4">
-                      {searchTerm
-                        ? "Try adjusting your search terms"
-                        : activeTab === "due"
-                        ? "No customers with due amount"
-                        : "Get started by adding your first customer"}
-                    </p>
+        {/* ---------------- CUSTOMER LIST ---------------- */}
+        <div className="space-y-3">
+          {isLoading ? (
+            [...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-24 w-full rounded-2xl" />
+            ))
+          ) : filteredCustomers.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-2xl border border-slate-200">
+              {activeTab === "due" ? (
+                <>
+                  <CheckCircle className="w-16 h-16 text-blue-400 mb-4" />
+                  <h3 className="text-lg font-bold text-slate-800 mb-1">
+                    {searchTerm ? "No Customers Found" : "All Clear! 🎉"}
+                  </h3>
+                  <p className="text-sm text-slate-400 max-w-sm">
+                    {searchTerm
+                      ? `No customers match "${searchTerm}".`
+                      : "Great job! All your customers have cleared their outstanding payments."}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <User className="w-16 h-16 text-slate-300 mb-4" />
+                  <h3 className="text-lg font-bold text-slate-800 mb-1">
+                    {searchTerm ? "No Customers Found" : "No Customers Yet"}
+                  </h3>
+                  <p className="text-sm text-slate-400 max-w-sm mb-4">
+                    {searchTerm
+                      ? `No customers match "${searchTerm}".`
+                      : "Start by adding your first customer to begin tracking sales and payments."}
+                  </p>
+                  {!searchTerm && (
                     <Button onClick={handleAddCustomer}>
                       <Plus className="w-4 h-4 mr-2" />
                       Add Customer
                     </Button>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader className={`${currentTheme.surfaceVariant}`}>
-                        <TableRow>
-                          <TableHead className="w-[250px]">Customer</TableHead>
-                          <TableHead>Contact</TableHead>
-                          <TableHead>Address</TableHead>
-                          <TableHead>GSTIN</TableHead>
-                          <TableHead className="text-right">
-                            Due Amount
-                          </TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        <AnimatePresence>
-                          {filteredCustomers.map((customer, index) => (
-                            <motion.tr
-                              key={customer._id}
-                              initial={{ opacity: 0, y: 20 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -20 }}
-                              transition={{
-                                duration: 0.2,
-                                delay: index * 0.02,
-                              }}
-                              className={`hover:${currentTheme.surfaceVariant} border-b ${currentTheme.outline}`}
-                            >
-                              <TableCell>
-                                <div className="flex items-center gap-3">
-                                  <div
-                                    className={`p-2 rounded-lg ${currentTheme.accentLight}`}
-                                  >
-                                    <User
-                                      className={`w-4 h-4 ${currentTheme.accent.replace(
-                                        "bg-",
-                                        "text-"
-                                      )}`}
-                                    />
-                                  </div>
-                                  <div>
-                                    <div className="font-medium">
-                                      {customer.name}
-                                    </div>
-                                    <div
-                                      className={`text-xs ${currentTheme.textTertiary} mt-1`}
-                                    >
-                                      ID: {customer._id?.slice(-6) || "N/A"}
-                                    </div>
-                                  </div>
-                                </div>
-                              </TableCell>
-
-                              <TableCell>
-                                <div className="space-y-1">
-                                  <div className="flex items-center gap-2">
-                                    <Phone className="w-3 h-3" />
-                                    <span>
-                                      {customer.mobile || customer.phone}
-                                    </span>
-                                  </div>
-                                  {customer.email && (
-                                    <div className="flex items-center gap-2">
-                                      <Mail className="w-3 h-3" />
-                                      <span className="text-sm truncate">
-                                        {customer.email}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              </TableCell>
-
-                              <TableCell>
-                                <div className="space-y-1 max-w-[200px]">
-                                  <div className="flex items-start gap-2">
-                                    <MapPin className="w-3 h-3 mt-1 flex-shrink-0" />
-                                    <span className="text-sm truncate">
-                                      {customer.address || "No address"}
-                                    </span>
-                                  </div>
-                                  {(customer.city || customer.state) && (
-                                    <div className="text-xs text-gray-500">
-                                      {[customer.city, customer.state]
-                                        .filter(Boolean)
-                                        .join(", ")}
-                                    </div>
-                                  )}
-                                </div>
-                              </TableCell>
-
-                              <TableCell>
-                                <div className="flex items-center gap-2">
-                                  <Hash className="w-3 h-3" />
-                                  <span className="text-sm font-mono">
-                                    {customer.gstNumber ||
-                                      customer.gstin ||
-                                      "-"}
-                                  </span>
-                                </div>
-                              </TableCell>
-
-                              <TableCell className="text-right">
-                                <div
-                                  className={`font-medium ${
-                                    (customer.dueAmount || 0) > 0
-                                      ? currentTheme.error
-                                      : currentTheme.success
-                                  }`}
-                                >
-                                  ₹{(customer.totalDue || 0).toLocaleString()}
-                                </div>
-                                <div
-                                  className={`text-xs ${currentTheme.textTertiary}`}
-                                >
-                                  {customer.totalInvoices || 0} invoices
-                                </div>
-                              </TableCell>
-
-                              <TableCell>
-                                <Badge
-                                  variant={
-                                    customer.status === "active"
-                                      ? "default"
-                                      : "secondary"
-                                  }
-                                  className={
-                                    customer.status === "active"
-                                      ? `${currentTheme.accent} text-white`
-                                      : currentTheme.textTertiary
-                                  }
-                                >
-                                  {customer.status || "active"}
-                                </Badge>
-                              </TableCell>
-
-                              <TableCell className="text-right">
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="sm">
-                                      <MoreVertical className="w-4 h-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent
-                                    align="end"
-                                    className={`${currentTheme.card}`}
-                                  >
-                                    <DropdownMenuItem
-                                      onClick={() =>
-                                        handleEditCustomer(customer)
-                                      }
-                                    >
-                                      <Edit className="w-4 h-4 mr-2" />
-                                      Edit
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      onClick={() =>
-                                        console.log("View details:", customer)
-                                      }
-                                    >
-                                      View Details
-                                    </DropdownMenuItem>
-                                    {(customer.dueAmount || 0) > 0 && (
-                                      <DropdownMenuItem
-                                        onClick={() =>
-                                          console.log(
-                                            "Send reminder:",
-                                            customer
-                                          )
-                                        }
-                                      >
-                                        Send Reminder
-                                      </DropdownMenuItem>
-                                    )}
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                      onClick={() =>
-                                        handleDeleteCustomer(customer)
-                                      }
-                                      className="text-red-600"
-                                    >
-                                      <Trash className="w-4 h-4 mr-2" />
-                                      Delete
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TableCell>
-                            </motion.tr>
-                          ))}
-                        </AnimatePresence>
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-
-              {/* Pagination */}
-              {filteredCustomers.length > 0 && (
-                <div
-                  className={`flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t ${currentTheme.outline} ${currentTheme.surfaceVariant}`}
-                >
-                  <div className={`text-sm ${currentTheme.textSecondary}`}>
-                    Page {page} of {totalPages}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={page === 1}
-                      className={currentTheme.buttonTertiary}
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                      Previous
-                    </Button>
-
-                    <div className="flex items-center gap-1">
-                      {Array.from(
-                        { length: Math.min(5, totalPages) },
-                        (_, i) => {
-                          let pageNum = i + 1;
-                          if (totalPages > 5) {
-                            if (page > 3) {
-                              pageNum = page - 2 + i;
-                              if (pageNum > totalPages)
-                                pageNum = totalPages - 4 + i;
-                            }
-                          }
-                          return (
-                            <Button
-                              key={pageNum}
-                              variant={page === pageNum ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => setPage(pageNum)}
-                              className={`w-8 h-8 p-0 ${
-                                page === pageNum
-                                  ? `${currentTheme.buttonPrimary}`
-                                  : currentTheme.buttonTertiary
-                              }`}
-                            >
-                              {pageNum}
-                            </Button>
-                          );
-                        }
-                      )}
-
-                      {totalPages > 5 && page < totalPages - 2 && (
-                        <>
-                          <span className={`px-2 ${currentTheme.textTertiary}`}>
-                            ...
-                          </span>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setPage(totalPages)}
-                            className={`w-8 h-8 p-0 ${currentTheme.buttonTertiary}`}
-                          >
-                            {totalPages}
-                          </Button>
-                        </>
-                      )}
-                    </div>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        setPage((p) => Math.min(totalPages, p + 1))
-                      }
-                      disabled={page === totalPages}
-                      className={currentTheme.buttonTertiary}
-                    >
-                      Next
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
-                  </div>
-
-                  <div className={`text-sm ${currentTheme.textSecondary}`}>
-                    {total.toLocaleString()} total customers
-                  </div>
-                </div>
+                  )}
+                </>
               )}
-            </Card>
-          </TabsContent>
-        </Tabs>
+            </div>
+          ) : (
+            <AnimatePresence>
+              {filteredCustomers.map((customer, index) => {
+                const isDueTab = activeTab === "due";
+                const dueAmount = customer.totalDue || customer.dueAmount || 0;
+                const showDueBadge = isDueTab && dueAmount > 0;
+                const severity = showDueBadge
+                  ? getDueSeverity(dueAmount)
+                  : null;
+                const rank = getCustomerRank(customer._id);
+
+                return (
+                  <motion.div
+                    key={customer._id}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -12 }}
+                    transition={{ duration: 0.2, delay: index * 0.02 }}
+                    className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+                    style={
+                      showDueBadge
+                        ? {
+                            borderLeftWidth: 4,
+                            borderLeftColor: severity.color,
+                          }
+                        : undefined
+                    }
+                  >
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => handleEditCustomer(customer)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handleEditCustomer(customer);
+                        }
+                      }}
+                      className="w-full text-left p-4 hover:bg-slate-50/60 transition-colors cursor-pointer"
+                    >
+                      {/* Top row — name + rank + actions */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <p className="font-bold text-slate-800 capitalize truncate">
+                            {customer.name || "No Name"}
+                          </p>
+                          {rank > 0 && (
+                            <span className="flex items-center gap-1 bg-amber-50 text-amber-700 text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0">
+                              <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                              #{rank}
+                            </span>
+                          )}
+                        </div>
+
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="shrink-0"
+                        >
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                              >
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => handleEditCustomer(customer)}
+                              >
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => handleDeleteCustomer(customer)}
+                                className="text-red-600"
+                              >
+                                <Trash className="w-4 h-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+
+                      {/* Contact row */}
+                      <div className="flex items-center justify-between mt-1.5">
+                        <div className="flex items-center gap-1.5 text-slate-600 text-sm">
+                          <Phone className="w-3.5 h-3.5 text-blue-500" />
+                          {customer.mobile || "No mobile"}
+                        </div>
+                        {customer.mobile && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCall(customer.mobile);
+                            }}
+                            className="w-7 h-7 rounded-full bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center shrink-0"
+                            title="Call customer"
+                          >
+                            <PhoneCall className="w-3.5 h-3.5 text-white" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Due section — Due tab only */}
+                      {showDueBadge && (
+                        <div
+                          className="flex items-center justify-between mt-3 p-2.5 rounded-xl border border-dashed"
+                          style={{
+                            borderColor: severity.border,
+                            backgroundColor: severity.bg,
+                          }}
+                        >
+                          <div>
+                            <p className="text-[10px] font-bold tracking-wide text-slate-500">
+                              OUTSTANDING
+                            </p>
+                            <p
+                              className="text-xl font-extrabold"
+                              style={{ color: severity.color }}
+                            >
+                              ₹{dueAmount.toLocaleString("en-IN")}
+                            </p>
+                          </div>
+                          <div
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg"
+                            style={{ backgroundColor: `${severity.color}15` }}
+                          >
+                            <FileText
+                              className="w-3.5 h-3.5"
+                              style={{ color: severity.color }}
+                            />
+                            <span
+                              className="text-xs font-bold"
+                              style={{ color: severity.color }}
+                            >
+                              {customer.pendingInvoiceCount || 0} Pending
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Bottom stats row */}
+                      <div className="flex items-center flex-wrap gap-3 mt-2.5">
+                        <div className="flex items-center gap-1 text-xs text-slate-500">
+                          <Hash className="w-3.5 h-3.5" />
+                          {customer.totalInvoices || 0} Invoice
+                          {customer.totalInvoices !== 1 ? "s" : ""}
+                        </div>
+
+                        {!showDueBadge && dueAmount > 0 && (
+                          <div className="flex items-center gap-1 text-xs text-orange-600 font-medium">
+                            <AlertCircle className="w-3.5 h-3.5" />₹
+                            {dueAmount.toLocaleString("en-IN")} due
+                          </div>
+                        )}
+
+                        {customer.address && (
+                          <div className="flex items-center gap-1 text-xs text-slate-500 min-w-0 flex-1">
+                            <MapPin className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">{customer.address}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          )}
+        </div>
+
+        {!isLoading && filteredCustomers.length > 0 && (
+          <p className="text-center text-xs text-slate-400">
+            Showing {filteredCustomers.length} of {total} customers
+          </p>
+        )}
       </div>
 
-      {/* Add/Edit Customer Dialog */}
+      {/* ---------------- Add/Edit Customer Dialog ---------------- */}
       <Dialog
         open={isCustomerDialogOpen}
         onOpenChange={(open) => {
@@ -1064,12 +836,12 @@ export default function CustomersPage() {
           }
         }}
       >
-        <DialogContent className={`sm:max-w-[500px] ${currentTheme.card}`}>
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle className={currentTheme.text}>
+            <DialogTitle>
               {isUpdate ? "Edit Customer" : "Add New Customer"}
             </DialogTitle>
-            <DialogDescription className={currentTheme.textSecondary}>
+            <DialogDescription>
               {isUpdate
                 ? "Update customer details below."
                 : "Enter customer details to add to your list."}
@@ -1092,14 +864,8 @@ export default function CustomersPage() {
             }) => (
               <Form className="space-y-4">
                 <div className="space-y-4">
-                  {/* Party Name */}
                   <div>
-                    <Label
-                      htmlFor="partyName"
-                      className={`text-sm font-medium ${currentTheme.text}`}
-                    >
-                      Party Name *
-                    </Label>
+                    <Label htmlFor="partyName">Party Name *</Label>
                     <Input
                       id="partyName"
                       name="partyName"
@@ -1107,11 +873,7 @@ export default function CustomersPage() {
                       onChange={handleChange}
                       onBlur={handleBlur}
                       placeholder="Enter party name"
-                      className={`mt-1 ${currentTheme.surface} ${
-                        errors.partyName && touched.partyName
-                          ? "border-red-500"
-                          : ""
-                      }`}
+                      className={`mt-1 ${errors.partyName && touched.partyName ? "border-red-500" : ""}`}
                     />
                     <ErrorMessage
                       name="partyName"
@@ -1120,14 +882,8 @@ export default function CustomersPage() {
                     />
                   </div>
 
-                  {/* Contact Number */}
                   <div>
-                    <Label
-                      htmlFor="contactNumber"
-                      className={`text-sm font-medium ${currentTheme.text}`}
-                    >
-                      Contact Number *
-                    </Label>
+                    <Label htmlFor="contactNumber">Contact Number *</Label>
                     <Input
                       id="contactNumber"
                       name="contactNumber"
@@ -1136,11 +892,7 @@ export default function CustomersPage() {
                       onBlur={handleBlur}
                       placeholder="Enter 10-digit contact number"
                       maxLength={10}
-                      className={`mt-1 ${currentTheme.surface} ${
-                        errors.contactNumber && touched.contactNumber
-                          ? "border-red-500"
-                          : ""
-                      }`}
+                      className={`mt-1 ${errors.contactNumber && touched.contactNumber ? "border-red-500" : ""}`}
                     />
                     <ErrorMessage
                       name="contactNumber"
@@ -1149,14 +901,8 @@ export default function CustomersPage() {
                     />
                   </div>
 
-                  {/* GSTIN */}
                   <div>
-                    <Label
-                      htmlFor="gstin"
-                      className={`text-sm font-medium ${currentTheme.text}`}
-                    >
-                      GSTIN
-                    </Label>
+                    <Label htmlFor="gstin">GSTIN</Label>
                     <Input
                       id="gstin"
                       name="gstin"
@@ -1164,9 +910,7 @@ export default function CustomersPage() {
                       onChange={handleChange}
                       onBlur={handleBlur}
                       placeholder="Enter GSTIN (optional)"
-                      className={`mt-1 ${currentTheme.surface} ${
-                        errors.gstin && touched.gstin ? "border-red-500" : ""
-                      }`}
+                      className={`mt-1 ${errors.gstin && touched.gstin ? "border-red-500" : ""}`}
                     />
                     <ErrorMessage
                       name="gstin"
@@ -1175,14 +919,8 @@ export default function CustomersPage() {
                     />
                   </div>
 
-                  {/* Address */}
                   <div>
-                    <Label
-                      htmlFor="address"
-                      className={`text-sm font-medium ${currentTheme.text}`}
-                    >
-                      Address
-                    </Label>
+                    <Label htmlFor="address">Address</Label>
                     <Input
                       id="address"
                       name="address"
@@ -1190,19 +928,13 @@ export default function CustomersPage() {
                       onChange={handleChange}
                       onBlur={handleBlur}
                       placeholder="Enter address"
-                      className={`mt-1 ${currentTheme.surface}`}
+                      className="mt-1"
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    {/* City */}
                     <div>
-                      <Label
-                        htmlFor="city"
-                        className={`text-sm font-medium ${currentTheme.text}`}
-                      >
-                        City
-                      </Label>
+                      <Label htmlFor="city">City</Label>
                       <Input
                         id="city"
                         name="city"
@@ -1210,18 +942,11 @@ export default function CustomersPage() {
                         onChange={handleChange}
                         onBlur={handleBlur}
                         placeholder="City"
-                        className={`mt-1 ${currentTheme.surface}`}
+                        className="mt-1"
                       />
                     </div>
-
-                    {/* State */}
                     <div>
-                      <Label
-                        htmlFor="state"
-                        className={`text-sm font-medium ${currentTheme.text}`}
-                      >
-                        State
-                      </Label>
+                      <Label htmlFor="state">State</Label>
                       <Input
                         id="state"
                         name="state"
@@ -1229,19 +954,13 @@ export default function CustomersPage() {
                         onChange={handleChange}
                         onBlur={handleBlur}
                         placeholder="State"
-                        className={`mt-1 ${currentTheme.surface}`}
+                        className="mt-1"
                       />
                     </div>
                   </div>
 
-                  {/* Postal Code */}
                   <div>
-                    <Label
-                      htmlFor="postalCode"
-                      className={`text-sm font-medium ${currentTheme.text}`}
-                    >
-                      Postal Code
-                    </Label>
+                    <Label htmlFor="postalCode">Postal Code</Label>
                     <Input
                       id="postalCode"
                       name="postalCode"
@@ -1250,11 +969,7 @@ export default function CustomersPage() {
                       onBlur={handleBlur}
                       placeholder="6-digit postal code"
                       maxLength={6}
-                      className={`mt-1 ${currentTheme.surface} ${
-                        errors.postalCode && touched.postalCode
-                          ? "border-red-500"
-                          : ""
-                      }`}
+                      className={`mt-1 ${errors.postalCode && touched.postalCode ? "border-red-500" : ""}`}
                     />
                     <ErrorMessage
                       name="postalCode"
@@ -1269,15 +984,10 @@ export default function CustomersPage() {
                     type="button"
                     variant="outline"
                     onClick={() => setIsCustomerDialogOpen(false)}
-                    className={currentTheme.buttonTertiary}
                   >
                     Cancel
                   </Button>
-                  <Button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className={currentTheme.buttonPrimary}
-                  >
+                  <Button type="submit" disabled={isSubmitting}>
                     {isSubmitting ? (
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     ) : isUpdate ? (
@@ -1294,29 +1004,22 @@ export default function CustomersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
+      {/* ---------------- Delete Confirmation Dialog ---------------- */}
       <AlertDialog
         open={isDeleteDialogOpen}
         onOpenChange={setIsDeleteDialogOpen}
       >
-        <AlertDialogContent className={currentTheme.card}>
+        <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className={currentTheme.text}>
-              Delete Customer
-            </AlertDialogTitle>
-            <AlertDialogDescription className={currentTheme.textSecondary}>
+            <AlertDialogTitle>Delete Customer</AlertDialogTitle>
+            <AlertDialogDescription>
               Are you sure you want to delete{" "}
-              <strong className={currentTheme.text}>
-                {selectedCustomer?.name}
-              </strong>
-              ? This action cannot be undone.
+              <strong>{selectedCustomer?.name}</strong>? This action cannot be
+              undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel
-              onClick={() => setIsDeleteDialogOpen(false)}
-              className={currentTheme.buttonTertiary}
-            >
+            <AlertDialogCancel onClick={() => setIsDeleteDialogOpen(false)}>
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
