@@ -2,6 +2,7 @@
 set -e
 
 DOMAIN="amdaani.com"
+WWW_DOMAIN="www.amdaani.com"
 EMAIL="devs.amptechnology@gmail.com"
 APP_CONTAINER="landing-app"
 APP_PORT="7010"
@@ -15,7 +16,7 @@ CERTBOT_CONF_DIR="$BACKEND_PROJECT_DIR/certbot/conf"
 CONF_FILE="$NGINX_CONF_DIR/$DOMAIN.conf"
 CERT_PATH="$CERTBOT_CONF_DIR/live/$DOMAIN/fullchain.pem"
 
-echo "=== Starting SSL setup for $DOMAIN (using existing nginx) ==="
+echo "=== Starting SSL setup for $DOMAIN + $WWW_DOMAIN (using existing nginx) ==="
 
 # Make sure the backend nginx is running
 if ! docker ps --format '{{.Names}}' | grep -q '^nginx$'; then
@@ -30,6 +31,14 @@ mkdir -p "$CERTBOT_CONF_DIR"
 
 write_https_config() {
 cat > "$CONF_FILE" << NGINXEOF
+# Redirect www → non-www (HTTP)
+server {
+    listen 80;
+    server_name $WWW_DOMAIN;
+    return 301 https://$DOMAIN\$request_uri;
+}
+
+# HTTP → HTTPS redirect for bare domain
 server {
     listen 80;
     server_name $DOMAIN;
@@ -43,12 +52,27 @@ server {
     }
 }
 
+# Redirect www → non-www (HTTPS)
+server {
+    listen 443 ssl;
+    server_name $WWW_DOMAIN;
+
+    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
+
+    return 301 https://$DOMAIN\$request_uri;
+}
+
+# Main HTTPS server
 server {
     listen 443 ssl;
     server_name $DOMAIN;
 
     ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
 
     location / {
         proxy_pass http://$APP_CONTAINER:$APP_PORT;
@@ -80,7 +104,7 @@ if test -f "$CERT_PATH"; then
 
   echo ""
   echo "=== Redeploy complete! ==="
-  echo "=== https://$DOMAIN is live ==="
+  echo "=== https://$DOMAIN and https://$WWW_DOMAIN are live ==="
   exit 0
 fi
 
@@ -89,11 +113,11 @@ fi
 # ─────────────────────────────────────────────────────────────
 echo "No certificate found — starting first-time SSL setup..."
 
-# Write temporary HTTP-only config
+# Temp HTTP config for BOTH domains (needed for certbot challenge)
 cat > "$CONF_FILE" << NGINXEOF
 server {
     listen 80;
-    server_name $DOMAIN;
+    server_name $DOMAIN $WWW_DOMAIN;
 
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
@@ -117,8 +141,8 @@ curl -sf -H "Host: $DOMAIN" http://localhost:80 > /dev/null \
   && echo "Domain responding OK" \
   || { echo "ERROR: $DOMAIN not responding — check DNS points to this VPS"; docker logs nginx --tail 30; exit 1; }
 
-# Request certificate
-echo "Requesting certificate from Let's Encrypt..."
+# ⚠️  Issue certificate for BOTH bare domain AND www
+echo "Requesting certificate for $DOMAIN and $WWW_DOMAIN..."
 docker run --rm \
   -v "$CERTBOT_WWW_DIR:/var/www/certbot" \
   -v "$CERTBOT_CONF_DIR:/etc/letsencrypt" \
@@ -128,7 +152,8 @@ docker run --rm \
   --email "$EMAIL" \
   --agree-tos \
   --no-eff-email \
-  -d "$DOMAIN"
+  -d "$DOMAIN" \
+  -d "$WWW_DOMAIN"
 
 if ! test -f "$CERT_PATH"; then
   echo "ERROR: Certificate not found at $CERT_PATH after certbot run!"
@@ -136,7 +161,7 @@ if ! test -f "$CERT_PATH"; then
   exit 1
 fi
 
-echo "Certificate obtained successfully!"
+echo "Certificate obtained for both domains!"
 
 # Write real HTTPS config
 write_https_config
@@ -152,4 +177,4 @@ docker exec nginx nginx -s reload
 
 echo ""
 echo "=== SSL setup complete! ==="
-echo "=== https://$DOMAIN is now live! ==="
+echo "=== https://$DOMAIN and https://$WWW_DOMAIN are now live! ==="
