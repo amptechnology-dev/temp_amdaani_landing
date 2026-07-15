@@ -1,9 +1,25 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
-  ArrowLeft, Phone, User, Calendar, Hash, ShoppingBag,
-  UserCircle2, Sparkles, Search, Trash2, ChevronDown, FileText, MapPin, Building2, Locate, Plus, Percent,
+  ArrowLeft,
+  Phone,
+  User,
+  Calendar,
+  Hash,
+  ShoppingBag,
+  UserCircle2,
+  Sparkles,
+  Search,
+  Trash2,
+  FileText,
+  MapPin,
+  Building2,
+  Locate,
+  Plus,
+  Percent,
+  X,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,16 +30,44 @@ import InvoiceSummary from "./InvoiceSummary";
 import AddItemFormModal from "./AddItemFormModal";
 
 // -------------------------------
-// Small inline product-combobox — used in the "add row" row of the table
+// Inline product combobox for the "add row" — uses a PORTAL so its dropdown
+// is never clipped by any ancestor's overflow-hidden/overflow-x-auto.
 // -------------------------------
-function ProductPicker({ products, onSelect }) {
+function InlineProductCombobox({ products, onSelect, onCreateNew }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const updateCoords = () => {
+    if (!inputRef.current) return;
+    const rect = inputRef.current.getBoundingClientRect();
+    setCoords({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    updateCoords();
+    const handle = () => updateCoords();
+    window.addEventListener("scroll", handle, true);
+    window.addEventListener("resize", handle);
+    return () => {
+      window.removeEventListener("scroll", handle, true);
+      window.removeEventListener("resize", handle);
+    };
+  }, [open]);
 
   useEffect(() => {
     const onClickOutside = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      if (
+        inputRef.current &&
+        !inputRef.current.contains(e.target) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target)
+      ) {
+        setOpen(false);
+      }
     };
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
@@ -31,14 +75,20 @@ function ProductPicker({ products, onSelect }) {
 
   const filtered = (() => {
     const q = query.trim().toLowerCase();
-    if (!q) return products.slice(0, 20);
-    return products.filter(
-      (p) =>
-        p.name?.toLowerCase().includes(q) ||
-        p.hsn?.toLowerCase().includes(q) ||
-        p.sku?.toLowerCase().includes(q)
-    );
+    if (!q) return products.slice(0, 15);
+    return products
+      .filter(
+        (p) =>
+          p.name?.toLowerCase().includes(q) ||
+          p.hsn?.toLowerCase().includes(q) ||
+          p.sku?.toLowerCase().includes(q),
+      )
+      .slice(0, 15);
   })();
+
+  const exactMatch = products.some(
+    (p) => p.name?.toLowerCase().trim() === query.trim().toLowerCase(),
+  );
 
   const pick = (product) => {
     onSelect(product);
@@ -46,35 +96,51 @@ function ProductPicker({ products, onSelect }) {
     setOpen(false);
   };
 
+  const handleCreateNew = () => {
+    onCreateNew(query.trim());
+    setQuery("");
+    setOpen(false);
+  };
+
   return (
-    <div ref={ref} className="relative w-full">
+    <div className="relative w-full">
       <div className="relative">
-        <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
         <input
+          ref={inputRef}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          placeholder="Search product to add..."
-          className="w-full h-9 pl-7 pr-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+          className="w-full max-w-[220px] h-8 px-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
         />
       </div>
 
-      {open && (
-        <div className="absolute z-30 left-0 right-0 top-10 bg-white border border-slate-200 rounded-md shadow-lg max-h-64 overflow-y-auto">
-          {filtered.length === 0 ? (
-            <p className="text-xs text-slate-400 text-center py-4">No products found</p>
-          ) : (
-            filtered.map((p) => (
+      {open &&
+        typeof window !== "undefined" &&
+        createPortal(
+          <div
+            ref={dropdownRef}
+            style={{
+              position: "fixed",
+              top: coords.top,
+              left: coords.left,
+              width: coords.width,
+              zIndex: 9999,
+            }}
+            className="bg-white border border-slate-200 rounded-md shadow-lg max-h-72 overflow-y-auto"
+          >
+            {filtered.map((p) => (
               <div
                 key={p._id}
                 onClick={() => pick(p)}
                 className="flex items-center justify-between px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0"
               >
                 <div className="min-w-0">
-                  <p className="font-medium text-slate-800 truncate">{p.name}</p>
+                  <p className="font-medium text-slate-800 truncate">
+                    {p.name}
+                  </p>
                   <p className="text-[11px] text-slate-400">
                     HSN: {p.hsn || "-"} · {p.unit || "Pcs"}
                   </p>
@@ -83,10 +149,27 @@ function ProductPicker({ products, onSelect }) {
                   ₹{Number(p.sellingPrice ?? 0).toFixed(2)}
                 </span>
               </div>
-            ))
-          )}
-        </div>
-      )}
+            ))}
+
+            {filtered.length === 0 && !query.trim() && (
+              <p className="text-xs text-slate-400 text-center py-4">
+                Start typing to search products
+              </p>
+            )}
+
+            {query.trim() && !exactMatch && (
+              <button
+                type="button"
+                onClick={handleCreateNew}
+                className="w-full flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-blue-600 hover:bg-blue-50 border-t border-slate-100"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Create "{query.trim()}" as new product
+              </button>
+            )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -153,16 +236,22 @@ export default function NewInvoiceFormPage({
       : {}),
   }));
 
-  const [selectedCustomerId, setSelectedCustomerId] = useState(selectedCustomer?._id || "");
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCustomerId, setSelectedCustomerId] = useState(
+    selectedCustomer?._id || "",
+  );
+  // ✅ which field's typeahead dropdown is currently open: "name" | "mobile" | null
+  const [activeField, setActiveField] = useState(null);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
-  const wrapperRef = useRef(null);
+  const [newItemPrefillName, setNewItemPrefillName] = useState("");
+  const customerGridRef = useRef(null);
 
   useEffect(() => {
     const onClickOutside = (e) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
-        setDropdownOpen(false);
+      if (
+        customerGridRef.current &&
+        !customerGridRef.current.contains(e.target)
+      ) {
+        setActiveField(null);
       }
     };
     document.addEventListener("mousedown", onClickOutside);
@@ -170,45 +259,61 @@ export default function NewInvoiceFormPage({
   }, []);
 
   // ✅ EDIT MODE — customers list loaded pore, existing customer ke mobile diye match kore
-  // dropdown-e select + lock kore dao (jehetu edit-e _id thake na loaded invoice-e)
-  useEffect(() => {
-    if (!isEditMode || selectedCustomerId || customers.length === 0) return;
-    if (!selectedCustomer?.mobile) return;
+  // fields e select kore dey (jehetu edit-e _id thake na loaded invoice-e)
+  const editSeededRef = useRef(false);
 
-    const matched = customers.find((c) => c.mobile === selectedCustomer.mobile);
-    if (matched) {
-      setSelectedCustomerId(matched._id);
+  useEffect(() => {
+    if (isLoading) {
+      editSeededRef.current = false; // next load-er jonno reset
+      return;
+    }
+
+    if (isEditMode && !editSeededRef.current && selectedCustomer) {
+      editSeededRef.current = true;
+
       setCustomerForm({
-        name: matched.name || "",
-        mobile: matched.mobile || "",
-        address: matched.address || "",
-        city: matched.city || "",
-        state: matched.state || "",
-        postalCode: matched.postalCode || "",
-        gstNumber: matched.gstNumber || "",
+        name: selectedCustomer.name || "",
+        mobile: selectedCustomer.mobile || "",
+        address: selectedCustomer.address || "",
+        city: selectedCustomer.city || "",
+        state: selectedCustomer.state || "",
+        postalCode: selectedCustomer.postalCode || "",
+        gstNumber: selectedCustomer.gstNumber || "",
       });
+
+      // customers list-e match pele _id-o link kore dao (optional — locked na kore)
+      const matched = customers.find((c) => c.mobile === selectedCustomer.mobile);
+      if (matched) setSelectedCustomerId(matched._id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditMode, customers]);
+  }, [isLoading, isEditMode, selectedCustomer, customers]);
 
   // ✅ Push customerForm up to parent as selectedCustomer whenever it changes
   useEffect(() => {
     const hasData = customerForm.name || customerForm.mobile;
-    setSelectedCustomer(hasData ? { _id: selectedCustomerId || undefined, ...customerForm } : null);
+    setSelectedCustomer(
+      hasData
+        ? { _id: selectedCustomerId || undefined, ...customerForm }
+        : null,
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerForm, selectedCustomerId]);
 
-  const isLocked = !!selectedCustomerId;
-
-  const filteredCustomers = (() => {
-    const q = searchTerm.trim().toLowerCase();
-    if (!q) return customers.slice(0, 20);
-    return customers.filter(
-      (c) => c.name?.toLowerCase().includes(q) || c.mobile?.includes(q)
-    );
+  // ✅ Typeahead suggestions — filtered live by whichever field (name/mobile) is active
+  const customerSuggestions = (() => {
+    if (!activeField) return [];
+    const q = (
+      activeField === "mobile" ? customerForm.mobile : customerForm.name
+    )
+      .trim()
+      .toLowerCase();
+    if (!q) return customers.slice(0, 8);
+    return customers
+      .filter((c) => c.name?.toLowerCase().includes(q) || c.mobile?.includes(q))
+      .slice(0, 8);
   })();
 
-  const pickCustomer = (c) => {
+  const pickCustomerSuggestion = (c) => {
     setSelectedCustomerId(c._id);
     setCustomerForm({
       name: c.name || "",
@@ -219,33 +324,62 @@ export default function NewInvoiceFormPage({
       postalCode: c.postalCode || "",
       gstNumber: c.gstNumber || "",
     });
-    setDropdownOpen(false);
-    setSearchTerm("");
+    setActiveField(null);
   };
 
-  const handleNewCustomer = () => {
-    setSelectedCustomerId("");
-    setCustomerForm(emptyCustomerForm);
-    setDropdownOpen(false);
-    setSearchTerm("");
-  };
-
-  const handleChangeCustomer = () => {
+  const handleClearCustomer = () => {
     setSelectedCustomerId("");
     setCustomerForm(emptyCustomerForm);
   };
 
   const updateField = (field) => (e) => {
-    setCustomerForm((prev) => ({ ...prev, [field]: e.target.value }));
+    const v = e.target.value;
+    setCustomerForm((prev) => ({ ...prev, [field]: v }));
+
+    // ✅ jodi user select kora customer-er field change kore, detach kore dao
+    // (ar seta ekhon "new customer" hisebe treat hobe)
+    if (selectedCustomerId) {
+      const matched = customers.find((c) => c._id === selectedCustomerId);
+      if (matched && matched[field] !== v) setSelectedCustomerId("");
+    }
   };
 
   const handleAddRow = (product) => {
     addToCart(product);
   };
 
+  const handleCreateNewProduct = (typedName) => {
+    setNewItemPrefillName(typedName);
+    setShowAddItemModal(true);
+  };
+
   const handleNewProductCreated = (newItem) => {
     setAllProducts?.((prev) => [newItem, ...prev]);
     addToCart(newItem);
+    setNewItemPrefillName("");
+  };
+
+  // -------------------------------
+  // ✅ Number field helpers — free typing (0, 1, 10, decimals etc.)
+  // -------------------------------
+  const handleQtyChange = (id) => (e) => {
+    const v = e.target.value.replace(/[^\d]/g, ""); // digits only
+    handleUpdateItemField(id, "qty", v);
+  };
+  const handleQtyBlur = (id) => (e) => {
+    const n = parseInt(e.target.value, 10);
+    handleUpdateItemField(id, "qty", isNaN(n) || n < 1 ? 1 : n);
+  };
+
+  const handleDecimalChange = (id, field) => (e) => {
+    let v = e.target.value.replace(/[^\d.]/g, "");
+    const parts = v.split(".");
+    if (parts.length > 2) v = parts[0] + "." + parts.slice(1).join("");
+    handleUpdateItemField(id, field, v);
+  };
+  const handleDecimalBlur = (id, field) => (e) => {
+    const n = parseFloat(e.target.value);
+    handleUpdateItemField(id, field, isNaN(n) ? 0 : n);
   };
 
   if (isLoading) {
@@ -262,7 +396,12 @@ export default function NewInvoiceFormPage({
         {/* Header */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-4 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={onBack} className="rounded-full hover:bg-slate-100">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onBack}
+              className="rounded-full hover:bg-slate-100"
+            >
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <div>
@@ -271,12 +410,17 @@ export default function NewInvoiceFormPage({
                   {isEditMode ? "Edit Invoice" : "New Invoice"}
                 </h1>
                 {isEditMode && (
-                  <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Editing</Badge>
+                  <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">
+                    Editing
+                  </Badge>
                 )}
               </div>
               <p className="text-sm text-slate-400 flex items-center gap-1 mt-0.5">
                 <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-                Add a customer and items to {isEditMode ? "update" : "generate"} the invoice
+                Add a customer and items to {isEditMode
+                  ? "update"
+                  : "generate"}{" "}
+                the invoice
               </p>
             </div>
           </div>
@@ -295,115 +439,91 @@ export default function NewInvoiceFormPage({
 
         {/* Customer */}
         <Card className="rounded-xl border-slate-200 shadow-sm overflow-visible relative">
-          <CardHeader className="bg-slate-50 border-b border-slate-100 py-2.5 px-4">
+          <CardHeader className="bg-slate-50 border-b border-slate-100 py-2.5 px-4 rounded-t-xl">
             <CardTitle className="flex items-center justify-between text-sm font-semibold text-slate-700">
               <span className="flex items-center gap-2">
                 <UserCircle2 className="w-4 h-4 text-blue-600" />
                 Customer
               </span>
-              {isLocked && (
+              {(customerForm.name || customerForm.mobile) && (
                 <button
-                  onClick={handleChangeCustomer}
-                  className="text-xs text-blue-600 hover:underline font-medium"
+                  onClick={handleClearCustomer}
+                  className="flex items-center gap-1 text-xs text-rose-500 hover:underline font-medium"
                 >
-                  Change
+                  <X className="w-3 h-3" />
+                  Clear
                 </button>
               )}
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-4 space-y-4">
-            {/* ── Select Customer dropdown ── */}
-            <div ref={wrapperRef} className="relative">
-              <label className="text-xs font-medium text-slate-500 mb-1 block">
-                Select Customer
-              </label>
-              <button
-                type="button"
-                onClick={() => setDropdownOpen((v) => !v)}
-                className="w-full h-10 px-3 rounded-md border border-slate-200 bg-white flex items-center justify-between text-sm hover:bg-slate-50"
-              >
-                <span className={customerForm.name || customerForm.mobile ? "text-slate-800" : "text-slate-400"}>
-                  {isLocked
-                    ? `${customerForm.name || "Unnamed"} — ${customerForm.mobile || "-"}`
-                    : customerForm.name || customerForm.mobile
-                    ? "New customer (typed manually)"
-                    : "Select existing customer or type new below"}
-                </span>
-                <ChevronDown className="w-4 h-4 text-slate-400" />
-              </button>
-
-              {dropdownOpen && (
-                <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg overflow-hidden">
-                  <div className="p-2 border-b border-slate-100">
-                    <div className="relative">
-                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                      <input
-                        autoFocus
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Search by name or mobile..."
-                        className="w-full h-9 pl-8 pr-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleNewCustomer}
-                    className="w-full text-left px-3 py-2.5 text-sm font-medium text-blue-600 hover:bg-blue-50 border-b border-slate-100"
-                  >
-                    + New Customer (type details manually)
-                  </button>
-
-                  <div className="max-h-56 overflow-y-auto">
-                    {filteredCustomers.length === 0 ? (
-                      <p className="text-xs text-slate-400 text-center py-4">No customers found</p>
-                    ) : (
-                      filteredCustomers.map((c) => (
-                        <div
-                          key={c._id}
-                          onClick={() => pickCustomer(c)}
-                          className={`flex items-center justify-between px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0 ${
-                            selectedCustomerId === c._id ? "bg-blue-50" : ""
-                          }`}
-                        >
-                          <div className="min-w-0">
-                            <p className="font-medium text-slate-800 truncate">{c.name}</p>
-                            <p className="text-[11px] text-slate-400">
-                              {c.mobile} {c.gstNumber ? `· ${c.gstNumber}` : ""}
-                            </p>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* ── Field grid — mirrors DB schema exactly ── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <CardContent className="p-4">
+            <div
+              ref={customerGridRef}
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
+            >
+              {/* Mobile — typeahead */}
               <div className="relative">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 z-10" />
                 <input
                   value={customerForm.mobile}
                   onChange={updateField("mobile")}
-                  disabled={isLocked}
+                  onFocus={() => setActiveField("mobile")}
                   maxLength={10}
                   placeholder="Mobile *"
-                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-500"
+                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
+                {activeField === "mobile" && customerSuggestions.length > 0 && (
+                  <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-56 overflow-y-auto">
+                    {customerSuggestions.map((c) => (
+                      <div
+                        key={c._id}
+                        onClick={() => pickCustomerSuggestion(c)}
+                        className="flex items-center justify-between px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-medium text-slate-800 truncate">
+                            {c.name || "Unnamed"}
+                          </p>
+                          <p className="text-[11px] text-slate-400">
+                            {c.mobile}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
+              {/* Name — typeahead */}
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 z-10" />
                 <input
                   value={customerForm.name}
                   onChange={updateField("name")}
-                  disabled={isLocked}
+                  onFocus={() => setActiveField("name")}
                   placeholder="Name"
-                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-500"
+                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
+                {activeField === "name" && customerSuggestions.length > 0 && (
+                  <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-56 overflow-y-auto">
+                    {customerSuggestions.map((c) => (
+                      <div
+                        key={c._id}
+                        onClick={() => pickCustomerSuggestion(c)}
+                        className="flex items-center justify-between px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-medium text-slate-800 truncate">
+                            {c.name || "Unnamed"}
+                          </p>
+                          <p className="text-[11px] text-slate-400">
+                            {c.mobile}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="relative">
@@ -411,11 +531,13 @@ export default function NewInvoiceFormPage({
                 <input
                   value={customerForm.gstNumber}
                   onChange={(e) =>
-                    setCustomerForm((prev) => ({ ...prev, gstNumber: e.target.value.toUpperCase() }))
+                    setCustomerForm((prev) => ({
+                      ...prev,
+                      gstNumber: e.target.value.toUpperCase(),
+                    }))
                   }
-                  disabled={isLocked}
                   placeholder="GSTIN (optional)"
-                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-500"
+                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
               </div>
 
@@ -424,9 +546,8 @@ export default function NewInvoiceFormPage({
                 <input
                   value={customerForm.address}
                   onChange={updateField("address")}
-                  disabled={isLocked}
                   placeholder="Address"
-                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-500"
+                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
               </div>
 
@@ -435,9 +556,8 @@ export default function NewInvoiceFormPage({
                 <input
                   value={customerForm.city}
                   onChange={updateField("city")}
-                  disabled={isLocked}
                   placeholder="City"
-                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-500"
+                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
               </div>
 
@@ -445,19 +565,17 @@ export default function NewInvoiceFormPage({
                 <input
                   value={customerForm.state}
                   onChange={updateField("state")}
-                  disabled={isLocked}
                   placeholder="State"
-                  className="w-full h-10 px-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-500"
+                  className="w-full h-10 px-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
                 <div className="relative">
                   <Locate className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                   <input
                     value={customerForm.postalCode}
                     onChange={updateField("postalCode")}
-                    disabled={isLocked}
                     maxLength={6}
                     placeholder="Postal Code"
-                    className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-500"
+                    className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
               </div>
@@ -481,7 +599,10 @@ export default function NewInvoiceFormPage({
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => setShowAddItemModal(true)}
+                onClick={() => {
+                  setNewItemPrefillName("");
+                  setShowAddItemModal(true);
+                }}
                 className="h-7 rounded-full text-xs gap-1"
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -493,58 +614,79 @@ export default function NewInvoiceFormPage({
             <table className="w-full text-sm border-collapse min-w-[900px]">
               <thead>
                 <tr className="bg-slate-50 text-slate-500 text-xs">
-                  <th className="text-left font-medium px-3 py-2 border-b border-slate-100 w-10">#</th>
-                  <th className="text-left font-medium px-3 py-2 border-b border-slate-100">Product</th>
-                  <th className="text-left font-medium px-3 py-2 border-b border-slate-100 w-20">HSN</th>
-                  <th className="text-left font-medium px-3 py-2 border-b border-slate-100 w-16">Unit</th>
-                  <th className="text-center font-medium px-3 py-2 border-b border-slate-100 w-20">Qty</th>
-                  <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-24">Price</th>
-                  <th className="text-center font-medium px-3 py-2 border-b border-slate-100 w-32">Discount</th>
-                  <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-16">GST%</th>
-                  <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-28">Total</th>
+                  <th className="text-left font-medium px-3 py-2 border-b border-slate-100 w-10">
+                    #
+                  </th>
+                  <th className="text-left font-medium px-3 py-2 border-b border-slate-100">
+                    Product
+                  </th>
+                  <th className="text-left font-medium px-3 py-2 border-b border-slate-100 w-20">
+                    HSN
+                  </th>
+                  <th className="text-left font-medium px-3 py-2 border-b border-slate-100 w-16">
+                    Unit
+                  </th>
+                  <th className="text-center font-medium px-3 py-2 border-b border-slate-100 w-20">
+                    Qty
+                  </th>
+                  <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-24">
+                    Price
+                  </th>
+                  <th className="text-center font-medium px-3 py-2 border-b border-slate-100 w-32">
+                    Discount
+                  </th>
+                  <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-16">
+                    GST%
+                  </th>
+                  <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-28">
+                    Total
+                  </th>
                   <th className="w-10 border-b border-slate-100"></th>
                 </tr>
               </thead>
               <tbody>
                 {cartItems.map((item, i) => (
                   <tr key={item._id} className="hover:bg-slate-50/60">
-                    <td className="px-3 py-1.5 border-b border-slate-100 text-slate-400">{i + 1}</td>
+                    <td className="px-3 py-1.5 border-b border-slate-100 text-slate-400">
+                      {i + 1}
+                    </td>
                     <td className="px-3 py-1.5 border-b border-slate-100 font-medium text-slate-800">
                       {item.name}
                     </td>
-                    <td className="px-3 py-1.5 border-b border-slate-100 text-slate-500">{item.hsn || "-"}</td>
-                    <td className="px-3 py-1.5 border-b border-slate-100 text-slate-500">{item.unit || "Pcs"}</td>
+                    <td className="px-3 py-1.5 border-b border-slate-100 text-slate-500">
+                      {item.hsn || "-"}
+                    </td>
+                    <td className="px-3 py-1.5 border-b border-slate-100 text-slate-500">
+                      {item.unit || "Pcs"}
+                    </td>
                     <td className="px-2 py-1.5 border-b border-slate-100">
                       <input
-                        type="number"
-                        min={1}
+                        type="text"
+                        inputMode="numeric"
                         value={item.qty}
-                        onChange={(e) => handleUpdateQuantity(item._id, Number(e.target.value) || 0)}
+                        onChange={handleQtyChange(item._id)}
+                        onBlur={handleQtyBlur(item._id)}
                         className="w-16 h-8 text-center border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 mx-auto block"
                       />
                     </td>
                     <td className="px-2 py-1.5 border-b border-slate-100">
                       <input
-                        type="number"
-                        min={0}
-                        step="0.01"
+                        type="text"
+                        inputMode="decimal"
                         value={item.price ?? item.sellingPrice ?? 0}
-                        onChange={(e) =>
-                          handleUpdateItemField(item._id, "sellingPrice", Number(e.target.value) || 0)
-                        }
+                        onChange={handleDecimalChange(item._id, "sellingPrice")}
+                        onBlur={handleDecimalBlur(item._id, "sellingPrice")}
                         className="w-20 h-8 text-right px-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                       />
                     </td>
                     <td className="px-2 py-1.5 border-b border-slate-100">
                       <div className="flex items-center gap-1">
                         <input
-                          type="number"
-                          min={0}
-                          step="0.01"
+                          type="text"
+                          inputMode="decimal"
                           value={item.discount ?? 0}
-                          onChange={(e) =>
-                            handleUpdateItemField(item._id, "discount", Number(e.target.value) || 0)
-                          }
+                          onChange={handleDecimalChange(item._id, "discount")}
+                          onBlur={handleDecimalBlur(item._id, "discount")}
                           className="w-16 h-8 text-right px-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
                         <button
@@ -553,7 +695,9 @@ export default function NewInvoiceFormPage({
                             handleUpdateItemField(
                               item._id,
                               "discountType",
-                              (item.discountType || "amount") === "amount" ? "percent" : "amount"
+                              (item.discountType || "amount") === "amount"
+                                ? "percent"
+                                : "amount",
                             )
                           }
                           title="Toggle discount type"
@@ -586,13 +730,17 @@ export default function NewInvoiceFormPage({
 
                 {/* Add-row */}
                 <tr>
-                  <td className="px-3 py-2 text-slate-300">{cartItems.length + 1}</td>
-                  <td colSpan={2} className="px-2 py-2">
-                    <ProductPicker products={products} onSelect={handleAddRow} />
+                  <td className="px-3 py-2 text-slate-300">
+                    {cartItems.length + 1}
                   </td>
-                  <td colSpan={7} className="px-3 py-2 text-xs text-slate-400">
-                    Select an existing product above, or click "New Product" to create one
+                  <td className="px-2 py-2">
+                    <InlineProductCombobox
+                      products={products}
+                      onSelect={handleAddRow}
+                      onCreateNew={handleCreateNewProduct}
+                    />
                   </td>
+                  <td colSpan={8} className="px-3 py-2"></td>
                 </tr>
               </tbody>
             </table>
@@ -627,7 +775,10 @@ export default function NewInvoiceFormPage({
               setRemarks={setRemarks}
               handleCreateInvoice={handleCreateInvoice}
               isLoading={isSubmitting}
-              disabled={!(customerForm.name || customerForm.mobile) || cartItems.length === 0}
+              disabled={
+                !(customerForm.name || customerForm.mobile) ||
+                cartItems.length === 0
+              }
               payment={payment}
               cartItems={cartItems}
               formValues={formValues}
@@ -640,11 +791,12 @@ export default function NewInvoiceFormPage({
         </Card>
       </div>
 
-      {/* নতুন item add করার modal — "+" button থেকে */}
+      {/* নতুন item add করার modal — "+" button ba "Create as new product" theke */}
       <AddItemFormModal
         open={showAddItemModal}
         onOpenChange={setShowAddItemModal}
         onItemCreated={handleNewProductCreated}
+        initialItemName={newItemPrefillName}
       />
     </div>
   );

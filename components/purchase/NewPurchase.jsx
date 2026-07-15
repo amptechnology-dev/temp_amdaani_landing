@@ -217,6 +217,7 @@ export default function PurchaseFlow() {
     try {
       const res = await api.get("/store");
       const data = res?.data || {};
+      console.log("Fetched store data:", data);
       setStoredata(data);
       return data;
     } catch {

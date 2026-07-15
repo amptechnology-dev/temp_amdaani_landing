@@ -247,6 +247,7 @@ export default function SalesFlow() {
   const fetchStoreData = async () => {
     try {
       const res = await api.get("/store");
+      console.log("STORE API RESPONSE:", res);
       const data = res?.data || {};
       setStoredata(data);
       return data;

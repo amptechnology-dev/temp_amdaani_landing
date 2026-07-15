@@ -29,6 +29,7 @@ export default function PurchaseSummary({
   const [previewOpen, setPreviewOpen] = useState(false);
 
   const handlePreview = () => {
+    console.log("PurchaseSummary storedata prop:", storedata);
     if (!cartItems?.length) return;
 
     const now = new Date();

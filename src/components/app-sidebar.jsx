@@ -41,8 +41,8 @@ import { LogOut, ChevronsUpDown } from "lucide-react";
 // -----------------------------------------
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Invoices", url: "/dashboard/sales", icon: Receipt },
   { title: "Purchase", url: "/dashboard/purchase", icon: ShoppingCart },
+  { title: "Invoices", url: "/dashboard/sales", icon: Receipt },
   { title: "Customers", url: "/dashboard/customers", icon: Users },
   { title: "Items", url: "/dashboard/items", icon: Package },
 ];
@@ -87,12 +87,19 @@ export function AppSidebar({ ...props }) {
   };
 
   return (
-    <Sidebar collapsible="icon" {...props} className="border-r border-slate-200/80 bg-white">
+    <Sidebar
+      collapsible="icon"
+      {...props}
+      className="border-r border-slate-200/80 bg-white"
+    >
       {/* ---------------- HEADER ---------------- */}
       <SidebarHeader className="border-b border-slate-100 px-3 py-4">
         <div className="flex items-center gap-2.5 group-data-[collapsible=icon]:justify-center">
           <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-blue-700 shrink-0 shadow-sm shadow-blue-200/60 ring-1 ring-blue-700/10">
-            <Package className="w-[18px] h-[18px] text-white" strokeWidth={2.25} />
+            <Package
+              className="w-[18px] h-[18px] text-white"
+              strokeWidth={2.25}
+            />
           </div>
           <div className="flex flex-col group-data-[collapsible=icon]:hidden min-w-0">
             <span className="font-black text-[17px] text-slate-900 tracking-tight leading-none truncate">
@@ -138,70 +145,13 @@ export function AppSidebar({ ...props }) {
                       }`}
                       strokeWidth={2}
                     />
-                    <span className="font-semibold text-[13.5px]">{item.title}</span>
+                    <span className="font-semibold text-[13.5px]">
+                      {item.title}
+                    </span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               );
             })}
-          </SidebarMenu>
-        </SidebarGroup>
-
-        {/* ---------------- QUICK ACTION ---------------- */}
-        <SidebarGroup className="mt-5">
-          <SidebarGroupLabel className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider px-2 mb-2">
-            Quick Action
-          </SidebarGroupLabel>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <div
-                className="relative"
-                onMouseEnter={handleFabEnter}
-                onMouseLeave={handleFabLeave}
-              >
-                <SidebarMenuButton
-                  onClick={() => setFabOpen((v) => !v)}
-                  tooltip="Quick Create"
-                  className={`h-11 rounded-xl px-3 border transition-all duration-150 ${
-                    fabOpen
-                      ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-600 hover:text-white"
-                      : "bg-blue-50/70 text-blue-600 border-blue-100 hover:bg-blue-50 hover:border-blue-200"
-                  }`}
-                >
-                  <div
-                    className={`flex items-center justify-center w-5 h-5 rounded-full shrink-0 transition-transform duration-200 ${
-                      fabOpen ? "bg-white rotate-90" : "bg-blue-600"
-                    }`}
-                  >
-                    {fabOpen ? (
-                      <X className="w-3 h-3 text-blue-600" strokeWidth={2.5} />
-                    ) : (
-                      <Plus className="w-3 h-3 text-white" strokeWidth={2.5} />
-                    )}
-                  </div>
-                  <span className="font-semibold text-[13.5px]">Quick Create</span>
-                </SidebarMenuButton>
-
-                {fabOpen && (
-                  <div className="absolute left-0 right-0 top-full mt-2 z-50 flex flex-col gap-1.5 p-2 bg-white rounded-2xl border border-slate-100 shadow-xl shadow-slate-900/[0.08] ring-1 ring-slate-900/[0.02] animate-in fade-in zoom-in-95 duration-150 group-data-[collapsible=icon]:left-full group-data-[collapsible=icon]:top-0 group-data-[collapsible=icon]:ml-2 group-data-[collapsible=icon]:w-48">
-                    {quickActions.map((action) => (
-                      <button
-                        key={action.label}
-                        onClick={() => {
-                          setFabOpen(false);
-                          router.push(action.url);
-                        }}
-                        className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-blue-50 hover:text-blue-600 text-[13px] font-semibold transition-colors"
-                      >
-                        <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-slate-50 shrink-0">
-                          <action.icon className="w-[15px] h-[15px]" strokeWidth={2} />
-                        </div>
-                        <span className="truncate">{action.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
@@ -215,7 +165,10 @@ export function AppSidebar({ ...props }) {
               className="h-10 rounded-xl px-3 text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               tooltip="Settings"
             >
-              <Settings className="w-[18px] h-[18px] text-slate-400" strokeWidth={2} />
+              <Settings
+                className="w-[18px] h-[18px] text-slate-400"
+                strokeWidth={2}
+              />
               <span className="font-semibold text-[13.5px]">Settings</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
