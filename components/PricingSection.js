@@ -178,15 +178,21 @@ export default function PricingSection() {
     [],
   );
 
+  // UPDATED: ekhon each feature line-e { label, available } object thake,
+  // jate Plans.js (admin) er moto na-available feature-e line-through dekhano jay
   const getFeatureLines = (plan) => {
     const parsed = (Array.isArray(plan?.features) ? plan.features : [])
       .map((feature, index) => {
-        if (typeof feature === "string") return feature;
-        if (feature?.name) return feature.name;
-        if (feature?.title) return feature.title;
-        if (feature?.label) return feature.label;
-        if (feature?.description) return feature.description;
-        return `Feature ${index + 1}`;
+        if (typeof feature === "string") {
+          return { label: feature, available: true };
+        }
+        const label =
+          feature?.name ||
+          feature?.title ||
+          feature?.label ||
+          feature?.description ||
+          `Feature ${index + 1}`;
+        return { label, available: feature?.available !== false };
       })
       .slice(0, 6);
 
@@ -200,7 +206,11 @@ export default function PricingSection() {
       ? `Validity: ${plan.durationDays} days`
       : null;
 
-    return [invoiceLine, durationLine, ...parsed].filter(Boolean);
+    const extraLines = [invoiceLine, durationLine]
+      .filter(Boolean)
+      .map((label) => ({ label, available: true }));
+
+    return [...extraLines, ...parsed];
   };
 
   const getIsPopular = (plan) => {
@@ -357,24 +367,6 @@ export default function PricingSection() {
                           : "border border-slate-800 bg-slate-900 shadow-sm hover:shadow-md"
                     }`}
                   >
-                    {/* Popular Badge */}
-                    {/* {isPopular && (
-                      <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
-                        <motion.div
-                          className="px-4 py-1.5 rounded-full text-xs font-bold text-white bg-gradient-to-r from-[#1A73E8] to-[#0D47A1] flex items-center gap-1.5 shadow-lg whitespace-nowrap"
-                          animate={{ scale: [1, 1.03, 1] }}
-                          transition={{
-                            duration: 2.5,
-                            repeat: Infinity,
-                            ease: "easeInOut",
-                          }}
-                        >
-                          <Sparkles className="w-3 h-3" />
-                          MOST POPULAR
-                        </motion.div>
-                      </div>
-                    )} */}
-
                     {/* Icon */}
                     <div
                       className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-5 ${accent.iconBg}`}
@@ -441,8 +433,12 @@ export default function PricingSection() {
                           >
                             <Check className={`w-3 h-3 ${accent.checkText}`} />
                           </span>
-                          <span className={`text-sm ${currentTheme.text}`}>
-                            {feature}
+                          <span
+                            className={`text-sm ${currentTheme.text} ${
+                              feature.available ? "" : "line-through opacity-60"
+                            }`}
+                          >
+                            {feature.label}
                           </span>
                         </motion.li>
                       ))}
@@ -477,76 +473,6 @@ export default function PricingSection() {
             </div>
           )}
         </motion.div>
-
-        {/* Feature Comparison */}
-        {/* <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          animate={isVisible ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6, delay: 0.6 }}
-          className="mb-20"
-        >
-          <h3
-            className={`text-3xl font-bold text-center mb-12 ${currentTheme.text}`}
-          >
-            Compare Features
-          </h3>
-          <div
-            className={`rounded-2xl border ${currentTheme.outline} ${currentTheme.surface} overflow-hidden`}
-          >
-            <table className="w-full">
-              <thead>
-                <tr className={`border-b ${currentTheme.outline}`}>
-                  <th className={`p-6 text-left ${currentTheme.text}`}>
-                    Features
-                  </th>
-                  {displayPlans.map((plan) => (
-                    <th
-                      key={`head-${plan._id || plan.name}`}
-                      className={`p-6 text-center ${currentTheme.text}`}
-                    >
-                      {plan.name}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {loadingPlans ? (
-                  <tr>
-                    <td
-                      colSpan={Math.max(displayPlans.length + 1, 2)}
-                      className={`p-6 text-center ${currentTheme.textSecondary}`}
-                    >
-                      Loading plan comparison...
-                    </td>
-                  </tr>
-                ) : (
-                  comparisonRows.map((row, index) => (
-                    <tr
-                      key={row.key}
-                      className={`border-b ${currentTheme.outline} ${
-                        index % 2 === 0 ? currentTheme.surfaceVariant : ""
-                      }`}
-                    >
-                      <td className={`p-4 font-medium ${currentTheme.text}`}>
-                        {row.label}
-                      </td>
-                      {displayPlans.map((plan) => (
-                        <td
-                          key={`${row.key}-${plan._id || plan.name}`}
-                          className={`p-4 text-center ${currentTheme.textSecondary}`}
-                        >
-                          {row.value(plan)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </motion.div> */}
-
-        {/* FAQ moved to components/FaqSection.js */}
       </div>
     </section>
   );
