@@ -3,11 +3,12 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "../../context/ThemeContext";
+import { useAuth, permissions } from "../../context/AuthContext";
 import { themeConfig } from "../../utils/ThemeConfig";
 import api from "../../utils/api";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-
+import { Badge } from "@/components/ui/badge";
 import {
   Plus,
   Edit,
@@ -21,6 +22,7 @@ import {
   Clock,
   Flame,
   Repeat,
+  PackagePlus,
 } from "lucide-react";
 
 import {
@@ -55,6 +57,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import AddItemFormModal from "../../components/invoice/AddItemFormModal";
+import AdjustStockModal from "./AdjustStockModal";
 
 // =========================
 // Sort chip config
@@ -90,6 +93,7 @@ export default function ItemsPage() {
   const { theme } = useTheme();
   const currentTheme = themeConfig[theme];
   const queryClient = useQueryClient();
+  const { isStockEnabled, hasPermission } = useAuth();
 
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
@@ -101,6 +105,10 @@ export default function ItemsPage() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [isItemDialogOpen, setIsItemDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
+  // ── Stock adjustment modal ──
+  const [stockModalOpen, setStockModalOpen] = useState(false);
+  const [stockItem, setStockItem] = useState(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["items", { page, limit }],
@@ -224,8 +232,20 @@ export default function ItemsPage() {
     setSelectedItem(null);
   };
 
+  const openStockModal = (item) => {
+    setStockItem(item);
+    setStockModalOpen(true);
+  };
+
+  const handleStockAdjusted = () => {
+    queryClient.invalidateQueries(["items"]);
+    setStockItem(null);
+  };
+
   const formatCurrency = (amount) =>
     new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(amount || 0);
+
+  const canManageStock = isStockEnabled && hasPermission?.(permissions.CAN_MANAGE_STOCKS);
 
   return (
     <div className={`min-h-screen p-6 ${currentTheme.background}`}>
@@ -301,96 +321,152 @@ export default function ItemsPage() {
 
         <CardContent className="p-4">
           {isLoading ? (
-            <div className="flex items-center justify-center py-16 text-slate-400">
-              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-              Loading items...
+  <div className="flex items-center justify-center py-16 text-slate-400">
+    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+    Loading items...
+  </div>
+) : orderedItems.length === 0 ? (
+  <p className="text-center text-sm text-slate-400 py-16">No items found</p>
+) : (
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <AnimatePresence>
+      {orderedItems.map((item, index) => {
+        const isTopSelling =
+          topSellingProduct &&
+          item._id === topSellingProduct._id &&
+          (item.sellCount || 0) > 0;
+        const displayPrice =
+          item.discountPrice > 0
+            ? item.sellingPrice - item.discountPrice
+            : item.sellingPrice;
+        const stock = item.currentStock ?? 0;
+        const stockSeverity =
+          stock <= 5
+            ? { color: "#DC2626", bg: "#FEF2F2", border: "#FCA5A5" }
+            : stock <= 20
+            ? { color: "#F57C00", bg: "#FFF7ED", border: "#FDBA74" }
+            : { color: "#059669", bg: "#ECFDF5", border: "#6EE7B7" };
+
+        return (
+          <motion.div
+            key={item._id}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.2, delay: index * 0.02 }}
+            onClick={() => handleEdit(item)}
+            className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 cursor-pointer hover:shadow-md hover:border-blue-200 transition-all relative group"
+            style={{ borderLeftWidth: 4, borderLeftColor: isTopSelling ? "#2563EB" : stockSeverity.color }}
+          >
+            {isTopSelling && (
+              <div className="absolute -top-2.5 left-4 bg-blue-600 text-white text-[10px] font-bold tracking-wide px-2 py-0.5 rounded-full flex items-center gap-1">
+                <Trophy className="w-3 h-3" />
+                TOP SELLING
+              </div>
+            )}
+
+            {/* Top row — name + actions menu */}
+            <div className="flex justify-between items-start gap-2 mt-1">
+              <div className="min-w-0">
+                <p className="font-bold text-slate-800 capitalize truncate">
+                  {item.name}
+                </p>
+                <p className="text-xs text-slate-400 mt-0.5 capitalize truncate">
+                  {(item.category?.name || item.category || "No Category")} · {item.unit}
+                </p>
+              </div>
+
+              <div className="flex items-start gap-1 shrink-0">
+                {item.hsn && (
+                  <Badge variant="outline" className="text-[10px]">
+                    HSN {item.hsn}
+                  </Badge>
+                )}
+                <div onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                        <MoreVertical className="w-3.5 h-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleEdit(item)}>
+                        <Edit className="w-4 h-4 mr-2" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleDelete(item)}
+                        className="text-red-600"
+                      >
+                        <Trash className="w-4 h-4 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
             </div>
-          ) : orderedItems.length === 0 ? (
-            <p className="text-center text-sm text-slate-400 py-16">No items found</p>
-          ) : (
-            <div className="space-y-3">
-              <AnimatePresence>
-                {orderedItems.map((item, index) => {
-                  const isTopSelling = topSellingProduct && item._id === topSellingProduct._id && (item.sellCount || 0) > 0;
-                  const displayPrice = item.discountPrice > 0 ? item.sellingPrice - item.discountPrice : item.sellingPrice;
-                  const stock = item.currentStock ?? 0;
-                  const stockColor =
-                    stock <= 5 ? "bg-rose-50 text-rose-600 border-rose-200"
-                    : stock <= 20 ? "bg-orange-50 text-orange-600 border-orange-200"
-                    : "bg-emerald-50 text-emerald-600 border-emerald-200";
 
-                  return (
-                    <motion.div
-                      key={item._id}
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.02 }}
-                      className={`relative bg-white rounded-2xl border overflow-hidden ${
-                        isTopSelling ? "border-blue-400 ring-1 ring-blue-100" : "border-slate-200"
-                      }`}
-                    >
-                      {isTopSelling && (
-                        <div className="flex items-center gap-1 bg-blue-600 text-white text-[11px] font-semibold px-3 py-1.5 rounded-br-lg w-fit">
-                          <Trophy className="w-3 h-3" /> Top selling Product
-                        </div>
-                      )}
+            {/* Stock row */}
+            {isStockEnabled && (
+              <div
+                className="flex items-center justify-between mt-3 px-2.5 py-1.5 rounded-lg border border-dashed"
+                style={{ borderColor: stockSeverity.border, backgroundColor: stockSeverity.bg }}
+              >
+                <span className="text-[10px] font-bold tracking-wide text-slate-500">
+                  STOCK
+                </span>
+                <span className="text-sm font-extrabold" style={{ color: stockSeverity.color }}>
+                  {stock} in stock
+                </span>
+              </div>
+            )}
 
-                      <div className="p-4 flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <p className="font-semibold text-slate-800 capitalize truncate">{item.name}</p>
-                          <p className="text-xs text-slate-400 mt-0.5 capitalize truncate">
-                            {(item.category?.name || item.category || "No Category")} · {item.unit}
-                          </p>
+            {/* Bottom row — price + sold count + stock action */}
+            <div className="flex justify-between items-center mt-3">
+              <div className="min-w-0">
+                {item.discountPrice > 0 ? (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-blue-600 font-bold text-sm">
+                      {formatCurrency(displayPrice)}
+                    </span>
+                    <span className="text-[11px] text-slate-400 line-through">
+                      {formatCurrency(item.sellingPrice)}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-blue-600 font-bold text-sm">
+                    {formatCurrency(item.sellingPrice)}
+                  </span>
+                )}
+              </div>
 
-                          <div className="flex items-center gap-2 flex-wrap mt-2">
-                            {item.hsn && <span className="text-[11px] text-slate-500 font-medium">HSN {item.hsn}</span>}
-                            <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${stockColor}`}>
-                              {stock} in stock
-                            </span>
-                          </div>
-                        </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-[10px] font-semibold text-slate-500 flex items-center gap-1">
+                  <ShoppingCart className="w-3 h-3" />
+                  {item.sellCount || 0} sold
+                </span>
 
-                        <div className="flex flex-col items-end gap-2 shrink-0">
-                          <div className="text-right">
-                            {item.discountPrice > 0 ? (
-                              <>
-                                <p className="text-blue-600 font-bold text-base leading-tight">{formatCurrency(displayPrice)}</p>
-                                <p className="text-xs text-slate-400 line-through">{formatCurrency(item.sellingPrice)}</p>
-                              </>
-                            ) : (
-                              <p className="text-blue-600 font-bold text-base">{formatCurrency(item.sellingPrice)}</p>
-                            )}
-                            <p className="flex items-center justify-end gap-1 text-xs text-slate-400 mt-1">
-                              <ShoppingCart className="w-3 h-3" />
-                              {item.sellCount || 0} sold
-                            </p>
-                          </div>
-
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                                <MoreVertical className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleEdit(item)}>
-                                <Edit className="w-4 h-4 mr-2" />
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleDelete(item)} className="text-red-600">
-                                <Trash className="w-4 h-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </AnimatePresence>
+                {canManageStock && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openStockModal(item);
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-[11px] font-bold hover:bg-blue-100 transition-colors"
+                  >
+                    <PackagePlus className="w-3 h-3" />
+                    Stock
+                  </button>
+                )}
+              </div>
             </div>
-          )}
+          </motion.div>
+        );
+      })}
+    </AnimatePresence>
+  </div>
+)}
         </CardContent>
       </Card>
 
@@ -408,6 +484,13 @@ export default function ItemsPage() {
         }}
         onItemCreated={handleItemSaved}
         editItem={selectedItem}
+      />
+
+      <AdjustStockModal
+        open={stockModalOpen}
+        onClose={() => setStockModalOpen(false)}
+        item={stockItem}
+        onAdjusted={handleStockAdjusted}
       />
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

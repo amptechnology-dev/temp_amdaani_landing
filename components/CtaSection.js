@@ -204,147 +204,36 @@ export default function CTASection() {
             className="relative flex justify-center lg:justify-end"
           >
             <div className="relative">
-              <div className="w-full max-w-[320px] sm:max-w-[360px] h-[560px] sm:h-[600px] rounded-[3rem] border-[14px] border-slate-900 bg-slate-900 shadow-2xl mx-auto lg:mx-0">
-                <div className="h-full rounded-[2rem] overflow-hidden bg-white">
-                  <div className="h-12 flex items-center justify-between px-6 bg-white border-b border-slate-200">
-                    <div className="flex items-center gap-1.5 text-slate-400">
-                      <div className="w-1 h-4 rounded-full bg-slate-300" />
-                      <div className="w-1 h-4 rounded-full bg-slate-400" />
-                      <div className="w-1 h-4 rounded-full bg-slate-300" />
-                    </div>
-                  </div>
-
-                  <div className="px-5 py-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <motion.div
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="flex items-center space-x-1 flex-shrink-0"
-                      >
-                        {/* Logo (UNCHANGED) */}
-                        <div className="w-18 h-18 rounded-xl overflow-hidden">
-                          <img
-                            src="/images/Tapplogo.png"
-                            alt="Amdaani Logo"
-                            className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal"
-                          />
-                        </div>
-
-                        {/* TEXT BLOCK */}
-                        <div className="flex flex-col ml-[-8px]">
-                          <span
-                            style={{
-                              fontFamily: "'Hit and Run', sans-serif",
-                              color: "#255e97",
-                            }}
-                            className="text-lg font-extrabold tracking-tight leading-none"
-                          >
-                            AMDAANI
-                          </span>
-
-                          {/* 👇 FIXED SPACING HERE */}
-                          <span
-                            className={`text-[11px] mt-[2px] tracking-[0.14em] font-bold ${currentTheme.textTertiary} hidden sm:block`}
-                          >
-                            Smart Business Solutions
-                          </span>
-                        </div>
-                      </motion.div>
-                    </div>
-
-                    <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5 mb-5">
-                      <div className="flex items-start justify-between gap-3 mb-4">
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.16em] text-slate-400 mb-1">
-                            Google Play
-                          </p>
-                          <h4 className="text-xl font-black tracking-tight text-slate-900">
-                            Play Store Listing
-                          </h4>
-                        </div>
-                        {/* <div className="flex items-center gap-1 rounded-full bg-white px-3 py-1.5 shadow-sm border border-slate-200">
-                          <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                          <span className="text-sm font-bold text-slate-700">
-                            4.9
-                          </span>
-                        </div> */}
-                      </div>
-
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="w-12 h-12 rounded-2xl bg-[#34A853] flex items-center justify-center shadow-md">
-                          <Play className="w-5 h-5 text-white fill-white" />
-                        </div>
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.14em] text-slate-400">
-                            Official App
-                          </p>
-                          <p className="font-bold text-slate-900">
-                            Install from Play Store
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="w-full">
-                        <button
-                          type="button"
-                          onClick={handlePlayStoreOpen}
-                          className="p-0 bg-transparent border-0 inline-flex items-center justify-center w-full"
-                          aria-label="Get it on Google Play"
-                        >
-                          <PlayStoreBadge className="h-12 sm:h-14 w-auto" />
-                        </button>
-                      </div>
-
-                      <div className="flex items-center justify-center gap-3 py-3 border-t border-slate-200">
-                        <p className={`text-xs font-semibold text-slate-500`}>
-                          Or scan:
-                        </p>
-                        <div className="w-12 h-12 rounded-lg border border-slate-300 bg-white p-1 shadow-sm">
-                          <img
-                            src="/images/PlayScanner.PNG"
-                            alt="QR Code"
-                            className="w-full h-full object-contain"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      {[
-                        { name: "Invoices", icon: "🧾" },
-                        { name: "Customers", icon: "👥" },
-                        { name: "Products", icon: "📦" },
-                        { name: "Reports", icon: "📊" },
-                      ].map((item) => (
-                        <div
-                          key={item.name}
-                          className="rounded-2xl border border-slate-200 bg-white p-3 text-center shadow-sm"
-                        >
-                          <div className="text-lg mb-1">{item.icon}</div>
-                          <span className="text-xs font-medium text-slate-500">
-                            {item.name}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+              <div className="w-full max-w-[300px] sm:max-w-[320px] h-[480px] sm:h-[520px] rounded-[3rem] border-[12px] border-slate-900 bg-slate-900 shadow-2xl mx-auto lg:mx-0">
+                <div className="h-full rounded-[2.2rem] overflow-hidden bg-white relative">
+                  {/* Play Store Screenshot with animation */}
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={
+                      isVisible ? { opacity: 1, scale: 1, y: [0, -8, 0] } : {}
+                    }
+                    transition={{
+                      opacity: { duration: 0.6, delay: 0.5 },
+                      scale: { duration: 0.6, delay: 0.5 },
+                      y: {
+                        duration: 3,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                        delay: 1.1,
+                      },
+                    }}
+                    className="w-full h-full flex items-center justify-center bg-white"
+                  >
+                    <img
+                      src="/images/amdaaniplaystore.jpeg"
+                      alt="Amdaani on Google Play"
+                      className="w-full h-full object-cover"
+                    />
+                  </motion.div>
                 </div>
               </div>
 
-              <motion.div
-                animate={{ y: [0, -10, 0] }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-                className={`absolute -top-4 -right-4 w-20 h-20 rounded-2xl ${currentTheme.accentLight} flex items-center justify-center shadow-lg`}
-              >
-                <Smartphone
-                  className={`w-8 h-8 ${currentTheme.accent.replace("bg-", "text-")}`}
-                />
-              </motion.div>
-
+              {/* Green Play badge */}
               <motion.div
                 animate={{ y: [0, 10, 0] }}
                 transition={{

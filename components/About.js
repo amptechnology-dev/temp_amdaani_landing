@@ -3,132 +3,16 @@ import { useTheme } from "../context/ThemeContext";
 import { motion } from "framer-motion";
 import { themeConfig } from "../utils/ThemeConfig";
 import { useInView } from "react-intersection-observer";
-import {
-  Target,
-  Zap,
-  Shield,
-  Users,
-  TrendingUp,
-  Globe,
-  Award,
-  CheckCircle,
-  CheckCircle2,
-  Play,
-  Star,
-  Rocket,
-  Sparkles,
-} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 const ABOUT_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/about/public-about`;
 
-const ICON_MAP = {
-  Target,
-  Zap,
-  Shield,
-  Users,
-  TrendingUp,
-  Globe,
-  Award,
-  Rocket,
-  Star,
-  Sparkles,
-  CheckCircle2,
-  IndianRupee,
-};
-
-const normalizeIconKey = (value) =>
-  String(value || "")
-    .trim()
-    .replace(/icon$/i, "")
-    .replace(/[\s_-]+/g, "")
-    .toLowerCase();
-
-const NORMALIZED_ICON_MAP = Object.entries(ICON_MAP).reduce(
-  (acc, [key, Icon]) => {
-    acc[normalizeIconKey(key)] = Icon;
-    return acc;
-  },
-  {},
-);
-
-const FALLBACK_ABOUT = {
-  badgeTitle: "About Amdaani",
-  heading: "Revolutionizing Business Management",
-  highlightText: "Made in India",
-  description:
-    "Amdaani is the fastest and most affordable billing solution built specifically for Indian businesses. We empower entrepreneurs with smart tools to grow their business efficiently.",
-  stats: [
-    { number: "10K+", label: "Businesses Served", icon: "Users" },
-    { number: "50M+", label: "Invoices Generated", icon: "TrendingUp" },
-    { number: "99.9%", label: "Uptime Reliability", icon: "Shield" },
-    { number: "15+", label: "Cities Across India", icon: "Globe" },
-  ],
-  missionTitle: "Our Mission",
-  missionDescription:
-    "To democratize business management tools for every Indian entrepreneur, making professional billing and customer management accessible and affordable.",
-  missionPoints: [
-    "Built specifically for Indian business needs",
-    "Instant Billing",
-    "Support for all printer types (A4, POS, Thermal)",
-    "GST-compliant invoices and reports",
-  ],
-  values: [
-    {
-      icon: "Zap",
-      title: "Lightning Fast",
-      description:
-        "Process invoices 3x faster than traditional software with our optimized workflow and intuitive interface.",
-      color: "from-blue-500 to-cyan-500",
-    },
-    {
-      icon: "IndianRupee",
-      title: "Cost Effective",
-      description:
-        "Save up to 70% on billing software costs with our affordable pricing and no hidden charges.",
-      color: "from-green-500 to-emerald-500",
-    },
-    {
-      icon: "Shield",
-      title: "Secure & Reliable",
-      description:
-        "Bank-grade security with automatic backups and 99.9% uptime guarantee for your business.",
-      color: "from-purple-500 to-pink-500",
-    },
-    {
-      icon: "Users",
-      title: "Customer First",
-      description:
-        "Dedicated support and continuous improvements based on real user feedback from Indian businesses.",
-      color: "from-orange-500 to-red-500",
-    },
-  ],
-};
-
-const getIconComponent = (iconName, fallback = Zap) => {
-  if (!iconName) return fallback;
-
-  const rawIconName =
-    typeof iconName === "string"
-      ? iconName
-      : typeof iconName === "object" && iconName !== null
-        ? iconName.name || iconName.icon || ""
-        : "";
-
-  if (!rawIconName) return fallback;
-
-  const normalizedIconName = normalizeIconKey(rawIconName);
-
-  // Handle legacy/alias keys from older payloads.
-  const ICON_ALIASES = {
-    checkcircle: "checkcircle2",
-    checkcircleicon: "checkcircle2",
-    sparkle: "sparkles",
-  };
-
-  const finalKey = ICON_ALIASES[normalizedIconName] || normalizedIconName;
-  return NORMALIZED_ICON_MAP[finalKey] || fallback;
-};
+const FALLBACK_STATS = [
+  { number: "10,000+", label: "App Downloads" },
+  { number: "5,000+", label: "Active Shops" },
+  { number: "₹50 Cr+", label: "Bills Generated" },
+  { number: "24×7", label: "Customer Support" },
+];
 
 const normalizeStats = (statsInput) => {
   if (!Array.isArray(statsInput)) return [];
@@ -137,27 +21,285 @@ const normalizeStats = (statsInput) => {
     .map((stat) => {
       const number = String(stat?.number ?? "").trim();
       const label = String(stat?.label ?? "").trim();
-      const icon = stat?.icon;
-
-      return { number, label, icon };
+      return { number, label };
     })
     .filter((stat) => {
       if (!stat.number || !stat.label) return false;
-
       const numericPart = stat.number.replace(/[^0-9.]/g, "");
       const isZeroValue = numericPart !== "" && Number(numericPart) === 0;
-
       return !isZeroValue;
     });
 };
 
+// Parses "10,000+" -> { prefix: "", value: 10000, suffix: "+", hasComma: true }
+// Parses "₹50 Cr+" -> { prefix: "₹", value: 50, suffix: " Cr+", hasComma: false }
+// Parses "24×7" -> { prefix: "", value: 24, suffix: "×7", hasComma: false }
+// Parses "99.9%" -> { prefix: "", value: 99.9, suffix: "%", hasComma: false }
+const parseStatNumber = (raw) => {
+  const str = String(raw || "").trim();
+  const match = str.match(/^([^\d]*)([\d,]*\.?\d+)(.*)$/);
+
+  if (!match)
+    return { prefix: "", value: 0, suffix: str, hasComma: false, decimals: 0 };
+
+  const [, prefix, numPart, suffix] = match;
+  const hasComma = numPart.includes(",");
+  const decimalMatch = numPart.match(/\.(\d+)$/);
+  const decimals = decimalMatch ? decimalMatch[1].length : 0;
+  const value = parseFloat(numPart.replace(/,/g, "")) || 0;
+
+  return { prefix, value, suffix, hasComma, decimals };
+};
+
+const formatCount = (num, { hasComma, decimals }) => {
+  const fixed =
+    decimals > 0 ? num.toFixed(decimals) : Math.round(num).toString();
+
+  if (!hasComma) return fixed;
+
+  const [intPart, decPart] = fixed.split(".");
+  const withCommas = Number(intPart).toLocaleString("en-IN");
+  return decPart ? `${withCommas}.${decPart}` : withCommas;
+};
+
+function AnimatedStatNumber({ rawNumber, inView, duration = 1600, delay = 0 }) {
+  const parsed = useMemo(() => parseStatNumber(rawNumber), [rawNumber]);
+  const [displayValue, setDisplayValue] = useState(0);
+  const [justFinished, setJustFinished] = useState(false);
+
+  useEffect(() => {
+    if (!inView) return;
+
+    let rafId;
+    let startTime;
+    const timer = setTimeout(() => {
+      const step = (timestamp) => {
+        if (!startTime) startTime = timestamp;
+        const progress = Math.min((timestamp - startTime) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+        setDisplayValue(parsed.value * eased);
+
+        if (progress < 1) {
+          rafId = requestAnimationFrame(step);
+        } else {
+          setDisplayValue(parsed.value);
+          // Small "pop" once the count finishes, so it doesn't just abruptly stop.
+          setJustFinished(true);
+          setTimeout(() => setJustFinished(false), 260);
+        }
+      };
+      rafId = requestAnimationFrame(step);
+    }, delay);
+
+    return () => {
+      clearTimeout(timer);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [inView, parsed.value, duration, delay]);
+
+  return (
+    <span
+      className={`inline-block transition-transform duration-300 ease-out ${
+        justFinished ? "scale-110" : "scale-100"
+      }`}
+    >
+      {parsed.prefix}
+      {formatCount(displayValue, parsed)}
+      {parsed.suffix}
+    </span>
+  );
+}
+
+// Deterministic-ish random, only ever called on the client (after mount),
+// so there is no server/client value mismatch to worry about.
+const rand = (min, max) =>
+  Math.round((min + Math.random() * (max - min)) * 100) / 100;
+
+const generateStars = (count) =>
+  Array.from({ length: count }, (_, i) => ({
+    id: i,
+    top: rand(0, 100),
+    left: rand(0, 100),
+    size: rand(1, 3),
+    duration: rand(6, 16),
+    delay: rand(0, 6),
+    dx: rand(-60, 60),
+    dy: rand(-60, 60),
+  }));
+
+const generateLightDots = (count) =>
+  Array.from({ length: count }, (_, i) => ({
+    id: i,
+    top: rand(0, 100),
+    left: rand(0, 100),
+    size: rand(4, 9),
+    duration: rand(10, 20),
+    delay: rand(0, 6),
+    dx: rand(-90, 90),
+    dy: rand(-60, 60),
+  }));
+
+function AnimatedBackground({ theme }) {
+  const [mounted, setMounted] = useState(false);
+  const [stars, setStars] = useState([]);
+  const [lightDots, setLightDots] = useState([]);
+
+  // Generate particle data ONLY on the client, after mount, so the server
+  // render and the first client render both start with an empty array —
+  // this avoids any hydration mismatch.
+  useEffect(() => {
+    setStars(generateStars(40));
+    setLightDots(generateLightDots(18));
+    setMounted(true);
+  }, []);
+
+  if (theme === "light") {
+    return (
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute inset-0 opacity-35 animate-[aboutMeshShift_16s_ease-in-out_infinite] bg-[radial-gradient(60%_60%_at_20%_20%,rgba(37,99,235,0.06)_0%,transparent_60%),radial-gradient(55%_55%_at_85%_15%,rgba(6,182,212,0.06)_0%,transparent_60%),radial-gradient(60%_60%_at_50%_100%,rgba(99,102,241,0.05)_0%,transparent_60%)] bg-[length:200%_200%]" />
+
+        <div className="absolute -top-16 -left-10 h-72 w-72 rounded-full bg-blue-400/8 blur-3xl animate-[aboutFloatA_14s_ease-in-out_infinite]" />
+        <div className="absolute top-0 right-[-40px] h-80 w-80 rounded-full bg-cyan-400/8 blur-3xl animate-[aboutFloatB_18s_ease-in-out_infinite]" />
+
+        <div className="absolute inset-0 opacity-20 animate-[aboutSweep_9s_ease-in-out_infinite] bg-[linear-gradient(115deg,transparent_30%,rgba(37,99,235,0.05)_50%,transparent_70%)]" />
+
+        {mounted &&
+          lightDots.map((dot) => (
+            <span
+              key={dot.id}
+              className="absolute rounded-full bg-[#2563eb]/15 blur-[1.5px] animate-[aboutDrift_var(--dur)_ease-in-out_infinite]"
+              style={{
+                top: `${dot.top}%`,
+                left: `${dot.left}%`,
+                width: `${dot.size}px`,
+                height: `${dot.size}px`,
+                "--dur": `${dot.duration}s`,
+                "--dx": `${dot.dx}px`,
+                "--dy": `${dot.dy}px`,
+                animationDelay: `${dot.delay}s`,
+              }}
+            />
+          ))}
+
+        <style jsx>{`
+          @keyframes aboutMeshShift {
+            0%,
+            100% {
+              background-position:
+                0% 0%,
+                100% 0%,
+                50% 100%;
+            }
+            50% {
+              background-position:
+                20% 20%,
+                80% 10%,
+                40% 90%;
+            }
+          }
+          @keyframes aboutFloatA {
+            0%,
+            100% {
+              transform: translate(0, 0) scale(1);
+            }
+            50% {
+              transform: translate(35px, -30px) scale(1.1);
+            }
+          }
+          @keyframes aboutFloatB {
+            0%,
+            100% {
+              transform: translate(0, 0) scale(1);
+            }
+            50% {
+              transform: translate(-30px, 25px) scale(1.08);
+            }
+          }
+          @keyframes aboutSweep {
+            0%,
+            100% {
+              transform: translateX(-10%);
+            }
+            50% {
+              transform: translateX(10%);
+            }
+          }
+          @keyframes aboutDrift {
+            0% {
+              transform: translate(0, 0);
+              opacity: 0.12;
+            }
+            50% {
+              transform: translate(var(--dx), var(--dy));
+              opacity: 0.5;
+            }
+            100% {
+              transform: translate(0, 0);
+              opacity: 0.12;
+            }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  // Dark mode — drifting + twinkling starfield
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      <div className="absolute -top-16 -left-10 h-72 w-72 rounded-full bg-blue-500/10 blur-3xl" />
+      <div className="absolute top-10 right-0 h-80 w-80 rounded-full bg-cyan-400/10 blur-3xl" />
+
+      {mounted &&
+        stars.map((star) => (
+          <span
+            key={star.id}
+            className="absolute rounded-full bg-white animate-[aboutStarDrift_var(--dur)_ease-in-out_infinite]"
+            style={{
+              top: `${star.top}%`,
+              left: `${star.left}%`,
+              width: `${star.size}px`,
+              height: `${star.size}px`,
+              "--dur": `${star.duration}s`,
+              "--dx": `${star.dx}px`,
+              "--dy": `${star.dy}px`,
+              animationDelay: `${star.delay}s`,
+              boxShadow: "0 0 4px rgba(255,255,255,0.7)",
+            }}
+          />
+        ))}
+
+      <style jsx>{`
+        @keyframes aboutStarDrift {
+          0% {
+            transform: translate(0, 0) scale(0.8);
+            opacity: 0.2;
+          }
+          50% {
+            transform: translate(var(--dx), var(--dy)) scale(1.4);
+            opacity: 1;
+          }
+          100% {
+            transform: translate(0, 0) scale(0.8);
+            opacity: 0.2;
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 export default function AboutSection() {
   const { theme } = useTheme();
   const currentTheme = themeConfig[theme];
-  const [aboutData, setAboutData] = useState(FALLBACK_ABOUT);
+  const [stats, setStats] = useState(FALLBACK_STATS);
+
+  // triggerOnce: counter shudhu ekbar count hobe (scroll up/down korle abar restart hobe na)
+  // threshold kome anlam + rootMargin diye ektu age (user scroll kore section er kachakachi
+  // ashtei) trigger hobe, jate onek deri na hoy
   const [ref, inView] = useInView({
     triggerOnce: true,
-    threshold: 0.1,
+    threshold: 0.15,
+    rootMargin: "0px 0px -80px 0px",
   });
 
   useEffect(() => {
@@ -174,497 +316,54 @@ export default function AboutSection() {
           result.data.find((item) => item?.isActive) || result.data[0];
         if (!activeItem) return;
 
-        setAboutData({
-          badgeTitle: activeItem?.badgeTitle || FALLBACK_ABOUT.badgeTitle,
-          heading: activeItem?.heading || FALLBACK_ABOUT.heading,
-          highlightText:
-            activeItem?.highlightText || FALLBACK_ABOUT.highlightText,
-          description: activeItem?.description || FALLBACK_ABOUT.description,
-          stats: normalizeStats(activeItem?.stats),
-          missionTitle: activeItem?.missionTitle || FALLBACK_ABOUT.missionTitle,
-          missionDescription:
-            activeItem?.missionDescription || FALLBACK_ABOUT.missionDescription,
-          missionPoints:
-            Array.isArray(activeItem?.missionPoints) &&
-            activeItem.missionPoints.length
-              ? activeItem.missionPoints
-              : FALLBACK_ABOUT.missionPoints,
-          values:
-            Array.isArray(activeItem?.values) && activeItem.values.length
-              ? activeItem.values
-              : FALLBACK_ABOUT.values,
-        });
+        const normalized = normalizeStats(activeItem?.stats);
+        setStats(normalized.length ? normalized : FALLBACK_STATS);
       } catch {
-        setAboutData(FALLBACK_ABOUT);
+        setStats(FALLBACK_STATS);
       }
     };
 
     fetchAbout();
   }, []);
 
-  const stats = useMemo(
-    () =>
-      normalizeStats(aboutData?.stats).map((stat) => ({
-        number: stat?.number || "0",
-        label: stat?.label || "Metric",
-        icon: getIconComponent(stat?.icon, Users),
-      })),
-    [aboutData?.stats],
-  );
-
-  const values = useMemo(
-    () =>
-      (Array.isArray(aboutData?.values) ? aboutData.values : []).map(
-        (value) => ({
-          icon: getIconComponent(value?.icon, Zap),
-          title: value?.title || "Value",
-          description: value?.description || "",
-          color: value?.color || "from-blue-500 to-cyan-500",
-        }),
-      ),
-    [aboutData?.values],
-  );
-
-  // Static core values to be shown instead of the dynamic backend-driven values
-  const STATIC_VALUES = [
-    {
-      icon: Zap,
-      animation: {
-        scale: [1, 1.08, 1],
-        opacity: [1, 0.75, 1],
-      },
-      transition: {
-        duration: 1.8,
-        repeat: Infinity,
-      },
-      title: "Lightning Fast",
-      description:
-        "Process invoices 3x faster with a streamlined workflow and instant preview.",
-      color: "from-blue-500 to-cyan-500",
-    },
-
-    {
-      icon: Users,
-      animation: {
-        rotate: [0, -2, 2, -2, 0],
-      },
-      transition: {
-        duration: 0.6,
-        repeat: Infinity,
-        repeatDelay: 3,
-      },
-      title: "Customer First",
-      description:
-        "Built with real user feedback to keep the experience simple and effective.",
-      color: "from-orange-500 to-red-500",
-    },
-
-    {
-      icon: Shield,
-      animation: {
-        y: [0, -3, 0],
-      },
-      transition: {
-        duration: 2.5,
-        repeat: Infinity,
-        ease: "easeInOut",
-      },
-      title: "Secure & Reliable",
-      description:
-        "Bank-grade security, automatic backups, and high availability.",
-      color: "from-purple-500 to-pink-500",
-    },
-
-    {
-      icon: Rocket,
-      animation: {
-        y: [0, -5, 0],
-      },
-      transition: {
-        duration: 2,
-        repeat: Infinity,
-        ease: "easeInOut",
-      },
-      title: "Scalable",
-      description:
-        "Designed to scale with your business — from single stores to enterprises.",
-      color: "from-green-500 to-emerald-500",
-    },
-  ];
-
   return (
     <section
       id="about"
-      className={`relative overflow-hidden py-12 sm:py-14 lg:py-20 px-5 sm:px-8 xl:px-12 ${currentTheme.background}`}
+      ref={ref}
+      className={`relative overflow-hidden py-14 ${
+        theme === "light" ? "bg-[#F5F7FA]" : "bg-[#0E0F11]"
+      }`}
     >
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-24 top-10 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
-        <div className="absolute right-0 top-40 h-96 w-96 rounded-full bg-blue-500/10 blur-3xl" />
-        <div className="absolute bottom-0 left-1/2 h-80 w-80 -translate-x-1/2 rounded-full bg-indigo-500/10 blur-3xl" />
-      </div>
+      {/* Animated background */}
+      <AnimatedBackground theme={theme} />
 
-      <div className="mx-auto w-full max-w-[1320px] px-2 sm:px-4 lg:px-6">
-        {/* Header Section */}
-        <motion.div
-          ref={ref}
-          initial={{ opacity: 0, y: 30 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6 }}
-          className="relative mx-auto mb-16 max-w-4xl text-center"
-        >
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={inView ? { scale: 1 } : {}}
-            transition={{ delay: 0.2, type: "spring" }}
-            className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold mb-4 ${currentTheme.accentLight} ${currentTheme.accent.replace("bg-", "text-")}`}
-          >
-            <Target className="w-4 h-4 mr-2" />
-            {aboutData?.badgeTitle || FALLBACK_ABOUT.badgeTitle}
-          </motion.div>
-
-          <h2
-            className={`text-3xl font-black leading-tight tracking-tight sm:text-4xl md:text-5xl mb-4 ${currentTheme.text}`}
-          >
-            {aboutData?.heading || FALLBACK_ABOUT.heading}
-            <span
-              className={`block bg-gradient-to-r ${
-                theme === "light"
-                  ? "from-[#1A73E8] to-[#03DAC5]"
-                  : "from-[#8AB4F8] to-[#66FFF9]"
-              } bg-clip-text text-transparent`}
+      <div className="relative z-10 max-w-6xl mx-auto px-5">
+        <div className="flex flex-wrap justify-around gap-8 text-center">
+          {stats.map((stat, index) => (
+            <motion.div
+              key={`${stat.label}-${index}`}
+              initial={{ opacity: 0, y: 16 }}
+              animate={inView ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.4, delay: index * 0.08 }}
             >
-              {aboutData?.highlightText || FALLBACK_ABOUT.highlightText}
-            </span>
-          </h2>
-
-          <p
-            className={`text-base leading-7 sm:text-lg max-w-3xl mx-auto ${currentTheme.textSecondary}`}
-          >
-            {aboutData?.description || FALLBACK_ABOUT.description}
-          </p>
-        </motion.div>
-
-        {/* Stats Section */}
-        {stats.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={inView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="mb-12 grid grid-cols-2 gap-4 md:grid-cols-4"
-          >
-            {stats.map((stat, index) => {
-              const IconComponent = stat.icon;
-              return (
-                <motion.div
-                  key={stat.label}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={inView ? { opacity: 1, scale: 1 } : {}}
-                  transition={{ duration: 0.5, delay: 0.4 + index * 0.1 }}
-                  className={`group rounded-3xl border p-6 text-center backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl ${currentTheme.surface} ${currentTheme.outline}`}
-                >
-                  <div
-                    className={`mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl ${currentTheme.accentLight}`}
-                  >
-                    <IconComponent
-                      className={`w-6 h-6 ${currentTheme.accent.replace(
-                        "bg-",
-                        "text-",
-                      )}`}
-                    />
-                  </div>
-                  <div
-                    className={`text-3xl font-black tracking-tight mb-2 ${currentTheme.text}`}
-                  >
-                    {stat.number}
-                  </div>
-                  <div
-                    className={`text-sm font-medium uppercase tracking-[0.12em] ${currentTheme.textTertiary}`}
-                  >
-                    {stat.label}
-                  </div>
-                </motion.div>
-              );
-            })}
-          </motion.div>
-        )}
-
-        {/* Mission & Values */}
-        <div className="mb-20 grid grid-cols-1 items-start gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-12">
-          <motion.div
-            initial={{ opacity: 0, x: -50 }}
-            animate={inView ? { opacity: 1, x: 0 } : {}}
-            transition={{ duration: 0.6, delay: 0.5 }}
-            className={`rounded-[2rem] border p-6 sm:p-8 shadow-xl backdrop-blur-xl ${currentTheme.surface} ${currentTheme.outline}`}
-          >
-            <div
-              className={`mb-4 inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${currentTheme.accentLight} ${currentTheme.accent.replace("bg-", "text-")}`}
-            >
-              Mission
-            </div>
-            <h3
-              className={`text-2xl font-black tracking-tight mb-4 ${currentTheme.text}`}
-            >
-              {aboutData?.missionTitle || FALLBACK_ABOUT.missionTitle}
-            </h3>
-            <p
-              className={`text-base leading-7 mb-6 ${currentTheme.textSecondary}`}
-            >
-              {aboutData?.missionDescription ||
-                FALLBACK_ABOUT.missionDescription}
-            </p>
-
-            <div className="space-y-3">
-              {(Array.isArray(aboutData?.missionPoints)
-                ? aboutData.missionPoints
-                : FALLBACK_ABOUT.missionPoints
-              ).map((feature, index) => (
-                <motion.div
-                  key={feature}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={inView ? { opacity: 1, x: 0 } : {}}
-                  transition={{ duration: 0.4, delay: 0.7 + index * 0.1 }}
-                  className={`flex items-start gap-3 rounded-2xl border px-4 py-2.5 ${theme === "light" ? "border-slate-200/70 bg-white/70" : "border-white/10 bg-white/5"}`}
-                >
-                  <CheckCircle
-                    className={`mt-0.5 w-5 h-5 flex-shrink-0 ${currentTheme.success}`}
-                  />
-                  <span
-                    className={`font-medium leading-7 ${currentTheme.text}`}
-                  >
-                    {feature}
-                  </span>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, x: 50 }}
-            animate={inView ? { opacity: 1, x: 0 } : {}}
-            transition={{ duration: 0.6, delay: 0.5 }}
-            className={`relative overflow-hidden rounded-[2rem] border p-6 sm:p-8 shadow-xl backdrop-blur-xl ${currentTheme.surface} ${currentTheme.outline}`}
-          >
-            <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl" />
-            <div
-              className={`relative mb-6 flex h-16 w-16 items-center justify-center rounded-2xl ${currentTheme.accentLight}`}
-            >
-              <Award
-                className={`w-8 h-8 ${currentTheme.accent.replace(
-                  "bg-",
-                  "text-",
-                )}`}
-              />
-            </div>
-            <h4
-              className={`text-xl font-black tracking-tight mb-3 ${currentTheme.text}`}
-            >
-              Why Choose Amdaani?
-            </h4>
-            <div className="space-y-3">
-              <div
-                className={`flex items-center justify-between rounded-2xl border px-4 py-2.5 ${theme === "light" ? "border-slate-200 bg-white/70" : "border-white/10 bg-white/5"}`}
-              >
-                <span className={`font-semibold ${currentTheme.text}`}>
-                  Speed
-                </span>
-                <div className="flex space-x-1">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Star
-                      key={star}
-                      className="w-4 h-4 fill-yellow-400 text-yellow-400"
-                    />
-                  ))}
-                </div>
+              <div className="text-[1.8rem] font-extrabold text-[#2563eb] mb-1 tabular-nums">
+                <AnimatedStatNumber
+                  rawNumber={stat.number}
+                  inView={inView}
+                  delay={index * 120}
+                />
               </div>
               <div
-                className={`flex items-center justify-between rounded-2xl border px-4 py-2.5 ${theme === "light" ? "border-slate-200 bg-white/70" : "border-white/10 bg-white/5"}`}
+                className={`text-sm ${
+                  theme === "light" ? "text-slate-600" : "text-slate-400"
+                }`}
               >
-                <span className={`font-semibold ${currentTheme.text}`}>
-                  Affordability
-                </span>
-                <div className="flex space-x-1">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Star
-                      key={star}
-                      className="w-4 h-4 fill-yellow-400 text-yellow-400"
-                    />
-                  ))}
-                </div>
+                {stat.label}
               </div>
-              <div
-                className={`flex items-center justify-between rounded-2xl border px-4 py-2.5 ${theme === "light" ? "border-slate-200 bg-white/70" : "border-white/10 bg-white/5"}`}
-              >
-                <span className={`font-semibold ${currentTheme.text}`}>
-                  Security
-                </span>
-                <div className="flex space-x-1">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Star
-                      key={star}
-                      className="w-4 h-4 fill-yellow-400 text-yellow-400"
-                    />
-                  ))}
-                </div>
-              </div>
-              <div
-                className={`flex items-center justify-between rounded-2xl border px-4 py-2.5 ${theme === "light" ? "border-slate-200 bg-white/70" : "border-white/10 bg-white/5"}`}
-              >
-                <span className={`font-semibold ${currentTheme.text}`}>
-                  Ease of Use
-                </span>
-                <div className="flex space-x-1">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Star
-                      key={star}
-                      className="w-4 h-4 fill-yellow-400 text-yellow-400"
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </motion.div>
+            </motion.div>
+          ))}
         </div>
-
-        {/* Core Values */}
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6, delay: 0.6 }}
-          className="mb-12"
-        >
-          <h3
-            className={`text-center text-2xl sm:text-3xl font-black tracking-tight mb-8 ${currentTheme.text}`}
-          >
-            Our Core Values
-          </h3>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {/* Dynamic core values (commented out) - keep for future use
-            {values.map((value, index) => {
-              const IconComponent = value.icon;
-              const isLight = theme === "light";
-              return (
-                <motion.div
-                  key={value.title}
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={inView ? { opacity: 1, y: 0 } : {}}
-                  transition={{ duration: 0.5, delay: 0.7 + index * 0.1 }}
-                  className={`group relative overflow-hidden rounded-[1.75rem] border p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl ${currentTheme.surface} ${currentTheme.outline}`}
-                >
-                  <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${value.color}`} />
-                  <div className={`absolute -right-10 -top-10 h-28 w-28 rounded-full bg-gradient-to-br ${value.color} opacity-10 blur-2xl transition-opacity duration-300 group-hover:opacity-20`} />
-                  <div
-                    className={`relative mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border transition-all duration-300 ${
-                      isLight
-                        ? "border-slate-200 bg-white text-slate-900 shadow-[0_10px_30px_rgba(15,23,42,0.08)]"
-                        : "border-white/10 bg-white/5 text-white shadow-[0_10px_30px_rgba(2,6,23,0.28)]"
-                    }`}
-                  >
-                    <span className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${value.color} opacity-10`} />
-                    <IconComponent
-                      className={`relative z-10 w-6 h-6 ${isLight ? "text-slate-900" : "text-white"}`}
-                    />
-                  </div>
-                  <h4 className={`text-lg font-black tracking-tight mb-2 ${currentTheme.text}`}>
-                    {value.title}
-                  </h4>
-                  <p className={`text-sm leading-6 ${currentTheme.textSecondary}`}>
-                    {value.description}
-                  </p>
-                </motion.div>
-              );
-            })}
-            */}
-
-            {/* Static core values - shown now */}
-            {STATIC_VALUES.map((value, index) => {
-              const IconComponent = value.icon;
-              const isLight = theme === "light";
-              return (
-                <motion.div
-                  key={value.title}
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={inView ? { opacity: 1, y: 0 } : {}}
-                  transition={{ duration: 0.5, delay: 0.7 + index * 0.08 }}
-                  className={`group relative overflow-hidden rounded-[1.75rem] border p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl ${currentTheme.surface} ${currentTheme.outline}`}
-                >
-                  {value.title === "Lightning Fast" && (
-                    <motion.div
-                      className="absolute inset-0 rounded-[1.75rem] bg-cyan-400/5"
-                      animate={{
-                        opacity: [0.15, 0.4, 0.15],
-                      }}
-                      transition={{
-                        duration: 1.8,
-                        repeat: Infinity,
-                      }}
-                    />
-                  )}
-
-                  <div
-                    className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${value.color}`}
-                  />
-                  <div
-                    className={`absolute -right-10 -top-10 h-28 w-28 rounded-full bg-gradient-to-br ${value.color} opacity-10 blur-2xl transition-opacity duration-300 group-hover:opacity-20`}
-                  />
-                  <div
-                    className={`relative mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border transition-all duration-300 ${
-                      isLight
-                        ? "border-slate-200 bg-white text-slate-900 shadow-[0_10px_30px_rgba(15,23,42,0.08)]"
-                        : "border-white/10 bg-white/5 text-white shadow-[0_10px_30px_rgba(2,6,23,0.28)]"
-                    }`}
-                  >
-                    <span
-                      className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${value.color} opacity-10`}
-                    />
-                    <motion.div
-                      animate={value.animation}
-                      transition={value.transition}
-                      className="relative z-10"
-                    >
-                      <IconComponent
-                        className={`w-6 h-6 ${
-                          isLight ? "text-slate-900" : "text-white"
-                        }`}
-                      />
-                    </motion.div>
-                  </div>
-                  <h4
-                    className={`text-lg font-black tracking-tight mb-2 ${currentTheme.text}`}
-                  >
-                    {value.title}
-                  </h4>
-                  <p
-                    className={`text-sm leading-6 ${currentTheme.textSecondary}`}
-                  >
-                    {value.description}
-                  </p>
-                </motion.div>
-              );
-            })}
-          </div>
-        </motion.div>
       </div>
     </section>
-  );
-}
-
-// IndianRupee icon component since it's not in lucide-react
-function IndianRupee(props) {
-  return (
-    <svg
-      {...props}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M6 12h12" />
-      <path d="M6 16h12" />
-      <path d="M6 8h12" />
-      <path d="M15 6l-3-3-3 3" />
-      <path d="M9 18l3 3 3-3" />
-    </svg>
   );
 }

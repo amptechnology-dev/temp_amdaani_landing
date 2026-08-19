@@ -10,6 +10,8 @@ import PricingSection from "../../components/PricingSection";
 import CTASection from "../../components/CtaSection";
 import Footer from "../../components/Footer";
 import AboutSection from "../../components/About";
+import FeaturesSection from "../../components/FeaturesSection";
+import VideoDemoSection from "../../components/VideoDemoSection";
 import TestimonialSection from "../../components/Testimonial";
 import ChatBotWidget from "../../components/ChatBotWidget";
 import FaqSection from "../../components/FaqSection";
@@ -53,53 +55,49 @@ export default function Home() {
     };
   }, []);
 
-  // page.js — শুধু এই দুটো useEffect change করো
+  useEffect(() => {
+    const sectionMap = [
+      { id: "contact", ref: footerRef },
+      { id: "faq", ref: faqRef },
+      { id: "pricing", ref: pricingRef },
+      { id: "testimonials", ref: testimonialsRef },
+      { id: "about", ref: aboutRef },
+      { id: "home", ref: heroRef },
+    ];
 
- useEffect(() => {
-  const sectionMap = [
-    { id: "contact", ref: footerRef },   // ✅ contact সবার আগে check
-    { id: "faq", ref: faqRef },
-    { id: "pricing", ref: pricingRef },
-    { id: "testimonials", ref: testimonialsRef },
-    { id: "about", ref: aboutRef },
-    { id: "home", ref: heroRef },
-  ];
-
-  const handleScroll = () => {
-    // ✅ একদম top এ থাকলে home
-    if (window.scrollY < 80) {
-      setActiveSection("home");
-      return;
-    }
-
-    // ✅ একদম bottom এ থাকলে contact
-    const scrollBottom = window.scrollY + window.innerHeight;
-    const pageHeight = document.documentElement.scrollHeight;
-    if (scrollBottom >= pageHeight - 80) {
-      setActiveSection("contact");
-      return;
-    }
-
-    // ✅ বাকিগুলো viewport center দিয়ে detect
-    const viewportCenter = window.scrollY + window.innerHeight / 2;
-
-    for (const { id, ref } of sectionMap) {
-      if (!ref?.current) continue;
-      const el = ref.current;
-      const top = el.offsetTop;
-      const bottom = top + el.offsetHeight;
-
-      if (viewportCenter >= top && viewportCenter < bottom) {
-        setActiveSection(id);
+    const handleScroll = () => {
+      if (window.scrollY < 80) {
+        setActiveSection("home");
         return;
       }
-    }
-  };
 
-  window.addEventListener("scroll", handleScroll, { passive: true });
-  handleScroll(); // initial call
-  return () => window.removeEventListener("scroll", handleScroll);
-}, []);
+      const scrollBottom = window.scrollY + window.innerHeight;
+      const pageHeight = document.documentElement.scrollHeight;
+      if (scrollBottom >= pageHeight - 80) {
+        setActiveSection("contact");
+        return;
+      }
+
+      // ✅ বাকিগুলো viewport center দিয়ে detect
+      const viewportCenter = window.scrollY + window.innerHeight / 2;
+
+      for (const { id, ref } of sectionMap) {
+        if (!ref?.current) continue;
+        const el = ref.current;
+        const top = el.offsetTop;
+        const bottom = top + el.offsetHeight;
+
+        if (viewportCenter >= top && viewportCenter < bottom) {
+          setActiveSection(id);
+          return;
+        }
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll(); // initial call
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   // 2. ✅ Scroll listener — একদম top এ গেলে force "home"
   useEffect(() => {
@@ -194,8 +192,6 @@ export default function Home() {
               </p>
             </div>
           </div>
-
-          {/* Using Tailwind arbitrary animation to avoid styled-jsx hydration issues */}
         </div>
       )}
       <Navigation
@@ -216,9 +212,13 @@ export default function Home() {
         />
       </div>
 
-      <section ref={aboutRef} id="about">
+      {/* <section ref={aboutRef} id="about">
         <AboutSection />
-      </section>
+      </section> */}
+
+      <FeaturesSection />
+
+      <VideoDemoSection />
 
       <section ref={testimonialsRef} id="testimonials">
         <TestimonialSection />
@@ -228,15 +228,14 @@ export default function Home() {
         <PricingSection pricingRef={pricingRef} />
       </section>
 
+      <CTASection />
       <section ref={faqRef} id="faq">
         <FaqSection />
       </section>
-
-      <CTASection />
       <section ref={footerRef} id="contact">
         <Footer />
       </section>
-      {/* <ChatBotWidget /> */}
+      <ChatBotWidget />
     </div>
   );
 }

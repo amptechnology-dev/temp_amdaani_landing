@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
-import { Search, Bell, Sun, Moon, User, ChevronDown } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Bell, Sun, Moon, User, ChevronDown, LogOut, Settings } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
-import { debounce } from "lodash";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   Breadcrumb,
@@ -14,156 +13,173 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 
-export default function Topbar({ theme }) {
+export default function Topbar({ theme, pageTitle = "Overview" }) {
   const { theme: currentTheme, toggleTheme } = useTheme();
   const { user } = useAuth();
-  const [searchQuery, setSearchQuery] = useState("");
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // Debounced search function
-  const handleSearch = useCallback(
-    debounce((query) => {
-      // Implement search functionality
-      console.log("Searching for:", query);
-    }, 500),
-    []
-  );
+  const userMenuRef = useRef(null);
+  const notifRef = useRef(null);
 
   useEffect(() => {
-    handleSearch(searchQuery);
-    return () => handleSearch.cancel();
-  }, [searchQuery, handleSearch]);
+    function handleClickOutside(e) {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
+        setShowUserMenu(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setShowNotifications(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleProfileClick = () => {
-    // Navigate to profile
-    window.location.href = "/profile";
+    window.location.href = "/dashboard/profile";
   };
 
   return (
-    <header className={`sticky top-0 z-40 ${theme.surface} shadow-sm`}>
-      <div className="px-4 md:px-6 py-3">
-        {/* Breadcrumb Section - Visible on desktop, hidden on mobile */}
-        <div className="hidden md:block mb-3">
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbLink href="/dashboard" className={theme.text}>
-                  Dashboard
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <span className={theme.textSecondary}>Overview</span>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-        </div>
+    <header className={`sticky top-0 z-40 ${theme.surface} border-b ${theme.outline}`}>
+      <div className="px-5 md:px-7 h-16 flex items-center justify-between gap-4">
+        {/* Left: sidebar trigger + breadcrumb / page title */}
+        <div className="flex items-center gap-3 min-w-0">
+          <SidebarTrigger
+            className={`${theme.buttonTertiary} p-2 rounded-lg border ${theme.outline} shrink-0`}
+          />
 
-        <div className="flex items-center justify-between">
-          {/* Left: Sidebar trigger & search */}
-          <div className="flex items-center space-x-2 md:space-x-4 flex-1">
-            {/* Sidebar trigger - visible on all screen sizes */}
-            <SidebarTrigger
-              className={`${theme.buttonTertiary} p-2 rounded-lg`}
-            />
+          <div className="hidden md:block h-6 w-px bg-slate-200 mx-1" />
+
+          <div className="hidden md:flex flex-col justify-center min-w-0">
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink
+                    href="/dashboard"
+                    className={`text-[12px] font-medium ${theme.textSecondary} hover:${theme.text} transition-colors`}
+                  >
+                    Dashboard
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <span className={`text-[12px] font-medium ${theme.textSecondary}`}>{pageTitle}</span>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+            <h1 className={`text-[15px] font-bold ${theme.text} leading-tight truncate mt-0.5`}>
+              {pageTitle}
+            </h1>
           </div>
 
-          {/* Right: Controls */}
-          <div className="flex items-center space-x-3 ml-4">
-            {/* Theme toggle */}
+          {/* Mobile page title */}
+          <h1 className={`md:hidden text-[15px] font-bold ${theme.text} truncate`}>{pageTitle}</h1>
+        </div>
+
+        {/* Right: controls */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Theme toggle */}
+          <button
+            onClick={toggleTheme}
+            className={`p-2 rounded-lg border ${theme.outline} ${theme.buttonTertiary} transition-colors`}
+            aria-label={`Switch to ${currentTheme === "light" ? "dark" : "light"} mode`}
+          >
+            {currentTheme === "light" ? (
+              <Moon size={18} className={theme.text} />
+            ) : (
+              <Sun size={18} className={theme.text} />
+            )}
+          </button>
+
+          {/* Notifications */}
+          <div className="relative" ref={notifRef}>
             <button
-              onClick={toggleTheme}
-              className={`p-2 rounded-lg ${theme.buttonTertiary}`}
-              aria-label={`Switch to ${
-                currentTheme === "light" ? "dark" : "light"
-              } mode`}
+              onClick={() => setShowNotifications((v) => !v)}
+              className={`p-2 rounded-lg border ${theme.outline} ${theme.buttonTertiary} relative transition-colors`}
+              aria-label="Notifications"
             >
-              {currentTheme === "light" ? (
-                <Moon size={20} className={theme.text} />
-              ) : (
-                <Sun size={20} className={theme.text} />
+              <Bell size={18} className={theme.text} />
+              {notifications.length > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center ring-2 ring-white">
+                  {notifications.length}
+                </span>
               )}
             </button>
 
-            {/* Notifications */}
-            <div className="relative">
-              <button
-                onClick={() => setShowNotifications(!showNotifications)}
-                className={`p-2 rounded-lg ${theme.buttonTertiary} relative`}
-                aria-label="Notifications"
+            {showNotifications && (
+              <div
+                className={`absolute right-0 mt-2 w-80 ${theme.card} rounded-xl shadow-xl border ${theme.outline} py-2 z-50`}
               >
-                <Bell size={20} className={theme.text} />
-                {notifications.length > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                    {notifications.length}
-                  </span>
-                )}
-              </button>
-
-              {showNotifications && (
-                <div
-                  className={`absolute right-0 mt-2 w-80 ${theme.card} rounded-lg shadow-xl border ${theme.outline} py-2`}
-                >
-                  <div className="px-4 py-2 border-b">
-                    <h3 className={`${theme.text} font-semibold`}>
-                      Notifications
-                    </h3>
-                  </div>
-                  {notifications.length === 0 ? (
-                    <div className="px-4 py-8 text-center">
-                      <p className={theme.textSecondary}>
-                        No new notifications
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="max-h-96 overflow-y-auto">
-                      {/* Notification items would go here */}
-                    </div>
+                <div className={`px-4 py-2.5 border-b ${theme.outline} flex items-center justify-between`}>
+                  <h3 className={`${theme.text} font-semibold text-[13.5px]`}>Notifications</h3>
+                  {notifications.length > 0 && (
+                    <span className="text-[11px] font-medium text-blue-600">Mark all read</span>
                   )}
                 </div>
-              )}
-            </div>
+                {notifications.length === 0 ? (
+                  <div className="px-4 py-10 text-center">
+                    <Bell size={22} className="mx-auto mb-2 text-slate-300" />
+                    <p className={`${theme.textSecondary} text-[13px]`}>No new notifications</p>
+                  </div>
+                ) : (
+                  <div className="max-h-96 overflow-y-auto">
+                    {/* Notification items would go here */}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
-            {/* User menu */}
-            <div className="relative">
-              <button
-                onClick={() => setShowUserMenu(!showUserMenu)}
-                className="flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-opacity-10 hover:bg-gray-500"
-                aria-label="User menu"
+          <div className="w-px h-6 bg-slate-200 mx-1 hidden sm:block" />
+
+          {/* User menu */}
+          <div className="relative" ref={userMenuRef}>
+            <button
+              onClick={() => setShowUserMenu((v) => !v)}
+              className={`flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 rounded-lg border ${theme.outline} ${theme.buttonTertiary} transition-colors`}
+              aria-label="User menu"
+            >
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center shrink-0 ring-1 ring-blue-700/10">
+                <User size={15} className="text-white" strokeWidth={2.25} />
+              </div>
+              <span className={`hidden md:inline ${theme.text} font-semibold text-[13px]`}>
+                {user?.name || "User"}
+              </span>
+              <ChevronDown
+                size={14}
+                className={`${theme.textSecondary} transition-transform ${showUserMenu ? "rotate-180" : ""}`}
+              />
+            </button>
+
+            {showUserMenu && (
+              <div
+                className={`absolute right-0 mt-2 w-52 ${theme.card} rounded-xl shadow-xl border ${theme.outline} py-1.5 z-50`}
               >
-                <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center">
-                  <User size={20} className="text-gray-600" />
+                <div className={`px-3.5 py-2 border-b ${theme.outline} mb-1`}>
+                  <p className={`${theme.text} font-semibold text-[13px] truncate`}>
+                    {user?.name || "User"}
+                  </p>
+                  <p className={`${theme.textSecondary} text-[11.5px] truncate`}>{user?.email || ""}</p>
                 </div>
-                <span className={`hidden md:inline ${theme.text} font-medium`}>
-                  {user?.name || "User"}
-                </span>
-                <ChevronDown size={16} className={theme.textSecondary} />
-              </button>
-
-              {showUserMenu && (
-                <div
-                  className={`absolute right-0 mt-2 w-48 ${theme.card} rounded-lg shadow-xl border ${theme.outline} py-1`}
+                <button
+                  onClick={handleProfileClick}
+                  className={`w-[calc(100%-8px)] flex items-center gap-2.5 text-left px-3.5 py-2 rounded-lg mx-1 hover:${theme.surfaceVariant} ${theme.text} text-[13px] font-medium transition-colors`}
                 >
-                  <button
-                    onClick={handleProfileClick}
-                    className={`w-full text-left px-4 py-2 hover:${theme.surfaceVariant} ${theme.text}`}
-                  >
-                    Profile
-                  </button>
-                  <button
-                    onClick={() => {
-                      // Implement logout
-                      window.location.href = "/auth/logout";
-                    }}
-                    className={`w-full text-left px-4 py-2 hover:${theme.surfaceVariant} ${theme.text}`}
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
-            </div>
+                  <Settings size={15} className={theme.textSecondary} />
+                  Profile Settings
+                </button>
+                <button
+                  onClick={() => {
+                    window.location.href = "/auth/logout";
+                  }}
+                  className="w-[calc(100%-8px)] flex items-center gap-2.5 text-left px-3.5 py-2 rounded-lg mx-1 hover:bg-red-50 text-red-600 text-[13px] font-medium transition-colors"
+                >
+                  <LogOut size={15} />
+                  Logout
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

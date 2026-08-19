@@ -269,6 +269,11 @@ export const AuthProvider = ({ children }) => {
     return userPerms.includes(permissions.ALL) || userPerms.includes(perm);
   };
 
+  const storeSettings = authState?.user?.store?.settings || {};
+  const isStockEnabled = !!storeSettings.stockManagement;
+  const isPurchaseOrderEnabled = !!storeSettings.purchaseOrderManagement;
+  const isMrpEnabled = !!storeSettings.mrpManagement;
+
   const completeOnboarding = () => {
     localStorage.setItem("onboarding", "true");
     setHasCompletedOnboarding(true);
@@ -292,8 +297,11 @@ export const AuthProvider = ({ children }) => {
       hasPermission,
       fetchUserProfile,
       completeOnboarding,
+      isStockEnabled,
+      isPurchaseOrderEnabled,
+      isMrpEnabled,
     }),
-    [authState, loading, subscription, usage, subLoading]
+    [authState, loading, subscription, usage, subLoading],
   );
 
   return (

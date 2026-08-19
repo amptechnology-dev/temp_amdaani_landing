@@ -2,8 +2,8 @@ import "./globals.css";
 import Providers from "./Providers";
 
 export const metadata = {
-  title: "Amdaani Billing App",
-  description: "Your app description",
+  title: "AMDAANI Invoice Billing App",
+  description: "Invoicing, Inventory, Billing, GST, Accounting App * Business",
 };
 
 export default function RootLayout({ children }) {

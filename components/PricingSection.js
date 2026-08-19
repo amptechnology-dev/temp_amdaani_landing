@@ -1,67 +1,325 @@
 "use client";
 import { useTheme } from "../context/ThemeContext";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { themeConfig } from "../utils/ThemeConfig";
 import { useEffect, useMemo, useState } from "react";
-import {
-  Check,
-  Users,
-  CreditCard,
-  Crown,
-  Sparkles,
-  ArrowRight,
-  RefreshCw,
-} from "lucide-react";
-
-// Motion variants for pricing animations
-const gridVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.08,
-      when: "beforeChildren",
-    },
-  },
-};
-
-const cardVariants = {
-  hidden: { opacity: 0, y: 24 },
-  visible: (i = 0) => ({
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.48, ease: [0.2, 0.8, 0.2, 1], delay: i * 0.08 },
-  }),
-  hover: {
-    scale: 1.03,
-    y: -6,
-    transition: { duration: 0.28, ease: "easeOut" },
-  },
-};
+import { Check, CreditCard, RefreshCw } from "lucide-react";
 
 const LANDING_PLANS_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/plan/landing-plans`;
 const HERO_BUTTON_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/herobutton/public-hero-button`;
 
-const planCardStyles = [
-  { color: "from-blue-500 to-cyan-500", icon: Users },
-  { color: "from-purple-500 to-pink-500", icon: Crown },
-  { color: "from-orange-500 to-red-500", icon: Building },
-];
+// Deterministic-ish random, only ever called on the client (after mount),
+// so there is no server/client value mismatch to worry about.
+const rand = (min, max) =>
+  Math.round((min + Math.random() * (max - min)) * 100) / 100;
+
+const generateStars = (count) =>
+  Array.from({ length: count }, (_, i) => ({
+    id: i,
+    top: rand(0, 100),
+    left: rand(0, 100),
+    size: rand(1, 3),
+    duration: rand(6, 16),
+    delay: rand(0, 6),
+    dx: rand(-60, 60),
+    dy: rand(-60, 60),
+  }));
+
+const generateLightDots = (count) =>
+  Array.from({ length: count }, (_, i) => ({
+    id: i,
+    top: rand(0, 100),
+    left: rand(0, 100),
+    size: rand(4, 9),
+    duration: rand(10, 20),
+    delay: rand(0, 6),
+    dx: rand(-90, 90),
+    dy: rand(-60, 60),
+  }));
+
+function AnimatedBackground({ theme }) {
+  const [mounted, setMounted] = useState(false);
+  const [stars, setStars] = useState([]);
+  const [lightDots, setLightDots] = useState([]);
+
+  // Generate particle data ONLY on the client, after mount, so the server
+  // render and the first client render both start with an empty array —
+  // this avoids any hydration mismatch.
+  useEffect(() => {
+    setStars(generateStars(50));
+    setLightDots(generateLightDots(20));
+    setMounted(true);
+  }, []);
+
+  if (theme === "light") {
+    return (
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute inset-0 opacity-35 animate-[priceMeshShift_16s_ease-in-out_infinite] bg-[radial-gradient(60%_60%_at_20%_20%,rgba(37,99,235,0.06)_0%,transparent_60%),radial-gradient(55%_55%_at_85%_15%,rgba(6,182,212,0.06)_0%,transparent_60%),radial-gradient(60%_60%_at_50%_100%,rgba(99,102,241,0.05)_0%,transparent_60%)] bg-[length:200%_200%]" />
+
+        <div className="absolute -top-16 -left-10 h-80 w-80 rounded-full bg-blue-400/8 blur-3xl animate-[priceFloatA_14s_ease-in-out_infinite]" />
+        <div className="absolute top-0 right-[-40px] h-96 w-96 rounded-full bg-cyan-400/8 blur-3xl animate-[priceFloatB_18s_ease-in-out_infinite]" />
+        <div className="absolute bottom-[-60px] left-1/3 h-72 w-72 rounded-full bg-indigo-300/8 blur-3xl animate-[priceFloatA_16s_ease-in-out_infinite_reverse]" />
+
+        <div className="absolute inset-0 opacity-20 animate-[priceSweep_9s_ease-in-out_infinite] bg-[linear-gradient(115deg,transparent_30%,rgba(37,99,235,0.05)_50%,transparent_70%)]" />
+
+        {mounted &&
+          lightDots.map((dot) => (
+            <span
+              key={dot.id}
+              className="absolute rounded-full bg-[#2563eb]/15 blur-[1.5px] animate-[priceDrift_var(--dur)_ease-in-out_infinite]"
+              style={{
+                top: `${dot.top}%`,
+                left: `${dot.left}%`,
+                width: `${dot.size}px`,
+                height: `${dot.size}px`,
+                "--dur": `${dot.duration}s`,
+                "--dx": `${dot.dx}px`,
+                "--dy": `${dot.dy}px`,
+                animationDelay: `${dot.delay}s`,
+              }}
+            />
+          ))}
+
+        <style jsx>{`
+          @keyframes priceMeshShift {
+            0%,
+            100% {
+              background-position:
+                0% 0%,
+                100% 0%,
+                50% 100%;
+            }
+            50% {
+              background-position:
+                20% 20%,
+                80% 10%,
+                40% 90%;
+            }
+          }
+          @keyframes priceFloatA {
+            0%,
+            100% {
+              transform: translate(0, 0) scale(1);
+            }
+            50% {
+              transform: translate(35px, -30px) scale(1.1);
+            }
+          }
+          @keyframes priceFloatB {
+            0%,
+            100% {
+              transform: translate(0, 0) scale(1);
+            }
+            50% {
+              transform: translate(-30px, 25px) scale(1.08);
+            }
+          }
+          @keyframes priceSweep {
+            0%,
+            100% {
+              transform: translateX(-10%);
+            }
+            50% {
+              transform: translateX(10%);
+            }
+          }
+          @keyframes priceDrift {
+            0% {
+              transform: translate(0, 0);
+              opacity: 0.12;
+            }
+            50% {
+              transform: translate(var(--dx), var(--dy));
+              opacity: 0.5;
+            }
+            100% {
+              transform: translate(0, 0);
+              opacity: 0.12;
+            }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  // Dark mode — drifting + twinkling starfield
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      <div className="absolute -top-16 -left-10 h-80 w-80 rounded-full bg-blue-500/10 blur-3xl" />
+      <div className="absolute top-10 right-0 h-96 w-96 rounded-full bg-cyan-400/10 blur-3xl" />
+
+      {mounted &&
+        stars.map((star) => (
+          <span
+            key={star.id}
+            className="absolute rounded-full bg-white animate-[priceStarDrift_var(--dur)_ease-in-out_infinite]"
+            style={{
+              top: `${star.top}%`,
+              left: `${star.left}%`,
+              width: `${star.size}px`,
+              height: `${star.size}px`,
+              "--dur": `${star.duration}s`,
+              "--dx": `${star.dx}px`,
+              "--dy": `${star.dy}px`,
+              animationDelay: `${star.delay}s`,
+              boxShadow: "0 0 4px rgba(255,255,255,0.7)",
+            }}
+          />
+        ))}
+
+      <style jsx>{`
+        @keyframes priceStarDrift {
+          0% {
+            transform: translate(0, 0) scale(0.8);
+            opacity: 0.2;
+          }
+          50% {
+            transform: translate(var(--dx), var(--dy)) scale(1.4);
+            opacity: 1;
+          }
+          100% {
+            transform: translate(0, 0) scale(0.8);
+            opacity: 0.2;
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// One pricing card. Uses its own whileInView so it animates in the moment
+// it scrolls into the viewport, and whileHover for the interactive lift.
+function PricingCard({
+  plan,
+  index,
+  theme,
+  isPopular,
+  isFree,
+  planFeatures,
+  formatCurrency,
+  getDurationLabel,
+  heroButton,
+  handleHeroButtonClick,
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 32 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.25, margin: "0px 0px -60px 0px" }}
+      transition={{
+        duration: 0.5,
+        delay: (index % 3) * 0.1,
+        ease: [0.2, 0.8, 0.2, 1],
+      }}
+      whileHover={{ y: -8, scale: 1.02 }}
+      className={`group relative flex flex-col rounded-xl p-9 text-center backdrop-blur-sm transition-colors duration-300 cursor-default ${
+        isPopular
+          ? "border-2 border-[#2563eb]"
+          : theme === "light"
+            ? "border border-slate-200 hover:border-[#2563eb]/40"
+            : "border border-slate-800 hover:border-[#3b82f6]/50"
+      } ${theme === "light" ? "bg-white/90" : "bg-slate-900/90"}`}
+      style={{
+        boxShadow: isPopular
+          ? "0 10px 30px rgba(37,99,235,0.1)"
+          : theme === "light"
+            ? "0 1px 2px rgba(15, 23, 42, 0.04)"
+            : "0 1px 2px rgba(0, 0, 0, 0.2)",
+      }}
+    >
+      {/* Hover glow */}
+      <div
+        className={`pointer-events-none absolute inset-0 rounded-xl opacity-0 transition-opacity duration-300 group-hover:opacity-100 ${
+          theme === "light"
+            ? "shadow-[0_16px_36px_-10px_rgba(37,99,235,0.28)]"
+            : "shadow-[0_16px_36px_-10px_rgba(59,130,246,0.4)]"
+        }`}
+      />
+
+      {/* Popular tag — demo .popular-tag */}
+      {isPopular && (
+        <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#2563eb] text-white text-xs font-bold px-3 py-1 rounded-full">
+          MOST POPULAR
+        </span>
+      )}
+
+      {/* Plan Name */}
+      <h3
+        className={`relative text-lg font-bold mb-3 transition-colors duration-300 ${
+          theme === "light"
+            ? "text-slate-900 group-hover:text-[#2563eb]"
+            : "text-white group-hover:text-[#8ab4f8]"
+        }`}
+      >
+        {plan.name}
+      </h3>
+
+      {/* Price — demo .amount */}
+      <div
+        className={`relative text-[2.4rem] font-extrabold mb-1 ${
+          theme === "light" ? "text-slate-900" : "text-white"
+        }`}
+      >
+        {formatCurrency(plan?.price ?? 0, plan?.currency || "INR")}
+        {!isFree && (
+          <span
+            className={`text-base font-medium ${
+              theme === "light" ? "text-slate-500" : "text-slate-400"
+            }`}
+          >
+            /{getDurationLabel(plan?.durationDays ?? 0)}
+          </span>
+        )}
+      </div>
+
+      <p
+        className={`relative text-sm mb-6 ${
+          theme === "light" ? "text-slate-500" : "text-slate-400"
+        }`}
+      >
+        {plan.description || `${plan?.durationDays ?? 0} days validity`}
+      </p>
+
+      {/* Features — demo plain checklist */}
+      <ul className="relative text-left flex flex-col gap-2.5 mb-8 flex-1 text-[0.95rem]">
+        {planFeatures.map((feature, featureIndex) => (
+          <li
+            key={`${plan._id || plan.name}-${featureIndex}`}
+            className={`flex items-start gap-2 ${
+              theme === "light" ? "text-slate-700" : "text-slate-300"
+            } ${feature.available ? "" : "line-through opacity-60"}`}
+          >
+            <Check className="w-4 h-4 mt-0.5 text-[#2563eb] flex-shrink-0" />
+            {feature.label}
+          </li>
+        ))}
+      </ul>
+
+      {/* CTA Button — demo .btn-outline / .btn-primary */}
+      <button
+        onClick={handleHeroButtonClick}
+        disabled={!heroButton?.link}
+        className={`relative w-full py-3 rounded-lg text-sm font-semibold transition-colors duration-200 ${
+          isPopular
+            ? "bg-[#2563eb] hover:bg-[#1d4ed8] text-white"
+            : theme === "light"
+              ? "border-2 border-[#2563eb] text-[#2563eb] hover:bg-blue-50"
+              : "border-2 border-[#3b82f6] text-[#3b82f6] hover:bg-slate-800"
+        } ${!heroButton?.link ? "opacity-60 cursor-not-allowed" : ""}`}
+      >
+        {heroButton?.name || (isFree ? "Start Free Trial" : "Buy Now")}
+      </button>
+    </motion.div>
+  );
+}
 
 export default function PricingSection() {
   const { theme } = useTheme();
   const currentTheme = themeConfig[theme];
-  // removed billing toggle state — show all plans
-  const [isVisible, setIsVisible] = useState(false);
   const [heroButton, setHeroButton] = useState(null);
   const [plans, setPlans] = useState([]);
   const [loadingPlans, setLoadingPlans] = useState(true);
   const [plansError, setPlansError] = useState("");
-
-  useEffect(() => {
-    const timer = setTimeout(() => setIsVisible(true), 300);
-    return () => clearTimeout(timer);
-  }, []);
 
   useEffect(() => {
     const fetchHeroButton = async () => {
@@ -142,44 +400,8 @@ export default function PricingSection() {
     return `${durationDays} days`;
   };
 
-  // Show all active plans (no monthly/annual filter)
   const displayPlans = useMemo(() => plans, [plans]);
 
-  const comparisonRows = useMemo(
-    () => [
-      {
-        key: "price",
-        label: "Price",
-        value: (plan) =>
-          formatCurrency(plan?.price ?? 0, plan?.currency || "INR"),
-      },
-      {
-        key: "billing",
-        label: "Billing cycle",
-        value: (plan) => `Per ${getDurationLabel(plan?.durationDays ?? 0)}`,
-      },
-      {
-        key: "invoice",
-        label: "Invoice limit",
-        value: (plan) =>
-          plan?.usageLimits?.unlimited
-            ? "Unlimited"
-            : plan?.usageLimits?.invoices != null
-              ? `${plan.usageLimits.invoices}`
-              : "N/A",
-      },
-      {
-        key: "features",
-        label: "Features",
-        value: (plan) =>
-          `${Array.isArray(plan?.features) ? plan.features.length : 0} included`,
-      },
-    ],
-    [],
-  );
-
-  // UPDATED: ekhon each feature line-e { label, available } object thake,
-  // jate Plans.js (admin) er moto na-available feature-e line-through dekhano jay
   const getFeatureLines = (plan) => {
     const parsed = (Array.isArray(plan?.features) ? plan.features : [])
       .map((feature, index) => {
@@ -231,58 +453,43 @@ export default function PricingSection() {
   return (
     <section
       id="pricing"
-      className={`py-20 px-4 sm:px-6 lg:px-8 ${currentTheme.background}`}
+      className={`relative overflow-hidden py-20 px-4 sm:px-6 lg:px-8 ${
+        theme === "light" ? "bg-[#F5F7FA]" : "bg-[#0E0F11]"
+      }`}
     >
-      <div className="max-w-7xl mx-auto">
-        {/* Header Section */}
+      {/* Animated background */}
+      <AnimatedBackground theme={theme} />
+
+      <div className="relative z-10 max-w-5xl mx-auto">
+        {/* Header — demo .section-title style, animates in on scroll */}
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={isVisible ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-16"
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.5 }}
+          className="text-center mb-14"
         >
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={isVisible ? { scale: 1 } : {}}
-            transition={{ delay: 0.2, type: "spring" }}
-            className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium mb-6 ${
-              currentTheme.accentLight
-            } ${currentTheme.accent.replace("bg-", "text-")}`}
-          >
-            <CreditCard className="w-4 h-4 mr-2" />
-            Simple, Transparent Pricing
-          </motion.div>
-
           <h2
-            className={`text-4xl md:text-5xl font-bold mb-6 ${currentTheme.text}`}
+            className={`text-[2.2rem] font-extrabold mb-3 ${
+              theme === "light" ? "text-slate-900" : "text-white"
+            }`}
           >
-            Pricing That Grows
-            <span
-              className={`block bg-gradient-to-r ${
-                theme === "light"
-                  ? "from-[#1A73E8] to-[#03DAC5]"
-                  : "from-[#8AB4F8] to-[#66FFF9]"
-              } bg-clip-text text-transparent`}
-            >
-              With Your Business
-            </span>
+            Pricing
           </h2>
-
           <p
-            className={`text-xl max-w-3xl mx-auto mb-8 ${currentTheme.textSecondary}`}
+            className={`text-[1.05rem] max-w-2xl mx-auto ${
+              theme === "light" ? "text-slate-500" : "text-slate-400"
+            }`}
           >
-            Start free, upgrade as you grow. No hidden fees, no surprise
-            charges.
+            No hidden charges. Choose the plan that fits your shop needs.
           </p>
 
-          {/* Billing toggle removed — showing all plans */}
-
           {plansError && (
-            <div className="mb-12 flex flex-col items-center gap-3">
-              <p className={`text-sm ${currentTheme.error}`}>{plansError}</p>
+            <div className="mt-8 flex flex-col items-center gap-3">
+              <p className="text-sm text-red-500">{plansError}</p>
               <button
                 onClick={fetchPlans}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl ${currentTheme.buttonSecondary}`}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-white bg-[#2563eb] hover:bg-[#1d4ed8] transition-colors"
               >
                 <RefreshCw className="h-4 w-4" />
                 Retry Plans
@@ -291,247 +498,65 @@ export default function PricingSection() {
           )}
         </motion.div>
 
-        {/* Pricing Cards */}
-        <motion.div
-          variants={gridVariants}
-          initial="hidden"
-          animate={isVisible ? "visible" : "hidden"}
-          className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-20 px-4 md:px-8 lg:px-16"
-        >
+        {/* Pricing Cards — each card animates in on its own as it scrolls into view */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {loadingPlans
             ? [0, 1, 2].map((idx) => (
                 <div
                   key={`skeleton-${idx}`}
-                  className={`rounded-2xl border p-8 animate-pulse ${currentTheme.outline} ${currentTheme.surface}`}
+                  className={`rounded-xl border p-9 animate-pulse ${
+                    theme === "light"
+                      ? "border-slate-200 bg-white"
+                      : "border-slate-800 bg-slate-900"
+                  }`}
                 >
-                  <div className="h-12 w-12 rounded-2xl bg-gray-300/40 mb-5" />
-                  <div className="h-5 w-32 bg-gray-300/40 rounded mb-2" />
-                  <div className="h-4 w-44 bg-gray-300/40 rounded mb-8" />
-                  <div className="h-10 w-28 bg-gray-300/40 rounded mb-2" />
-                  <div className="h-3 w-20 bg-gray-300/40 rounded mb-8" />
+                  <div className="h-5 w-32 bg-gray-300/40 rounded mb-4" />
+                  <div className="h-10 w-28 bg-gray-300/40 rounded mb-4" />
+                  <div className="h-4 w-40 bg-gray-300/30 rounded mb-8" />
                   <div className="space-y-3 mb-8">
-                    {[1, 2, 3, 4].map((i) => (
+                    {[1, 2, 3].map((i) => (
                       <div
                         key={i}
-                        className="h-4 w-full bg-gray-300/40 rounded"
+                        className="h-4 w-full bg-gray-300/30 rounded"
                       />
                     ))}
                   </div>
-                  <div className="h-11 w-full bg-gray-300/40 rounded-xl" />
+                  <div className="h-11 w-full bg-gray-300/40 rounded-lg" />
                 </div>
               ))
             : displayPlans.map((plan, index) => {
-                const style = planCardStyles[index % planCardStyles.length];
-                const IconComponent = style.icon;
                 const isFree = (plan?.price ?? 0) === 0;
                 const isPopular = getIsPopular(plan);
                 const planFeatures = getFeatureLines(plan);
 
-                const accentColors = [
-                  {
-                    iconBg: "bg-[#E1F5EE]",
-                    iconText: "text-[#0F6E56]",
-                    checkBg: "bg-[#E1F5EE]",
-                    checkText: "text-[#0F6E56]",
-                  },
-                  {
-                    iconBg: "bg-[#E6F1FB]",
-                    iconText: "text-[#185FA5]",
-                    checkBg: "bg-[#E6F1FB]",
-                    checkText: "text-[#185FA5]",
-                  },
-                  {
-                    iconBg: "bg-[#FAEEDA]",
-                    iconText: "text-[#854F0B]",
-                    checkBg: "bg-[#FAEEDA]",
-                    checkText: "text-[#854F0B]",
-                  },
-                ];
-                const accent = accentColors[index % accentColors.length];
-
                 return (
-                  <motion.div
+                  <PricingCard
                     key={plan._id || plan.name}
-                    custom={index}
-                    variants={cardVariants}
-                    initial="hidden"
-                    animate={isVisible ? "visible" : "hidden"}
-                    whileHover={{ y: -5, transition: { duration: 0.2 } }}
-                    className={`relative flex flex-col rounded-2xl transition-all duration-300 p-8 ${
-                      isPopular
-                        ? theme === "light"
-                          ? "border-2 border-[#1A73E8] bg-white shadow-2xl shadow-blue-100"
-                          : "border-2 border-[#8AB4F8] bg-slate-900 shadow-2xl shadow-blue-900/30"
-                        : theme === "light"
-                          ? "border border-gray-200 bg-white shadow-sm hover:shadow-md"
-                          : "border border-slate-800 bg-slate-900 shadow-sm hover:shadow-md"
-                    }`}
-                  >
-                    {/* Icon */}
-                    <div
-                      className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-5 ${accent.iconBg}`}
-                    >
-                      <IconComponent className={`w-5 h-5 ${accent.iconText}`} />
-                    </div>
-
-                    {/* Plan Name & Description */}
-                    <h3
-                      className={`text-xl font-bold mb-1.5 ${currentTheme.text}`}
-                    >
-                      {plan.name}
-                    </h3>
-                    <p
-                      className={`text-sm leading-relaxed mb-5 ${currentTheme.textSecondary}`}
-                    >
-                      {plan.description}
-                    </p>
-
-                    {/* Price */}
-                    <div className="flex items-baseline gap-1 mb-1">
-                      <span
-                        className={`text-4xl font-extrabold tracking-tight ${currentTheme.text}`}
-                      >
-                        {formatCurrency(
-                          plan?.price ?? 0,
-                          plan?.currency || "INR",
-                        )}
-                      </span>
-                      {!isFree && (
-                        <span
-                          className={`text-base ${currentTheme.textTertiary}`}
-                        >
-                          /{getDurationLabel(plan?.durationDays ?? 0)}
-                        </span>
-                      )}
-                    </div>
-                    <p className={`text-xs mb-5 ${currentTheme.textTertiary}`}>
-                      {plan?.durationDays ?? 0} days validity
-                    </p>
-
-                    {/* Divider */}
-                    <div
-                      className={`h-px mb-5 ${
-                        theme === "light" ? "bg-gray-100" : "bg-slate-800"
-                      }`}
-                    />
-
-                    {/* Features */}
-                    <ul className="flex flex-col gap-3 mb-7 flex-1">
-                      {planFeatures.map((feature, featureIndex) => (
-                        <motion.li
-                          key={`${plan._id || plan.name}-${featureIndex}`}
-                          initial={{ opacity: 0, x: -12 }}
-                          animate={isVisible ? { opacity: 1, x: 0 } : {}}
-                          transition={{
-                            duration: 0.35,
-                            delay: 0.6 + featureIndex * 0.06,
-                          }}
-                          className="flex items-center gap-3"
-                        >
-                          <span
-                            className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${accent.checkBg}`}
-                          >
-                            <Check className={`w-3 h-3 ${accent.checkText}`} />
-                          </span>
-                          <span
-                            className={`text-sm ${currentTheme.text} ${
-                              feature.available ? "" : "line-through opacity-60"
-                            }`}
-                          >
-                            {feature.label}
-                          </span>
-                        </motion.li>
-                      ))}
-                    </ul>
-
-                    {/* CTA Button */}
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.97 }}
-                      onClick={handleHeroButtonClick}
-                      disabled={!heroButton?.link}
-                      className={`w-full py-3.5 rounded-xl text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2 ${
-                        isPopular
-                          ? "bg-[#1A73E8] hover:bg-[#1558B0] text-white shadow-lg shadow-blue-200 dark:shadow-blue-900/30"
-                          : theme === "light"
-                            ? "bg-gray-100 hover:bg-gray-200 text-gray-800 border border-gray-200"
-                            : "bg-slate-800 hover:bg-slate-700 text-white border border-slate-700"
-                      } ${!heroButton?.link ? "opacity-60 cursor-not-allowed" : ""}`}
-                    >
-                      <HeroButtonIcon />
-                      {heroButton?.name || (isFree ? "Buy Now" : "Buy Now")}
-                    </motion.button>
-                  </motion.div>
+                    plan={plan}
+                    index={index}
+                    theme={theme}
+                    isPopular={isPopular}
+                    isFree={isFree}
+                    planFeatures={planFeatures}
+                    formatCurrency={formatCurrency}
+                    getDurationLabel={getDurationLabel}
+                    heroButton={heroButton}
+                    handleHeroButtonClick={handleHeroButtonClick}
+                  />
                 );
               })}
 
           {!loadingPlans && !displayPlans.length && !plansError && (
             <div
-              className={`md:col-span-3 text-center py-16 ${currentTheme.textSecondary}`}
+              className={`md:col-span-2 lg:col-span-3 text-center py-16 ${
+                theme === "light" ? "text-slate-500" : "text-slate-400"
+              }`}
             >
               No active plans available right now.
             </div>
           )}
-        </motion.div>
+        </div>
       </div>
     </section>
-  );
-}
-
-function HeroButtonIcon() {
-  return (
-    <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden="true">
-      <defs>
-        <linearGradient
-          id="pricingHeroButtonGradient"
-          x1="0%"
-          y1="0%"
-          x2="100%"
-          y2="100%"
-        >
-          <stop offset="0%" stopColor="#00C853" />
-          <stop offset="45%" stopColor="#1A73E8" />
-          <stop offset="100%" stopColor="#FBBC05" />
-        </linearGradient>
-      </defs>
-      <path
-        d="M4.5 3.9c0-.8.9-1.3 1.6-.9l13.1 7.5c.7.4.7 1.4 0 1.8l-13.1 7.5c-.7.4-1.6-.1-1.6-.9V3.9z"
-        fill="url(#pricingHeroButtonGradient)"
-      />
-      <path
-        d="M4.5 3.9l8.3 8.1-8.3 8.1"
-        fill="none"
-        stroke="rgba(255,255,255,0.9)"
-        strokeWidth="1.3"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-// Building icon component
-function Building(props) {
-  return (
-    <svg
-      {...props}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect x="4" y="2" width="16" height="20" rx="2" ry="2" />
-      <path d="M9 22v-4h6v4" />
-      <path d="M8 6h.01" />
-      <path d="M16 6h.01" />
-      <path d="M12 6h.01" />
-      <path d="M12 10h.01" />
-      <path d="M12 14h.01" />
-      <path d="M16 10h.01" />
-      <path d="M16 14h.01" />
-      <path d="M8 10h.01" />
-      <path d="M8 14h.01" />
-    </svg>
   );
 }

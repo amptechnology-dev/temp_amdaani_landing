@@ -536,9 +536,9 @@ export default function PurchaseFlow() {
 
       await resetFormState();
       setStep("list");
-    } catch {
+    } catch(error) {
       toast.error(
-        isEditMode ? "Purchase update failed" : "Purchase creation failed",
+        isEditMode ? error?.message : error?.message,
       );
     } finally {
       setIsSubmitting(false);

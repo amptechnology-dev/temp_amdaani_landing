@@ -68,6 +68,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
+import { useRouter } from "next/navigation";
 
 // Helper function for debouncing
 function useDebounce(value, delay) {
@@ -171,6 +172,7 @@ export default function CustomersPage() {
   const { theme } = useTheme();
   const currentTheme = themeConfig[theme];
   const { authState } = useAuth();
+  const router = useRouter();
 
   // State management
   const [activeTab, setActiveTab] = useState("all");
@@ -602,14 +604,14 @@ export default function CustomersPage() {
           </Card>
         )}
 
-        {/* ---------------- CUSTOMER LIST ---------------- */}
-        <div className="space-y-3">
+        {/* ---------------- CUSTOMER LIST  */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {isLoading ? (
-            [...Array(5)].map((_, i) => (
-              <Skeleton key={i} className="h-24 w-full rounded-2xl" />
+            [...Array(6)].map((_, i) => (
+              <Skeleton key={i} className="h-32 w-full rounded-2xl" />
             ))
           ) : filteredCustomers.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-2xl border border-slate-200">
+            <div className="col-span-full flex flex-col items-center justify-center py-20 text-center bg-white rounded-2xl border border-slate-200">
               {activeTab === "due" ? (
                 <>
                   <CheckCircle className="w-16 h-16 text-blue-400 mb-4" />
@@ -660,7 +662,14 @@ export default function CustomersPage() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -12 }}
                     transition={{ duration: 0.2, delay: index * 0.02 }}
-                    className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+                    onClick={() => {
+                      if (activeTab === "due") {
+                        router.push(`/dashboard/customers/due/${customer._id}`);
+                      } else {
+                        handleEditCustomer(customer);
+                      }
+                    }}
+                    className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 cursor-pointer hover:shadow-md hover:border-blue-200 transition-all relative group"
                     style={
                       showDueBadge
                         ? {
@@ -670,44 +679,48 @@ export default function CustomersPage() {
                         : undefined
                     }
                   >
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => handleEditCustomer(customer)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          handleEditCustomer(customer);
-                        }
-                      }}
-                      className="w-full text-left p-4 hover:bg-slate-50/60 transition-colors cursor-pointer"
-                    >
-                      {/* Top row — name + rank + actions */}
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
+                    {/* Top row — name + rank + actions menu */}
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
                           <p className="font-bold text-slate-800 capitalize truncate">
                             {customer.name || "No Name"}
                           </p>
                           {rank > 0 && (
-                            <span className="flex items-center gap-1 bg-amber-50 text-amber-700 text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0">
+                            <span className="flex items-center gap-1 bg-amber-50 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
                               <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
                               #{rank}
                             </span>
                           )}
                         </div>
+                        <div className="flex items-center gap-1 text-xs text-slate-500 mt-0.5">
+                          <Phone className="w-3 h-3" />
+                          {customer.mobile || "-"}
+                        </div>
+                      </div>
 
-                        <div
-                          onClick={(e) => e.stopPropagation()}
-                          className="shrink-0"
-                        >
+                      <div className="flex items-start gap-1 shrink-0">
+                        {customer.mobile && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCall(customer.mobile);
+                            }}
+                            className="w-6 h-6 rounded-full bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center shrink-0"
+                            title="Call customer"
+                          >
+                            <PhoneCall className="w-3 h-3 text-white" />
+                          </button>
+                        )}
+                        <div onClick={(e) => e.stopPropagation()}>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-7 w-7 p-0"
+                                className="h-6 w-6 p-0"
                               >
-                                <MoreVertical className="w-4 h-4" />
+                                <MoreVertical className="w-3.5 h-3.5" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
@@ -729,87 +742,56 @@ export default function CustomersPage() {
                           </DropdownMenu>
                         </div>
                       </div>
+                    </div>
 
-                      {/* Contact row */}
-                      <div className="flex items-center justify-between mt-1.5">
-                        <div className="flex items-center gap-1.5 text-slate-600 text-sm">
-                          <Phone className="w-3.5 h-3.5 text-blue-500" />
-                          {customer.mobile || "No mobile"}
-                        </div>
-                        {customer.mobile && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCall(customer.mobile);
-                            }}
-                            className="w-7 h-7 rounded-full bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center shrink-0"
-                            title="Call customer"
-                          >
-                            <PhoneCall className="w-3.5 h-3.5 text-white" />
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Due section — Due tab only */}
-                      {showDueBadge && (
-                        <div
-                          className="flex items-center justify-between mt-3 p-2.5 rounded-xl border border-dashed"
-                          style={{
-                            borderColor: severity.border,
-                            backgroundColor: severity.bg,
-                          }}
+                    {/* Due / Invoice count row */}
+                    {showDueBadge ? (
+                      <div
+                        className="flex items-center justify-between mt-3 px-2.5 py-1.5 rounded-lg border border-dashed"
+                        style={{
+                          borderColor: severity.border,
+                          backgroundColor: severity.bg,
+                        }}
+                      >
+                        <span className="text-[10px] font-bold tracking-wide text-slate-500">
+                          OUTSTANDING
+                        </span>
+                        <span
+                          className="text-sm font-extrabold"
+                          style={{ color: severity.color }}
                         >
-                          <div>
-                            <p className="text-[10px] font-bold tracking-wide text-slate-500">
-                              OUTSTANDING
-                            </p>
-                            <p
-                              className="text-xl font-extrabold"
-                              style={{ color: severity.color }}
-                            >
-                              ₹{dueAmount.toLocaleString("en-IN")}
-                            </p>
-                          </div>
-                          <div
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg"
-                            style={{ backgroundColor: `${severity.color}15` }}
-                          >
-                            <FileText
-                              className="w-3.5 h-3.5"
-                              style={{ color: severity.color }}
-                            />
-                            <span
-                              className="text-xs font-bold"
-                              style={{ color: severity.color }}
-                            >
-                              {customer.pendingInvoiceCount || 0} Pending
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Bottom stats row */}
-                      <div className="flex items-center flex-wrap gap-3 mt-2.5">
-                        <div className="flex items-center gap-1 text-xs text-slate-500">
-                          <Hash className="w-3.5 h-3.5" />
-                          {customer.totalInvoices || 0} Invoice
-                          {customer.totalInvoices !== 1 ? "s" : ""}
-                        </div>
-
-                        {!showDueBadge && dueAmount > 0 && (
-                          <div className="flex items-center gap-1 text-xs text-orange-600 font-medium">
-                            <AlertCircle className="w-3.5 h-3.5" />₹
-                            {dueAmount.toLocaleString("en-IN")} due
-                          </div>
-                        )}
-
-                        {customer.address && (
-                          <div className="flex items-center gap-1 text-xs text-slate-500 min-w-0 flex-1">
-                            <MapPin className="w-3.5 h-3.5 shrink-0" />
-                            <span className="truncate">{customer.address}</span>
-                          </div>
-                        )}
+                          ₹{dueAmount.toLocaleString("en-IN")}
+                        </span>
                       </div>
+                    ) : (
+                      <div className="flex items-center gap-1 text-[11px] text-slate-400 mt-2">
+                        <Hash className="w-3 h-3" />
+                        {customer.totalInvoices || 0} Invoice
+                        {customer.totalInvoices !== 1 ? "s" : ""}
+                      </div>
+                    )}
+
+                    {/* Bottom row — address + pending badge */}
+                    <div className="flex justify-between items-center mt-3">
+                      <div className="flex items-center gap-1 text-xs text-slate-400 min-w-0">
+                        <MapPin className="w-3 h-3 shrink-0" />
+                        <span className="truncate">
+                          {customer.address || "-"}
+                        </span>
+                      </div>
+                      {showDueBadge ? (
+                        <span className="text-[10px] font-semibold text-slate-500 flex items-center gap-1 shrink-0">
+                          <FileText className="w-3 h-3" />
+                          {customer.pendingInvoiceCount || 0} Pending
+                        </span>
+                      ) : (
+                        !isDueTab &&
+                        dueAmount > 0 && (
+                          <p className="text-orange-600 font-bold text-xs shrink-0">
+                            ₹{dueAmount.toLocaleString("en-IN")} due
+                          </p>
+                        )
+                      )}
                     </div>
                   </motion.div>
                 );

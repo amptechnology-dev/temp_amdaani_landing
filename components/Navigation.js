@@ -16,7 +16,7 @@ function TranslateWidget() {
   return (
     <div
       suppressHydrationWarning
-      className="flex items-center gap-1.5 px-2.5 h-9 rounded-full border border-gray-200/60 dark:border-slate-700/60 bg-white/60 dark:bg-slate-900/40 backdrop-blur-md shadow-sm overflow-visible min-w-[140px]"
+      className="flex items-center gap-1.5 px-2.5 h-9 rounded-full border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-visible min-w-[140px]"
     >
       <span className="text-[12px] leading-none flex-shrink-0">🌐</span>
       <div className="translate-mini flex-1 min-w-0">
@@ -82,10 +82,9 @@ function IconContact() {
   );
 }
 
-// ✅ Compact badge — mobile এ ছোট, desktop এ বড়
+// Play Store badge — same as before, untouched
 function PlayStoreBadge({ compact = false }) {
   if (compact) {
-    // Mobile header — just icon + small text
     return (
       <div style={{
         display: "inline-flex",
@@ -120,7 +119,6 @@ function PlayStoreBadge({ compact = false }) {
     );
   }
 
-  // Desktop — full size
   return (
     <div style={{
       display: "inline-flex",
@@ -287,71 +285,71 @@ export default function Navigation({
     window.open(href, "_blank", "noopener,noreferrer");
   };
 
+  // ---- Demo-style clean nav background ----
   const navBg =
     theme === "light"
-      ? isScrolled ? "bg-white/95 shadow-md" : "bg-white/95"
+      ? isScrolled
+        ? "bg-white shadow-[0_2px_12px_rgba(15,23,42,0.06)] border-b border-gray-200"
+        : "bg-white border-b border-gray-100"
       : isScrolled
-        ? "bg-slate-950/90 shadow-[0_4px_24px_rgba(2,6,23,0.5)]"
-        : "bg-slate-950/85";
+        ? "bg-slate-950 shadow-[0_2px_12px_rgba(2,6,23,0.5)] border-b border-slate-800"
+        : "bg-slate-950 border-b border-slate-900";
 
+  // ---- Demo-style plain text links w/ blue accent ----
   const getItemClass = (active) =>
     [
-      "relative px-3.5 py-2 rounded-lg font-semibold text-[14px] transition-all duration-200",
+      "relative px-3.5 py-2 rounded-md font-semibold text-[14px] transition-colors duration-200",
       "flex items-center gap-2",
       active
-        ? theme === "light" ? "text-blue-600 bg-blue-50" : "text-blue-400 bg-blue-950/40"
+        ? "text-[#2563eb]"
         : theme === "light"
-          ? "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-          : "text-slate-400 hover:text-white hover:bg-slate-800",
+          ? "text-slate-600 hover:text-[#2563eb]"
+          : "text-slate-300 hover:text-[#3b82f6]",
     ].join(" ");
 
   const getIconClass = (active) =>
     active
-      ? theme === "light" ? "text-blue-500" : "text-blue-400"
+      ? "text-[#2563eb]"
       : theme === "light" ? "text-slate-400" : "text-slate-500";
 
   return (
     <div className="sticky top-0 z-50">
       <nav
-        className={`w-full backdrop-blur-xl transition-all duration-300 ${navBg} ${
-          isScrolled ? "py-2" : "py-3"
+        className={`w-full transition-all duration-300 ${navBg} ${
+          isScrolled ? "py-2.5" : "py-3.5"
         }`}
       >
-        {/* ✅ max-w + overflow hidden শুধু nav এ, sticky wrapper এ না */}
-        <div className="w-full px-3 sm:px-6 lg:px-8 overflow-hidden">
+        <div className="w-full px-4 sm:px-6 lg:px-10 overflow-hidden">
           <div className="flex items-center justify-between gap-2">
 
-            {/* Logo */}
+            {/* Logo — demo-style bold blue wordmark */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              className="flex items-center gap-1 flex-shrink-0 cursor-pointer min-w-0"
+              className="flex items-center gap-2 flex-shrink-0 cursor-pointer min-w-0"
               onClick={() => handleNavigationClick(heroRef, "Home")}
             >
-              <div className="w-18 h-18 rounded-xl overflow-hidden flex-shrink-0">
+              <div className="w-11 h-11 rounded-xl overflow-hidden flex-shrink-0 ring-1 ring-[#2563eb]/10 bg-white">
                 <img
                   src="/images/Tapplogo.png"
                   alt="Amdaani Logo"
-                  className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal"
+                  className="w-full h-full object-contain"
                 />
               </div>
-              <div className="flex flex-col ml-[-4px] min-w-0">
-                <span
-                  style={{ fontFamily: "'Hit and Run', sans-serif", color: "#255e97" }}
-                  className="text-base font-extrabold tracking-tight leading-none whitespace-nowrap"
-                >
-                  AMDAANI
+              <div className="flex flex-col min-w-0">
+                <span className="text-[22px] font-extrabold tracking-tight leading-none text-[#2563eb] whitespace-nowrap">
+                  Amdaani
                 </span>
-                <span className={`text-[10px] mt-[2px] tracking-[0.12em] font-bold ${currentTheme.textTertiary} hidden sm:block whitespace-nowrap`}>
+                <span className={`text-[10px] mt-[3px] tracking-[0.1em] font-semibold uppercase ${currentTheme.textTertiary} hidden sm:block whitespace-nowrap`}>
                   Smart Business Solutions
                 </span>
               </div>
             </motion.div>
 
-            {/* Desktop Nav — center */}
+            {/* Desktop Nav — center, plain links like demo */}
             {!noLanding && (
               <div
-                className="hidden lg:flex items-center gap-0.5 flex-shrink-0"
+                className="hidden lg:flex items-center gap-1 flex-shrink-0"
                 ref={dropdownRef}
               >
                 {navigationItems.map((item) => {
@@ -368,7 +366,7 @@ export default function Navigation({
                       </span>
                       <span>{item.name}</span>
                       {active && (
-                        <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-3 h-0.5 rounded-full bg-blue-500" />
+                        <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-[2px] rounded-full bg-[#2563eb]" />
                       )}
                     </button>
                   );
@@ -390,9 +388,9 @@ export default function Navigation({
               )}
               <button
                 onClick={toggleTheme}
-                className={`p-2.5 rounded-xl transition-all duration-200 border flex-shrink-0 ${
+                className={`p-2.5 rounded-lg transition-all duration-200 border flex-shrink-0 ${
                   theme === "light"
-                    ? "bg-white border-gray-200 hover:bg-slate-100 text-slate-700"
+                    ? "bg-white border-gray-200 hover:bg-slate-50 text-slate-700"
                     : "bg-slate-900 border-slate-700 hover:bg-slate-800 text-slate-300"
                 }`}
                 aria-label="Toggle theme"
@@ -401,7 +399,7 @@ export default function Navigation({
               </button>
             </div>
 
-            {/* ✅ Mobile Right — compact layout */}
+            {/* Mobile Right */}
             <div className="flex lg:hidden items-center gap-1.5 flex-shrink-0">
               {!heroButtonLoading && heroButton?.isActive && (
                 <button
@@ -409,7 +407,6 @@ export default function Navigation({
                   className="p-0 bg-transparent border-0 inline-flex flex-shrink-0"
                   aria-label="Get it on Google Play"
                 >
-                  {/* ✅ Mobile এ compact badge */}
                   <PlayStoreBadge compact={true} />
                 </button>
               )}
@@ -417,9 +414,9 @@ export default function Navigation({
               {!noLanding && (
                 <button
                   onClick={toggleTheme}
-                  className={`w-9 h-9 flex items-center justify-center rounded-xl border flex-shrink-0 transition-all duration-200 ${
+                  className={`w-9 h-9 flex items-center justify-center rounded-lg border flex-shrink-0 transition-all duration-200 ${
                     theme === "light"
-                      ? "bg-white border-gray-200 hover:bg-slate-100 text-slate-700"
+                      ? "bg-white border-gray-200 hover:bg-slate-50 text-slate-700"
                       : "bg-slate-900 border-slate-700 hover:bg-slate-800 text-slate-300"
                   }`}
                   aria-label="Toggle theme"
@@ -431,9 +428,9 @@ export default function Navigation({
               {!noLanding && (
                 <button
                   onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                  className={`w-9 h-9 flex items-center justify-center rounded-xl border flex-shrink-0 transition-all duration-200 ${
+                  className={`w-9 h-9 flex items-center justify-center rounded-lg border flex-shrink-0 transition-all duration-200 ${
                     theme === "light"
-                      ? "bg-white border-gray-200 hover:bg-slate-100 text-slate-700"
+                      ? "bg-[#2563eb] border-[#2563eb] text-white hover:bg-[#1d4ed8]"
                       : "bg-slate-900 border-slate-700 hover:bg-slate-800 text-slate-300"
                   }`}
                   aria-label="Toggle menu"
@@ -444,7 +441,7 @@ export default function Navigation({
             </div>
           </div>
 
-          {/* ✅ Mobile Dropdown Menu */}
+          {/* Mobile Dropdown Menu */}
           {!noLanding && (
             <AnimatePresence>
               {isMobileMenuOpen && (
@@ -453,7 +450,7 @@ export default function Navigation({
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
                   transition={{ duration: 0.25 }}
-                  className={`lg:hidden border mt-2 rounded-2xl overflow-hidden backdrop-blur-xl ${
+                  className={`lg:hidden border mt-2 rounded-xl overflow-hidden ${
                     theme === "light"
                       ? "bg-white border-gray-200"
                       : "bg-slate-900 border-slate-800"
@@ -467,13 +464,11 @@ export default function Navigation({
                         <button
                           key={item.name}
                           onClick={() => handleNavigationClick(item.ref, item.name)}
-                          className={`w-full text-left px-4 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center gap-3 ${
+                          className={`w-full text-left px-4 py-3 rounded-lg font-semibold transition-all duration-200 flex items-center gap-3 ${
                             active
-                              ? theme === "light"
-                                ? "bg-blue-50 text-blue-600"
-                                : "bg-blue-950/40 text-blue-400"
+                              ? "bg-blue-50 text-[#2563eb] dark:bg-blue-950/40 dark:text-blue-400"
                               : theme === "light"
-                                ? "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                                ? "text-slate-700 hover:bg-slate-50 hover:text-[#2563eb]"
                                 : "text-slate-300 hover:bg-slate-800 hover:text-white"
                           }`}
                         >

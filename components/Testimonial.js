@@ -4,13 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTheme } from "../context/ThemeContext";
 import { themeConfig } from "../utils/ThemeConfig";
 import { motion } from "framer-motion";
-import {
-  Quote,
-  PlayCircle,
-  RefreshCw,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
+import { PlayCircle, RefreshCw } from "lucide-react";
 
 const TESTIMONIALS_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/testimonial/public-testimonials`;
 
@@ -18,8 +12,6 @@ const DEFAULT_STATIC_MESSAGE = "Amdaani app is good — nice billing.";
 const DEFAULT_NAME = "Amdaani User";
 const DEFAULT_DESIGNATION = "Business Owner";
 
-// Fallback testimonial: intentionally does not include a YouTube link so
-// the UI shows the static avatar and default message when real data is absent.
 const FALLBACK_TESTIMONIALS = [
   {
     _id: "fallback-1",
@@ -33,15 +25,9 @@ const FALLBACK_TESTIMONIALS = [
 const normalizeVideoUrl = (rawUrl) => {
   const value = String(rawUrl || "").trim();
   if (!value) return "";
-
   if (/^https?:\/\//i.test(value)) return value;
-
-  if (/^https?:/i.test(value)) {
-    return value.replace(/^https?:/i, "https://");
-  }
-
+  if (/^https?:/i.test(value)) return value.replace(/^https?:/i, "https://");
   if (value.startsWith("//")) return `https:${value}`;
-
   return `https://${value}`;
 };
 
@@ -60,37 +46,29 @@ const isValidYouTubeHost = (host) => {
 const getYouTubeVideoId = (rawUrl) => {
   const normalized = normalizeVideoUrl(rawUrl);
   if (!normalized) return "";
-
   try {
     const parsed = new URL(normalized);
     if (!isValidYouTubeHost(parsed.hostname)) return "";
-
     if (parsed.hostname.includes("youtu.be")) {
       const id = parsed.pathname.split("/").filter(Boolean)[0];
       return id || "";
     }
-
     const queryId = parsed.searchParams.get("v");
     if (queryId) return queryId;
-
     const parts = parsed.pathname.split("/").filter(Boolean);
     if (parts[0] === "shorts" && parts[1]) return parts[1];
     if (parts[0] === "embed" && parts[1]) return parts[1];
   } catch {
     return "";
   }
-
   return "";
 };
 
-const extractVideoId = (rawUrl) => {
-  return getYouTubeVideoId(rawUrl);
-};
+const extractVideoId = (rawUrl) => getYouTubeVideoId(rawUrl);
 
 const getEmbedUrl = (rawUrl) => {
   const videoId = extractVideoId(rawUrl);
   if (!videoId) return "";
-
   const params = new URLSearchParams({
     autoplay: "1",
     mute: "1",
@@ -101,25 +79,140 @@ const getEmbedUrl = (rawUrl) => {
     rel: "0",
     modestbranding: "1",
   });
-
   return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
 };
 
-const getSlidesPerView = (width) => {
-  if (width >= 1024) return 3;
-  if (width >= 768) return 2;
-  return 1;
-};
+const rand = (min, max) =>
+  Math.round((min + Math.random() * (max - min)) * 100) / 100;
+
+const generateStars = (count) =>
+  Array.from({ length: count }, (_, i) => ({
+    id: i,
+    top: rand(0, 100),
+    left: rand(0, 100),
+    size: rand(1, 3),
+    duration: rand(6, 16),
+    delay: rand(0, 6),
+    dx: rand(-60, 60),
+    dy: rand(-60, 60),
+  }));
+
+const generateLightDots = (count) =>
+  Array.from({ length: count }, (_, i) => ({
+    id: i,
+    top: rand(0, 100),
+    left: rand(0, 100),
+    size: rand(4, 9),
+    duration: rand(10, 20),
+    delay: rand(0, 6),
+    dx: rand(-90, 90),
+    dy: rand(-60, 60),
+  }));
+
+function AnimatedBackground({ theme }) {
+  const [mounted, setMounted] = useState(false);
+  const [stars, setStars] = useState([]);
+  const [lightDots, setLightDots] = useState([]);
+
+  useEffect(() => {
+    setStars(generateStars(50));
+    setLightDots(generateLightDots(20));
+    setMounted(true);
+  }, []);
+
+  if (theme === "light") {
+    return (
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute inset-0 opacity-35 animate-[testiMeshShift_16s_ease-in-out_infinite] bg-[radial-gradient(60%_60%_at_20%_20%,rgba(37,99,235,0.06)_0%,transparent_60%),radial-gradient(55%_55%_at_85%_15%,rgba(6,182,212,0.06)_0%,transparent_60%),radial-gradient(60%_60%_at_50%_100%,rgba(99,102,241,0.05)_0%,transparent_60%)] bg-[length:200%_200%]" />
+        <div className="absolute -top-16 -left-10 h-80 w-80 rounded-full bg-blue-400/8 blur-3xl animate-[testiFloatA_14s_ease-in-out_infinite]" />
+        <div className="absolute top-0 right-[-40px] h-96 w-96 rounded-full bg-cyan-400/8 blur-3xl animate-[testiFloatB_18s_ease-in-out_infinite]" />
+        <div className="absolute bottom-[-60px] left-1/3 h-72 w-72 rounded-full bg-indigo-300/8 blur-3xl animate-[testiFloatA_16s_ease-in-out_infinite_reverse]" />
+        <div className="absolute inset-0 opacity-20 animate-[testiSweep_9s_ease-in-out_infinite] bg-[linear-gradient(115deg,transparent_30%,rgba(37,99,235,0.05)_50%,transparent_70%)]" />
+
+        {mounted &&
+          lightDots.map((dot) => (
+            <span
+              key={dot.id}
+              className="absolute rounded-full bg-[#2563eb]/15 blur-[1.5px] animate-[testiDrift_var(--dur)_ease-in-out_infinite]"
+              style={{
+                top: `${dot.top}%`,
+                left: `${dot.left}%`,
+                width: `${dot.size}px`,
+                height: `${dot.size}px`,
+                "--dur": `${dot.duration}s`,
+                "--dx": `${dot.dx}px`,
+                "--dy": `${dot.dy}px`,
+                animationDelay: `${dot.delay}s`,
+              }}
+            />
+          ))}
+
+        <style jsx>{`
+          @keyframes testiMeshShift {
+            0%, 100% { background-position: 0% 0%, 100% 0%, 50% 100%; }
+            50% { background-position: 20% 20%, 80% 10%, 40% 90%; }
+          }
+          @keyframes testiFloatA {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(35px, -30px) scale(1.1); }
+          }
+          @keyframes testiFloatB {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(-30px, 25px) scale(1.08); }
+          }
+          @keyframes testiSweep {
+            0%, 100% { transform: translateX(-10%); }
+            50% { transform: translateX(10%); }
+          }
+          @keyframes testiDrift {
+            0% { transform: translate(0, 0); opacity: 0.12; }
+            50% { transform: translate(var(--dx), var(--dy)); opacity: 0.5; }
+            100% { transform: translate(0, 0); opacity: 0.12; }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      <div className="absolute -top-16 -left-10 h-80 w-80 rounded-full bg-blue-500/10 blur-3xl" />
+      <div className="absolute top-10 right-0 h-96 w-96 rounded-full bg-cyan-400/10 blur-3xl" />
+      {mounted &&
+        stars.map((star) => (
+          <span
+            key={star.id}
+            className="absolute rounded-full bg-white animate-[testiStarDrift_var(--dur)_ease-in-out_infinite]"
+            style={{
+              top: `${star.top}%`,
+              left: `${star.left}%`,
+              width: `${star.size}px`,
+              height: `${star.size}px`,
+              "--dur": `${star.duration}s`,
+              "--dx": `${star.dx}px`,
+              "--dy": `${star.dy}px`,
+              animationDelay: `${star.delay}s`,
+              boxShadow: "0 0 4px rgba(255,255,255,0.7)",
+            }}
+          />
+        ))}
+      <style jsx>{`
+        @keyframes testiStarDrift {
+          0% { transform: translate(0, 0) scale(0.8); opacity: 0.2; }
+          50% { transform: translate(var(--dx), var(--dy)) scale(1.4); opacity: 1; }
+          100% { transform: translate(0, 0) scale(0.8); opacity: 0.2; }
+        }
+      `}</style>
+    </div>
+  );
+}
 
 export default function TestimonialSection() {
   const { theme } = useTheme();
-  const currentTheme = themeConfig[theme];
 
   const [testimonials, setTestimonials] = useState(FALLBACK_TESTIMONIALS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [slidesPerView, setSlidesPerView] = useState(3);
 
   const fetchTestimonials = async () => {
     setLoading(true);
@@ -149,17 +242,6 @@ export default function TestimonialSection() {
 
   useEffect(() => {
     fetchTestimonials();
-  }, []);
-
-  useEffect(() => {
-    const updateSlidesPerView = () => {
-      setSlidesPerView(getSlidesPerView(window.innerWidth));
-    };
-
-    updateSlidesPerView();
-    window.addEventListener("resize", updateSlidesPerView);
-
-    return () => window.removeEventListener("resize", updateSlidesPerView);
   }, []);
 
   const cards = useMemo(
@@ -194,89 +276,148 @@ export default function TestimonialSection() {
       cards.map((item) => ({
         ...item,
         hasVideo: Boolean(item?.videoId && item?.embedUrl),
-        hasImage: Boolean(item?.imageUrl),
+        // hasImage is intentionally NOT used to render a big duplicate box —
+        // the image is shown only once, in the small avatar at the bottom.
       })),
     [cards],
   );
 
-  const totalSlides = cards.length;
+  const totalSlides = visibleCards.length;
   const isSingleTestimonial = totalSlides === 1;
-  // Single testimonial e carousel-er dorkar nei, tai effective slidesPerView
-  // 1 dhore nichi jate maxIndex shomoy 0-e thake ebong flex-basis full width hoy
-  const effectiveSlidesPerView = isSingleTestimonial ? 1 : slidesPerView;
-  const maxIndex = Math.max(0, totalSlides - effectiveSlidesPerView);
 
-  useEffect(() => {
-    setCurrentIndex((prev) => Math.min(prev, maxIndex));
-  }, [maxIndex]);
+  // Marquee speed: roughly 5s per card so more testimonials = longer, smoother loop
+  const marqueeDuration = Math.max(totalSlides * 6, 18);
 
-  useEffect(() => {
-    if (loading || isSingleTestimonial || totalSlides <= slidesPerView) return;
+  const renderCard = (item, index, keySuffix = "") => (
+    <motion.div
+      key={`${item?._id || item?.name}-${index}${keySuffix}`}
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.15 }}
+      transition={{ duration: 0.45, delay: (index % 6) * 0.04 }}
+      className={`w-[300px] sm:w-[340px] flex-shrink-0 rounded-xl border p-6 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${
+        theme === "light"
+          ? "bg-white/90 border-slate-200"
+          : "bg-slate-900/90 border-slate-800"
+      }`}
+    >
+      {/* Video preview only — image testimonials do NOT get a big duplicate box */}
+      {item.hasVideo && (
+        <div className="relative h-40 w-full mb-4 rounded-lg overflow-hidden bg-black">
+          <iframe
+            src={item.embedUrl}
+            title={`${item?.name || "Customer"} testimonial video`}
+            className="h-full w-full pointer-events-none"
+            allow="autoplay; encrypted-media; picture-in-picture"
+            allowFullScreen
+          />
+          <a
+            href={item.videoUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="absolute inset-0 group"
+            aria-label={`Open ${item?.name || "customer"} video on YouTube`}
+          >
+            <div className="absolute inset-0 flex items-center justify-center bg-black/10 transition-colors group-hover:bg-black/20">
+              <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/90 text-red-600 shadow-lg">
+                <PlayCircle className="h-6 w-6" />
+              </span>
+            </div>
+          </a>
+        </div>
+      )}
 
-    const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev >= maxIndex ? 0 : prev + 1));
-    }, 4000);
+      <div className="text-amber-500 text-sm mb-2">★★★★★</div>
 
-    return () => clearInterval(interval);
-  }, [loading, isSingleTestimonial, totalSlides, slidesPerView, maxIndex]);
+      <p
+        className={`text-[0.95rem] leading-relaxed mb-2 line-clamp-4 ${
+          theme === "light" ? "text-slate-600" : "text-slate-300"
+        }`}
+      >
+        "{item?.message || DEFAULT_STATIC_MESSAGE}"
+      </p>
 
-  const handlePrev = () => {
-    setCurrentIndex((prev) => (prev <= 0 ? maxIndex : prev - 1));
-  };
+      {item.hasVideo && (
+        <a
+          href={item.videoUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#2563eb] hover:underline mb-2"
+        >
+          <PlayCircle className="h-4 w-4" />
+          Watch Video
+        </a>
+      )}
 
-  const handleNext = () => {
-    setCurrentIndex((prev) => (prev >= maxIndex ? 0 : prev + 1));
-  };
+      <div
+        className={`flex items-center gap-3 mt-4 pt-4 border-t ${
+          theme === "light" ? "border-slate-100" : "border-slate-800"
+        }`}
+      >
+        <img
+          src={item.imageUrl || "/images/testimonial-avatar.svg"}
+          alt={`${item?.name || "Customer"} avatar`}
+          className="w-11 h-11 rounded-full object-cover bg-slate-200 flex-shrink-0"
+        />
+        <div>
+          <strong
+            className={`block text-sm ${
+              theme === "light" ? "text-slate-900" : "text-white"
+            }`}
+          >
+            {item?.name || "Customer"}
+          </strong>
+          <div
+            className={`text-[0.85rem] ${
+              theme === "light" ? "text-slate-500" : "text-slate-400"
+            }`}
+          >
+            {item?.designation || "Business Owner"}
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
 
   return (
     <section
       id="testimonials"
-      className={`relative overflow-hidden py-24 px-5 sm:px-8 lg:px-12 xl:px-16 ${currentTheme.background}`}
+      className={`relative overflow-hidden py-20 px-5 sm:px-8 lg:px-12 ${
+        theme === "light" ? "bg-slate-50" : "bg-slate-950"
+      }`}
     >
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-24 top-10 h-80 w-80 rounded-full bg-cyan-400/10 blur-3xl" />
-        <div className="absolute right-0 top-24 h-96 w-96 rounded-full bg-blue-500/10 blur-3xl" />
-        <div className="absolute bottom-0 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-indigo-500/10 blur-3xl" />
-      </div>
+      <AnimatedBackground theme={theme} />
 
-      <div className="relative mx-auto w-full max-w-7xl">
+      <div className="relative z-10 mx-auto w-full max-w-7xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.2 }}
           transition={{ duration: 0.5 }}
-          className="mx-auto mb-14 max-w-4xl text-center"
+          className="text-center mb-12"
         >
-          <div
-            className={`mb-6 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold ${currentTheme.accentLight} ${currentTheme.accent.replace("bg-", "text-")}`}
-          >
-            <Quote className="h-4 w-4" />
-            Customer Stories
-          </div>
-
           <h2
-            className={`text-4xl font-black tracking-tight sm:text-5xl md:text-6xl mb-5 ${currentTheme.text}`}
+            className={`text-[2.2rem] font-extrabold mb-3 ${
+              theme === "light" ? "text-slate-900" : "text-white"
+            }`}
           >
-            Trusted by businesses
-            <span className="block bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              that want speed and clarity.
-            </span>
+            Trusted by Real Shop Owners Across India
           </h2>
           <p
-            className={`mx-auto max-w-3xl text-lg leading-8 ${currentTheme.textSecondary}`}
+            className={`text-[1.05rem] max-w-2xl mx-auto ${
+              theme === "light" ? "text-slate-500" : "text-slate-400"
+            }`}
           >
-            Real feedback from teams using Amdaani to keep billing simple,
-            professional, and fast.
+            Read real stories from retailers growing their business with
+            Amdaani.
           </p>
 
           {error && (
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-              <p className={`text-sm font-medium ${currentTheme.error}`}>
-                {error}
-              </p>
+              <p className="text-sm font-medium text-red-500">{error}</p>
               <button
                 onClick={fetchTestimonials}
-                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 font-semibold shadow-sm transition-all duration-200 hover:-translate-y-0.5 ${currentTheme.buttonSecondary}`}
+                className="inline-flex items-center gap-2 rounded-lg px-4 py-2 font-semibold text-white bg-[#2563eb] hover:bg-[#1d4ed8] transition-colors"
               >
                 <RefreshCw className="h-4 w-4" />
                 Retry
@@ -290,187 +431,63 @@ export default function TestimonialSection() {
             {[1, 2, 3].map((item) => (
               <div
                 key={item}
-                className={`overflow-hidden rounded-[1.75rem] border animate-pulse ${currentTheme.surface} ${currentTheme.outline}`}
+                className={`rounded-xl border animate-pulse ${
+                  theme === "light"
+                    ? "border-slate-200 bg-slate-50"
+                    : "border-slate-800 bg-slate-900"
+                }`}
               >
-                <div className="h-52 bg-gray-300/30" />
                 <div className="space-y-3 p-6">
+                  <div className="h-4 w-24 rounded bg-gray-300/40" />
                   <div className="h-4 rounded bg-gray-300/30" />
                   <div className="h-4 w-2/3 rounded bg-gray-300/20" />
-                  <div className="h-10 rounded bg-gray-300/20" />
+                  <div className="h-12 rounded bg-gray-300/20" />
                 </div>
               </div>
             ))}
           </div>
+        ) : isSingleTestimonial ? (
+          <div className="flex justify-center">
+            {renderCard(visibleCards[0], 0)}
+          </div>
         ) : (
-          <div className="space-y-6">
+          <div
+            className="relative overflow-hidden"
+            style={{
+              maskImage:
+                "linear-gradient(to right, transparent 0%, black 6%, black 94%, transparent 100%)",
+              WebkitMaskImage:
+                "linear-gradient(to right, transparent 0%, black 6%, black 94%, transparent 100%)",
+            }}
+          >
             <div
-              className={`relative overflow-hidden rounded-[2rem] border shadow-[0_20px_70px_rgba(15,23,42,0.12)] backdrop-blur-xl ${theme === "light" ? "border-white/70 bg-white/70" : "border-white/10 bg-white/5"}`}
+              className="flex gap-6 w-max testimonial-marquee-track"
+              style={{ "--marquee-duration": `${marqueeDuration}s` }}
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 via-transparent to-indigo-500/5" />
-              <div
-                className={`relative p-4 sm:p-6 ${isSingleTestimonial ? "flex justify-center" : ""}`}
-              >
-                <motion.div
-                  className={
-                    isSingleTestimonial
-                      ? "flex w-full justify-center"
-                      : "flex gap-5"
-                  }
-                  animate={
-                    isSingleTestimonial
-                      ? undefined
-                      : { x: `-${currentIndex * (100 / slidesPerView)}%` }
-                  }
-                  transition={{ type: "spring", stiffness: 220, damping: 28 }}
-                >
-                  {visibleCards.map((item, index) => (
-                    <motion.div
-                      key={item?._id || `${item?.name}-${index}`}
-                      initial={{ opacity: 0, y: 20 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true, amount: 0.15 }}
-                      transition={{ duration: 0.45, delay: index * 0.04 }}
-                      className={`group overflow-hidden rounded-[1.75rem] border shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl ${currentTheme.surface} ${currentTheme.outline}`}
-                      style={
-                        isSingleTestimonial
-                          ? { flex: "0 0 100%", maxWidth: "32rem" }
-                          : { flex: `0 0 calc(${100 / slidesPerView}% - 1.25rem)` }
-                      }
-                    >
-                      {item.hasVideo ? (
-                        <div className="relative h-52 w-full bg-black">
-                          <iframe
-                            src={item.embedUrl}
-                            title={`${item?.name || "Customer"} testimonial video`}
-                            className="h-full w-full pointer-events-none"
-                            allow="autoplay; encrypted-media; picture-in-picture"
-                            allowFullScreen
-                          />
-                          <a
-                            href={item.videoUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="absolute inset-0 group"
-                            aria-label={`Open ${item?.name || "customer"} video on YouTube`}
-                          >
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/10 transition-colors group-hover:bg-black/20">
-                              <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-white/90 text-red-600 shadow-lg">
-                                <PlayCircle className="h-7 w-7" />
-                              </span>
-                            </div>
-                          </a>
-                        </div>
-                      ) : item.hasImage ? (
-                        <div
-                          className={`flex h-52 w-full items-center justify-center ${theme === "light" ? "bg-slate-50" : "bg-white/5"}`}
-                        >
-                          <img
-                            src={item.imageUrl}
-                            alt={`${item?.name || "Customer"} testimonial image`}
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div
-                          className={`flex h-52 w-full items-center justify-center ${theme === "light" ? "bg-slate-50" : "bg-white/5"}`}
-                        >
-                          <img
-                            src="/images/testimonial-avatar.svg"
-                            alt={`${item?.name || "Customer"} avatar`}
-                            className="h-40 w-40 rounded-full object-cover shadow-lg ring-4 ring-white/80"
-                          />
-                        </div>
-                      )}
-
-                      <div className="space-y-4 p-6">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <h3
-                              className={`text-lg font-bold tracking-tight ${currentTheme.text}`}
-                            >
-                              {item?.name || "Customer"}
-                            </h3>
-                            <p
-                              className={`text-sm ${currentTheme.textSecondary}`}
-                            >
-                              {item?.designation || "Business Owner"}
-                            </p>
-                          </div>
-                          <div
-                            className={`rounded-full p-2 ${theme === "light" ? "bg-slate-100 text-slate-500" : "bg-white/5 text-slate-300"}`}
-                          >
-                            <Quote className="h-4 w-4" />
-                          </div>
-                        </div>
-
-                        <p
-                          className={`text-sm leading-7 ${currentTheme.textSecondary}`}
-                        >
-                          {item?.message || DEFAULT_STATIC_MESSAGE}
-                        </p>
-
-                        {item.hasVideo && (
-                          <a
-                            href={item.videoUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 transition-all hover:gap-2 hover:underline"
-                          >
-                            <PlayCircle className="h-4 w-4 mr-1.5" />
-                            Watch Video
-                          </a>
-                        )}
-                      </div>
-                    </motion.div>
-                  ))}
-                </motion.div>
-              </div>
-
-              {!isSingleTestimonial && totalSlides > slidesPerView && (
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex items-center gap-2">
-                    <ButtonNav
-                      onClick={handlePrev}
-                      ariaLabel="Previous testimonials"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </ButtonNav>
-                    <ButtonNav
-                      onClick={handleNext}
-                      ariaLabel="Next testimonials"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </ButtonNav>
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    {Array.from({ length: maxIndex + 1 }).map((_, dotIndex) => (
-                      <button
-                        key={`dot-${dotIndex}`}
-                        onClick={() => setCurrentIndex(dotIndex)}
-                        className={`h-2.5 rounded-full transition-all ${dotIndex === currentIndex ? "w-6 bg-blue-600" : "w-2.5 bg-gray-300"}`}
-                        aria-label={`Go to slide ${dotIndex + 1}`}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
+              {visibleCards.map((item, index) => renderCard(item, index, "-a"))}
+              {visibleCards.map((item, index) => renderCard(item, index, "-b"))}
             </div>
+
+            <style jsx>{`
+              .testimonial-marquee-track {
+                animation: testimonialMarquee var(--marquee-duration) linear
+                  infinite;
+              }
+              .testimonial-marquee-track:hover {
+                animation-play-state: paused;
+              }
+              @keyframes testimonialMarquee {
+                from {
+                  transform: translateX(0);
+                }
+                to {
+                  transform: translateX(-50%);
+                }
+              }
+            `}</style>
           </div>
         )}
       </div>
     </section>
-  );
-}
-
-function ButtonNav({ onClick, ariaLabel, children }) {
-  return (
-    <button
-      onClick={onClick}
-      className="inline-flex h-10 w-10 items-center justify-center rounded-xl border bg-white/80 text-gray-700 shadow-sm backdrop-blur transition-all duration-200 hover:-translate-y-0.5 hover:bg-white hover:shadow-md"
-      aria-label={ariaLabel}
-    >
-      {children}
-    </button>
   );
 }

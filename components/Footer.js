@@ -355,7 +355,7 @@ export default function Footer() {
             </h3>
 
             <div className="space-y-3 mb-4">
-              {hasPhone && (
+              {/* {hasPhone && (
                 <div className="flex items-center space-x-3">
                   <Phone className={`w-4 h-4 ${currentTheme.textTertiary}`} />
                   <a
@@ -365,7 +365,7 @@ export default function Footer() {
                     {helpline.phone}
                   </a>
                 </div>
-              )}
+              )} */}
 
               {hasEmail && (
                 <div className="flex items-center space-x-3">
