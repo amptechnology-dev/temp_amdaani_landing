@@ -14,12 +14,11 @@ export const generateInvoiceHTML = ({
   storedata,
   invoiceDate,
   isGstInvoice,
+  isMrpEnabled = false,
   isFreePlan = true,
   appBrand = { name: "AMDAANI", logoUrl: "" },
   payment = { paid: 0, due: 0, status: "unpaid" },
 }) => {
-  // Compute total values across all items
-  // console.log('Generating invoice HTML with data:', { invoiceData, storedata });
   let totalQty = 0;
   let totalDiscount = 0;
   let totalTaxable = 0;
@@ -28,7 +27,6 @@ export const generateInvoiceHTML = ({
 
   cartItems.forEach((item) => {
     const qty = item.qty || item.quantity || 0;
-    const baseRate = item.baseRate || 0;
     const gstRate = item.gstRate || 0;
     const gstAmount = item.gstAmount || 0;
     const isTaxInclusive = item.isTaxInclusive || false;
@@ -49,29 +47,26 @@ export const generateInvoiceHTML = ({
   const itemsHTML = cartItems
     .map((item, index) => {
       const qty = item.qty || item.quantity || 0;
-      const price = item.price || 0;
       const baseRate = item.baseRate || 0;
       const taxableValue = item.taxableValue || 0;
-      let discount = item.discount * qty || 0;
       const gstRate = item.gstRate || 0;
       const gstAmount = item.gstAmount || 0;
       const totalAmount = item.total || 0;
       const isTaxInclusive = item.isTaxInclusive || false;
+      const mrp = Number(item.mrp || 0);
 
       let perItemDiscount = Number(item.discount || 0);
       if (isTaxInclusive && gstRate > 0) {
-        // Convert inclusive discount to base equivalent
         perItemDiscount = perItemDiscount / (1 + gstRate / 100);
       }
 
-      // Total discount for quantity
       const totalDiscount = perItemDiscount * qty;
 
-      // ✅ Calculate percentage using per-item base rate
       const discountPercent =
         baseRate > 0 && perItemDiscount > 0
           ? ((perItemDiscount / baseRate) * 100).toFixed(2)
           : null;
+
       return `
       <tr class="item-row">
         <td class="sr-no">${index + 1}</td>
@@ -81,6 +76,11 @@ export const generateInvoiceHTML = ({
         </td>
         <td class="qty">${qty}</td>
         <td class="unit">${item.unit || "PCS"}</td>
+        ${
+          isMrpEnabled
+            ? `<td class="mrp">₹${mrp > 0 ? mrp.toFixed(2) : "—"}</td>`
+            : ""
+        }
         <td class="rate">₹${baseRate.toFixed(2)}</td>
       <td class="discount">
         ${
@@ -94,7 +94,7 @@ export const generateInvoiceHTML = ({
       ${
         isGstInvoice
           ? `
-        <td>₹${taxableValue.toFixed(2)}</td>
+        <td class="taxable-value">₹${taxableValue.toFixed(2)}</td>
           <td class="gst-amount">₹${gstAmount.toFixed(2)} (${gstRate}%)</td>
         `
           : ""
@@ -107,12 +107,10 @@ export const generateInvoiceHTML = ({
 
   let gstTotals = { taxableValue: 0, cgst: 0, sgst: 0, igst: 0 };
   let gstBreakdownHTML = "";
-
-  // ✅ Detect IGST condition from payload
   const isIgst = invoiceData?.isIgst === true;
 
   for (const [rate, breakdown] of Object.entries(
-    invoiceCalculations.gstBreakdown
+    invoiceCalculations.gstBreakdown,
   )) {
     if (parseFloat(rate) === 0) continue;
 
@@ -150,23 +148,13 @@ export const generateInvoiceHTML = ({
     </tr>
   `;
 
-  // const gstTotalsRow = `
-  //   <tr style="font-weight:bold; background:#f8f8f8;">
-  //     <td>Total</td>
-  //     <td>₹${gstTotals.taxableValue.toFixed(2)}</td>
-  //     <td>₹${gstTotals.cgst.toFixed(2)}</td>
-  //     <td>₹${gstTotals.sgst.toFixed(2)}</td>
-  //     <td>₹${gstTotals.igst.toFixed(2)}</td>
-  //   </tr>
-  // `;
-
   const amountInWords =
     numberToWords
       .toWords(
         Math.round(
           invoiceCalculations.grandTotal -
-            (invoiceCalculations?.discountTotal || 0)
-        ).toFixed(2)
+            (invoiceCalculations?.discountTotal || 0),
+        ).toFixed(2),
       )
       .replace(/\b\w/g, (c) => c.toUpperCase()) + " Rupees Only";
 
@@ -184,32 +172,33 @@ export const generateInvoiceHTML = ({
       storedata.bankDetails.branch ||
       storedata.bankDetails.upiId);
 
-  // ✅ Calculate round-off (difference between raw total and rounded total)
   const roundedGrandTotal = Math.round(
-    invoiceCalculations.grandTotal - (invoiceCalculations?.discountTotal || 0)
+    invoiceCalculations.grandTotal - (invoiceCalculations?.discountTotal || 0),
   );
   const rawGrandTotal =
     invoiceCalculations.grandTotal - (invoiceCalculations?.discountTotal || 0);
   const roundOffValue = (roundedGrandTotal - rawGrandTotal).toFixed(2);
 
-  // ✅ safe version
-const upiString = storedata?.bankDetails?.upiId
-  ? `upi://pay?pa=${storedata.bankDetails.upiId}&pn=${encodeURIComponent(
-      storedata?.name || "Merchant"
-    )}&am=${roundedGrandTotal}&cu=INR`
-  : "";
+  const upiString = storedata?.bankDetails?.upiId
+    ? `upi://pay?pa=${storedata.bankDetails.upiId}&pn=${encodeURIComponent(
+        storedata?.name || "Merchant",
+      )}&am=${roundedGrandTotal}&cu=INR`
+    : "";
 
-const qrURL = upiString
-  ? `https://quickchart.io/qr?text=${encodeURIComponent(upiString)}`
-  : "";
+  const qrURL = upiString
+    ? `https://quickchart.io/qr?text=${encodeURIComponent(upiString)}`
+    : "";
 
-  // console.log('QR Code URL:', qrURL);
+  // ✅ dynamic column count — base columns +1 when MRP column is shown
+  const baseCols = isGstInvoice ? 9 : 7;
+  const totalCols = baseCols + (isMrpEnabled ? 1 : 0);
+  const colspanCount = totalCols - 2;
 
   const totalsRowCount =
     2 +
     (isGstInvoice ? 2 : 1) +
     ((invoiceCalculations?.discountTotal ?? 0) > 0 ? 1 : 0) +
-    (roundOffValue ?? 0 > 0 ? 1 : 0);
+    ((roundOffValue ?? 0 > 0) ? 1 : 0);
 
   return /*html*/ `
   <!DOCTYPE html>
@@ -253,9 +242,9 @@ const qrURL = upiString
         .gst-table th { background: #2c5aa0; color: white; }
         .description {
   text-align: left !important;
-  white-space: normal;       /* allow line breaks */
-  word-break: break-word;    /* break long words if needed */
-  overflow-wrap: anywhere;   /* modern fallback for wrapping */
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .description .item-name,
@@ -272,7 +261,7 @@ const qrURL = upiString
   border-top: 1px solid #000;
   margin-top: 10px;
   min-height: 80px;
-  justify-content: flex-end; /* pushes signature section to the right */
+  justify-content: flex-end;
 }
 
 .terms-section {
@@ -304,7 +293,6 @@ const qrURL = upiString
   --muted: #666;
 }
 
-/* Top brand strip (app branding) */
 .brand-strip {
   display: flex;
   justify-content: space-between;
@@ -332,11 +320,10 @@ const qrURL = upiString
   padding: 14px 16px;
   border-bottom: 1.5px solid #000;
   background: #ffffff;
-  flex-wrap: wrap; /* makes it adapt on smaller widths */
+  flex-wrap: wrap;
   gap: 12px;
 }
 
-/* Left Section (Logo + Info) */
 .header-left {
   display: flex;
   flex-direction: row;
@@ -360,7 +347,6 @@ const qrURL = upiString
   margin-right: 8px;
 }
 
-/* Company text */
 .company-block {
   display: flex;
   flex-direction: column;
@@ -391,7 +377,6 @@ const qrURL = upiString
   text-align: left;
 }
 
-/* Right Section (Invoice Meta) */
 .meta-block {
   display: flex;
   flex-direction: column;
@@ -414,10 +399,10 @@ const qrURL = upiString
   margin-bottom: 4px;
 }
 
-
 .items-table td.rate,
+.items-table td.mrp,
 .items-table td.discount,
-.items-table td:nth-child(7), /* Taxable Value */
+.items-table td.taxable-value,
 .items-table td.gst-amount,
 .items-table td.total-amount {
   text-align: right !important;
@@ -428,11 +413,10 @@ const qrURL = upiString
 .items-table .summary-total-row td:not(.description):not(.sr-no) {
   text-align: right;
 }
-/* status shown below the main invoice badge when invoice is cancelled */
 .invoice-status-badge {
   font-weight: 800;
   font-size: 12px;
-  color: #e53935; /* red to indicate cancellation */
+  color: #e53935;
   background: transparent;
   margin-top: 2px;
   text-transform: uppercase;
@@ -449,7 +433,6 @@ const qrURL = upiString
   border-bottom: none;
 }
 
-/* ===== Payment Status Badge (Bottom Section) ===== */
 .payment-status-container {
   text-align: right;
   margin-top: 4px;
@@ -469,17 +452,16 @@ const qrURL = upiString
 }
 
 .payment-status.paid {
-  background-color: #43a047; /* green */
+  background-color: #43a047;
 }
 
 .payment-status.partial {
-  background-color: #fb8c00; /* orange */
+  background-color: #fb8c00;
 }
 
 .payment-status.unpaid {
-  background-color: #e53935; /* red */
+  background-color: #e53935;
 }
-
 
 .meta-table {
   border-collapse: collapse;
@@ -531,26 +513,18 @@ const qrURL = upiString
   }
 }
 
-
 @media print {
         body { margin: 0; padding: 0; }
-
-        /* Repeat header/footer for each page */
         thead { display: table-header-group; }
         tfoot { display: table-footer-group; }
-
-        /* Avoid cutting important sections */
         .page-break { page-break-before: always; }
         .no-break { page-break-inside: avoid; }
-
-        /* Optional: keep background color for header/footer */
         .brand-strip, .header-grid, .footer-section {
           -webkit-print-color-adjust: exact !important;
           print-color-adjust: exact !important;
         }
       }
 
-      /* ====== Page Number (Print Mode) ====== */
 @media print {
   body {
     counter-reset: pageTotal;
@@ -568,7 +542,6 @@ const qrURL = upiString
     }
   }
 
-  /* ✅ Fallback for browsers that don't support @bottom-right (like Chrome) */
   .page-number {
     position: fixed;
     bottom: 8mm;
@@ -578,13 +551,11 @@ const qrURL = upiString
     font-family: Arial, sans-serif;
   }
 
-  /* Only visible in print */
   .page-number::after {
     content: "Page " counter(page);
   }
 }
 
-/* ====== Final Totals Alignment (Professional Layout) ====== */
 .items-table .totals-row td,
 .items-table .grand-total-row td {
   border: 1px solid #000;
@@ -599,13 +570,13 @@ const qrURL = upiString
 }
 
 .items-table .label {
-  text-align: left;       /* ✅ label text left */
+  text-align: left;
   font-weight: 600;
   background: #f8f8f8;
 }
 
 .items-table .amount {
-  text-align: center;     /* ✅ values center */
+  text-align: center;
   font-weight: 600;
 }
 
@@ -630,13 +601,10 @@ const qrURL = upiString
   font-weight: 600;
 }
 
-
-/* Anchor overlay to the table area */
 .items-table-wrap {
   position: relative;
 }
 
-/* Overlay centered over table content */
 .items-table-watermark {
   position: absolute;
   inset: 0;
@@ -647,21 +615,18 @@ const qrURL = upiString
   z-index: 2;
 }
 
-/* Responsive diagonal text with clamped size */
 .items-table-watermark .text {
   font-family: Arial, sans-serif;
   font-weight: 800;
-  /* Scales with table width: min 36px, ideal 10vw, max 96px */
   font-size: clamp(36px, 10vw, 96px);
   letter-spacing: 0.5em;
   text-transform: uppercase;
-  color: rgba(0, 0, 0, 0.08);   /* low opacity watermark */
+  color: rgba(0, 0, 0, 0.08);
   transform: rotate(-28deg);
   user-select: none;
   white-space: nowrap;
 }
 
-/* Fine-tune for very small phones */
 @media (max-width: 380px) {
   .items-table-watermark .text {
     font-size: clamp(28px, 12vw, 72px);
@@ -669,7 +634,6 @@ const qrURL = upiString
   }
 }
 
-/* Print-safe colors preserved */
 @media print {
   .items-table-watermark .text {
     -webkit-print-color-adjust: exact !important;
@@ -677,13 +641,11 @@ const qrURL = upiString
   }
 }
 
-
     </style>
   </head>
 
   <body>
     <div class="invoice-container">
-      <!-- ✅ Header and brand (repeats on every page) -->
       <table style="width:100%; border-collapse: collapse;">
         <thead>
           <tr>
@@ -733,8 +695,8 @@ ${
                     <div class="company-details">
                       ${storedata?.address?.street || ""}<br>
                       ${storedata?.address?.city || ""} - ${
-        storedata?.address?.postalCode || ""
-      }<br>
+                        storedata?.address?.postalCode || ""
+                      }<br>
                       ${storedata?.address?.state || ""}<br>
                       ${
                         isGstInvoice
@@ -803,11 +765,11 @@ ${
                   <div class="info-row"><span class="info-label">Invoice No:</span><span>${invoiceNumber}</span></div>
                   <div class="info-row"><span class="info-label">Invoice Date:</span><span>${format(
                     invoiceDate,
-                    "dd-MMM-yyyy"
+                    "dd-MMM-yyyy",
                   )}</span></div>
                   <div class="info-row"><span class="info-label">Invoice Time:</span><span>${format(
                     invoiceDate,
-                    "hh:mm a"
+                    "hh:mm a",
                   )}</span></div>
                 </div>
               </div>
@@ -828,7 +790,6 @@ ${
   `
       : ""
   }
-              <!-- ✅ Main content -->
               <table class="items-table">
                 <thead>
                   <tr>
@@ -836,6 +797,7 @@ ${
                     <th>Item Description</th>
                     <th>Qty</th>
                     <th>Unit</th>
+                    ${isMrpEnabled ? `<th>MRP(₹)</th>` : ""}
                     <th>Price/ Unit(₹)</th>
                     <th>Discount(₹)</th>
                     
@@ -848,19 +810,19 @@ ${
                   </tr>
                 </thead>
                 <tbody>${itemsHTML}
-                      <!-- ✅ Summary Totals Row -->
         <tr class="summary-total-row" style="font-weight:bold; background:#f8f8f8;">
     <td class="sr-no"></td>
     <td class="description" style="text-align:left;">Total</td>
     <td class="qty" style="text-align:center;">${totalQty}</td>
     <td class="unit"></td>
+    ${isMrpEnabled ? `<td class="mrp"></td>` : ""}
     <td class="rate"></td>
     <td class="discount">₹${totalDiscount.toFixed(2)}</td>
     
     ${
       isGstInvoice
-        ? `<td>₹${totalTaxable.toFixed(
-            2
+        ? `<td class="taxable-value">₹${totalTaxable.toFixed(
+            2,
           )}</td><td class="gst-amount">₹${totalGST.toFixed(2)}</td>`
         : ""
     }
@@ -868,9 +830,7 @@ ${
   </tr>
 
       <tr class="totals-row no-break">
-      <td colspan="${
-        isGstInvoice ? 7 : 5
-      }" rowspan="${totalsRowCount}" class="amount-words-cell" style="text-align:left; vertical-align:top; border-right:1px solid #000; padding:10px;">
+      <td colspan="${colspanCount}" rowspan="${totalsRowCount}" class="amount-words-cell" style="text-align:left; vertical-align:top; border-right:1px solid #000; padding:10px;">
         <div class="amount-words-title" style="font-weight:bold; color:#2c5aa0;">Amount in Words:</div>
         <div class="words-text" style="font-size:11px;">${amountInWords}</div>
 
@@ -894,14 +854,14 @@ ${
           <tr>
             <td style="border:1px solid #ddd; padding:6px; text-align:left;">${format(
               new Date(transaction.createdAt),
-              "dd-MMM-yyyy hh:mm a"
+              "dd-MMM-yyyy hh:mm a",
             )}</td>
             <td style="border:1px solid #ddd; padding:6px; text-align:right;">₹${transaction.amount.toFixed(
-              2
+              2,
             )}</td>
             <td style="border:1px solid #ddd; padding:6px; text-align:center;">${transaction.paymentMethod.toUpperCase()}</td>
           </tr>
-        `
+        `,
           )
           .join("")}
       </tbody>
@@ -936,7 +896,6 @@ ${
         : ""
     }
 
-<!-- ✅ Round Off Row -->
 ${
   roundOffValue != 0
     ? `
@@ -948,17 +907,16 @@ ${
     ${
       createdInvoice
         ? `${Number(invoiceData?.roundOff) >= 0 ? "+" : ""}${Number(
-            invoiceData?.roundOff
+            invoiceData?.roundOff,
           ).toFixed(2)}`
         : `${roundOffValue < 0 ? "−" : "+"}₹${Math.abs(roundOffValue).toFixed(
-            2
+            2,
           )}`
     }
   </td>
 </tr>`
     : ""
 }
-
 
 <tr class="grand-total-row no-break">
   <td class="label">Net Total</td>
@@ -967,7 +925,7 @@ ${
       ? Math.round(invoiceData?.grandTotal).toFixed(2)
       : Math.round(
           invoiceCalculations.grandTotal -
-            (invoiceCalculations?.discountTotal || 0)
+            (invoiceCalculations?.discountTotal || 0),
         ).toFixed(2)
   }</td>
 </tr>
@@ -990,20 +948,18 @@ ${
 
                 </tbody>
               </table>
-              <!-- ✅ Payment Status Badge -->
 <div class="payment-status-container">
   <span class="payment-status ${payment.status?.toLowerCase()}">
     ${
       payment.status === "paid"
         ? "Amount is Fully Paid"
         : payment.status === "partial"
-        ? "Amount is Partially Paid"
-        : "Amount is Unpaid"
+          ? "Amount is Partially Paid"
+          : "Amount is Unpaid"
     }
   </span>
 </div>
 
-<!-- Payment Details -->
 ${
   invoiceData?.paymentMethod || invoiceData?.paymentNote
     ? `
@@ -1036,7 +992,7 @@ ${
                            ${
                              !preview &&
                              Object.keys(invoiceCalculations.gstBreakdown).some(
-                               (r) => parseFloat(r) > 0
+                               (r) => parseFloat(r) > 0,
                              ) &&
                              isGstInvoice
                                ? `
@@ -1056,7 +1012,6 @@ ${
           </tr>
         </tbody>
 
-        <!-- ✅ Footer repeats automatically -->
         ${
           preview
             ? ""
@@ -1071,7 +1026,6 @@ ${
                     <div class="terms-section" 
                     style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
 
-                    <!-- LEFT SIDE: BANK DETAILS -->
                     <div>
                       <div class="section-title" style="font-weight:600; margin-bottom:4px;">Bank Details:</div>
 
@@ -1097,8 +1051,6 @@ ${
                       }
                     </div>
 
-
-                    <!-- RIGHT SIDE: QR CODE BOX -->
                     ${
                       storedata?.bankDetails?.upiId
                         ? `

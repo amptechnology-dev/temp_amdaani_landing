@@ -5,7 +5,10 @@ import { format } from "date-fns";
 import { FileText, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 
 import { generatePurchaseHTML } from "../../utils/purchaseTemplate";
@@ -23,13 +26,13 @@ export default function PurchaseSummary({
   storedata = {},
   purchaseNumber = "PREVIEW-0001",
   isGstInvoice = false,
+  isMrpEnabled = true,
   submitLabel = "Create Purchase",
 }) {
   const [previewHtml, setPreviewHtml] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
 
   const handlePreview = () => {
-    console.log("PurchaseSummary storedata prop:", storedata);
     if (!cartItems?.length) return;
 
     const now = new Date();
@@ -46,6 +49,7 @@ export default function PurchaseSummary({
       storedata,
       invoiceDate: now,
       isGstInvoice,
+      isMrpEnabled,
       payment: {
         paid: payment?.paid ?? 0,
         due: payment?.due ?? 0,
@@ -71,11 +75,17 @@ export default function PurchaseSummary({
           Preview
         </Button>
 
-        <Button onClick={handleCreatePurchase} disabled={disabled || isLoading} className="flex-1">
+        <Button
+          onClick={handleCreatePurchase}
+          disabled={disabled || isLoading}
+          className="flex-1"
+        >
           {isLoading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              {submitLabel === "Update Purchase" ? "Updating..." : "Creating..."}
+              {submitLabel === "Update Purchase"
+                ? "Updating..."
+                : "Creating..."}
             </>
           ) : (
             <>
@@ -91,7 +101,11 @@ export default function PurchaseSummary({
           <DialogHeader className="px-4 py-2 border-b shrink-0">
             <DialogTitle>Purchase Preview</DialogTitle>
           </DialogHeader>
-          <iframe title="purchase-preview" srcDoc={previewHtml} className="flex-1 w-full border-0 bg-white" />
+          <iframe
+            title="purchase-preview"
+            srcDoc={previewHtml}
+            className="flex-1 w-full border-0 bg-white"
+          />
         </DialogContent>
       </Dialog>
     </div>

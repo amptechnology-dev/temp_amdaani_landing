@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Bell, Sun, Moon, User, ChevronDown, LogOut, Settings } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
@@ -15,10 +16,13 @@ import {
 
 export default function Topbar({ theme, pageTitle = "Overview" }) {
   const { theme: currentTheme, toggleTheme } = useTheme();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const router = useRouter();
+
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const userMenuRef = useRef(null);
   const notifRef = useRef(null);
@@ -37,7 +41,21 @@ export default function Topbar({ theme, pageTitle = "Overview" }) {
   }, []);
 
   const handleProfileClick = () => {
-    window.location.href = "/dashboard/profile";
+    setShowUserMenu(false);
+    router.push("/dashboard/profile");
+  };
+
+  // ✅ ekhon hard redirect na kore AuthContext er logout() call kora hocche —
+  // eta /auth/logout API hit korbe, tarpor local session clear kore /auth e pathabe
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setShowUserMenu(false);
+    setLoggingOut(true);
+    try {
+      await logout();
+    } finally {
+      setLoggingOut(false);
+    }
   };
 
   return (
@@ -170,13 +188,12 @@ export default function Topbar({ theme, pageTitle = "Overview" }) {
                   Profile Settings
                 </button>
                 <button
-                  onClick={() => {
-                    window.location.href = "/auth/logout";
-                  }}
-                  className="w-[calc(100%-8px)] flex items-center gap-2.5 text-left px-3.5 py-2 rounded-lg mx-1 hover:bg-red-50 text-red-600 text-[13px] font-medium transition-colors"
+                  onClick={handleLogout}
+                  disabled={loggingOut}
+                  className="w-[calc(100%-8px)] flex items-center gap-2.5 text-left px-3.5 py-2 rounded-lg mx-1 hover:bg-red-50 text-red-600 text-[13px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <LogOut size={15} />
-                  Logout
+                  {loggingOut ? "Logging out..." : "Logout"}
                 </button>
               </div>
             )}

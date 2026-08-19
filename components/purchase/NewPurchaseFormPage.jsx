@@ -31,16 +31,14 @@ import PurchaseSummary from "./PurchaseSummary";
 import AddItemFormModal from "../../components/invoice/AddItemFormModal";
 import api from "../../utils/api";
 
-// -------------------------------
-// Inline product combobox for the "add row" — uses a PORTAL so its dropdown
-// is never clipped by any ancestor's overflow-hidden/overflow-x-auto.
-// -------------------------------
 function InlineProductCombobox({ products, onSelect, onCreateNew }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
+  const [highlightIndex, setHighlightIndex] = useState(-1);
   const inputRef = useRef(null);
   const dropdownRef = useRef(null);
+  const itemRefs = useRef([]);
 
   const updateCoords = () => {
     if (!inputRef.current) return;
@@ -92,16 +90,61 @@ function InlineProductCombobox({ products, onSelect, onCreateNew }) {
     (p) => p.name?.toLowerCase().trim() === query.trim().toLowerCase(),
   );
 
+  // ✅ Reset highlight whenever the visible list changes (new query / open)
+  useEffect(() => {
+    setHighlightIndex(-1);
+  }, [query, open]);
+
+  // ✅ Keep the highlighted row scrolled into view
+  useEffect(() => {
+    if (highlightIndex >= 0 && itemRefs.current[highlightIndex]) {
+      itemRefs.current[highlightIndex].scrollIntoView({ block: "nearest" });
+    }
+  }, [highlightIndex]);
+
   const pick = (product) => {
     onSelect(product);
     setQuery("");
     setOpen(false);
+    setHighlightIndex(-1);
   };
 
   const handleCreateNew = () => {
     onCreateNew(query.trim());
     setQuery("");
     setOpen(false);
+    setHighlightIndex(-1);
+  };
+
+  // ✅ Total selectable rows = filtered products + optional "create new" row
+  const showCreateRow = query.trim() && !exactMatch;
+  const totalRows = filtered.length + (showCreateRow ? 1 : 0);
+
+  const handleKeyDown = (e) => {
+    if (!open && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+      setOpen(true);
+      return;
+    }
+    if (!open) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightIndex((prev) => (prev + 1 >= totalRows ? 0 : prev + 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightIndex((prev) => (prev - 1 < 0 ? totalRows - 1 : prev - 1));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (highlightIndex === -1) return;
+      if (highlightIndex < filtered.length) {
+        pick(filtered[highlightIndex]);
+      } else if (showCreateRow) {
+        handleCreateNew();
+      }
+    } else if (e.key === "Escape") {
+      setOpen(false);
+      setHighlightIndex(-1);
+    }
   };
 
   return (
@@ -115,6 +158,7 @@ function InlineProductCombobox({ products, onSelect, onCreateNew }) {
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
+          onKeyDown={handleKeyDown}
           className="w-full max-w-[220px] h-8 px-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
         />
       </div>
@@ -133,18 +177,22 @@ function InlineProductCombobox({ products, onSelect, onCreateNew }) {
             }}
             className="bg-white border border-slate-200 rounded-md shadow-lg max-h-72 overflow-y-auto"
           >
-            {filtered.map((p) => (
+            {filtered.map((p, idx) => (
               <div
                 key={p._id}
+                ref={(el) => (itemRefs.current[idx] = el)}
+                onMouseEnter={() => setHighlightIndex(idx)}
                 onClick={() => pick(p)}
-                className="flex items-center justify-between px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0"
+                className={`flex items-center justify-between px-3 py-2 text-sm cursor-pointer border-b border-slate-50 last:border-0 ${
+                  highlightIndex === idx ? "bg-blue-50" : "hover:bg-blue-50"
+                }`}
               >
                 <div className="min-w-0">
                   <p className="font-medium text-slate-800 truncate">
                     {p.name}
                   </p>
                   <p className="text-[11px] text-slate-400">
-                    HSN: {p.hsn || "-"} · {p.unit || "Pcs"}
+                    HSN: {p.hsn?.trim() || "-"} · {p.unit || "Pcs"}
                   </p>
                 </div>
                 <span className="text-blue-600 font-semibold text-xs shrink-0 ml-2">
@@ -159,11 +207,17 @@ function InlineProductCombobox({ products, onSelect, onCreateNew }) {
               </p>
             )}
 
-            {query.trim() && !exactMatch && (
+            {showCreateRow && (
               <button
                 type="button"
+                ref={(el) => (itemRefs.current[filtered.length] = el)}
+                onMouseEnter={() => setHighlightIndex(filtered.length)}
                 onClick={handleCreateNew}
-                className="w-full flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-blue-600 hover:bg-blue-50 border-t border-slate-100"
+                className={`w-full flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-blue-600 border-t border-slate-100 ${
+                  highlightIndex === filtered.length
+                    ? "bg-blue-50"
+                    : "hover:bg-blue-50"
+                }`}
               >
                 <Plus className="w-3.5 h-3.5" />
                 Create "{query.trim()}" as new product
@@ -212,6 +266,7 @@ export default function NewPurchaseFormPage({
   handleUpdateItemField,
   handleRemoveItem,
   handleClearCart,
+  isMrpEnabled = false,
 }) {
   console.log("NewPurchaseFormPage received storedata:", storedata);
   const [vendorForm, setVendorForm] = useState(() => ({
@@ -234,6 +289,8 @@ export default function NewPurchaseFormPage({
   );
   // ✅ which field's typeahead dropdown is currently open: "name" | "mobile" | null
   const [activeField, setActiveField] = useState(null);
+  const [vendorHighlightIndex, setVendorHighlightIndex] = useState(-1);
+  const vendorItemRefs = useRef([]);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [newItemPrefillName, setNewItemPrefillName] = useState("");
   const vendorGridRef = useRef(null);
@@ -289,7 +346,6 @@ export default function NewPurchaseFormPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendorForm, selectedVendorId]);
 
-  // ✅ Typeahead suggestions — filtered live by whichever field (name/mobile) is active
   const vendorSuggestions = (() => {
     if (!activeField) return [];
     const q = (activeField === "mobile" ? vendorForm.mobile : vendorForm.name)
@@ -300,6 +356,23 @@ export default function NewPurchaseFormPage({
       .filter((v) => v.name?.toLowerCase().includes(q) || v.mobile?.includes(q))
       .slice(0, 8);
   })();
+
+  // ✅ Reset highlight whenever field switches or the query changes
+  useEffect(() => {
+    setVendorHighlightIndex(-1);
+  }, [activeField, vendorForm.mobile, vendorForm.name]);
+
+  // ✅ Keep the highlighted row scrolled into view
+  useEffect(() => {
+    if (
+      vendorHighlightIndex >= 0 &&
+      vendorItemRefs.current[vendorHighlightIndex]
+    ) {
+      vendorItemRefs.current[vendorHighlightIndex].scrollIntoView({
+        block: "nearest",
+      });
+    }
+  }, [vendorHighlightIndex]);
 
   const pickVendorSuggestion = (v) => {
     setSelectedVendorId(v._id);
@@ -313,6 +386,7 @@ export default function NewPurchaseFormPage({
       gstNumber: v.gstNumber || "",
     });
     setActiveField(null);
+    setVendorHighlightIndex(-1);
   };
 
   const handleClearVendor = () => {
@@ -324,10 +398,42 @@ export default function NewPurchaseFormPage({
     const v = e.target.value;
     setVendorForm((prev) => ({ ...prev, [field]: v }));
 
-    // ✅ jodi user select kora vendor-er field change kore, detach kore dao
     if (selectedVendorId) {
       const matched = vendors.find((vd) => vd._id === selectedVendorId);
       if (matched && matched[field] !== v) setSelectedVendorId("");
+    }
+  };
+
+  const handleVendorFieldKeyDown = (fieldName) => (e) => {
+    const isOpen = activeField === fieldName && vendorSuggestions.length > 0;
+
+    if (!isOpen && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+      setActiveField(fieldName);
+      return;
+    }
+    if (!isOpen) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setVendorHighlightIndex((prev) =>
+        prev + 1 >= vendorSuggestions.length ? 0 : prev + 1,
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setVendorHighlightIndex((prev) =>
+        prev - 1 < 0 ? vendorSuggestions.length - 1 : prev - 1,
+      );
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (
+        vendorHighlightIndex >= 0 &&
+        vendorSuggestions[vendorHighlightIndex]
+      ) {
+        pickVendorSuggestion(vendorSuggestions[vendorHighlightIndex]);
+      }
+    } else if (e.key === "Escape") {
+      setActiveField(null);
+      setVendorHighlightIndex(-1);
     }
   };
 
@@ -340,78 +446,78 @@ export default function NewPurchaseFormPage({
     setShowAddItemModal(true);
   };
 
- const handleEditItem = async (item) => {
-  const productId = item.product || item._id;
-  const isValidObjectId = (id) => /^[0-9a-fA-F]{24}$/.test(String(id || ""));
+  const handleEditItem = async (item) => {
+    const productId = item.product || item._id;
+    const isValidObjectId = (id) => /^[0-9a-fA-F]{24}$/.test(String(id || ""));
 
-  if (!isValidObjectId(productId)) {
-    setEditingCartItem({ ...item, cartItemId: item._id });
-    setNewItemPrefillName("");
-    setShowAddItemModal(true);
-    return;
-  }
-
-  try {
-    setFetchingItemId(item._id);
-    const res = await api.get(`/product/id/${productId}`);
-    const freshProduct = res?.data?.data || res?.data;
-
-    if (freshProduct) {
-      // ✅ freshProduct-er nijer real _id ke overwrite na kore rekhe dao —
-      // eta diyei AddItemFormModal PUT call korbe
-      setEditingCartItem({
-        ...freshProduct,
-        cartItemId: item._id, // ✅ cart row track korar jonno alada field
-      });
-    } else {
+    if (!isValidObjectId(productId)) {
       setEditingCartItem({ ...item, cartItemId: item._id });
+      setNewItemPrefillName("");
+      setShowAddItemModal(true);
+      return;
     }
-  } catch (err) {
-    console.warn("Failed to fetch fresh product data for edit:", err);
-    setEditingCartItem({ ...item, cartItemId: item._id });
-  } finally {
-    setFetchingItemId(null);
-    setNewItemPrefillName("");
-    setShowAddItemModal(true);
-  }
-};
+
+    try {
+      setFetchingItemId(item._id);
+      const res = await api.get(`/product/id/${productId}`);
+      const freshProduct = res?.data?.data || res?.data;
+
+      if (freshProduct) {
+        // ✅ freshProduct-er nijer real _id ke overwrite na kore rekhe dao —
+        // eta diyei AddItemFormModal PUT call korbe
+        setEditingCartItem({
+          ...freshProduct,
+          cartItemId: item._id, // ✅ cart row track korar jonno alada field
+        });
+      } else {
+        setEditingCartItem({ ...item, cartItemId: item._id });
+      }
+    } catch (err) {
+      console.warn("Failed to fetch fresh product data for edit:", err);
+      setEditingCartItem({ ...item, cartItemId: item._id });
+    } finally {
+      setFetchingItemId(null);
+      setNewItemPrefillName("");
+      setShowAddItemModal(true);
+    }
+  };
 
   const handleNewProductCreated = (newItem) => {
-  if (editingCartItem) {
-    const targetId = editingCartItem.cartItemId || editingCartItem._id;
+    if (editingCartItem) {
+      const targetId = editingCartItem.cartItemId || editingCartItem._id;
 
-    // ✅ edit mode — existing cart item field-gulo update kore dao
-    handleUpdateItemField(targetId, "name", newItem.name);
-    handleUpdateItemField(targetId, "hsn", newItem.hsn || "");
-    handleUpdateItemField(targetId, "unit", newItem.unit || "PCS");
-    handleUpdateItemField(
-      targetId,
-      "costPrice",
-      Number(newItem.costPrice || 0),
-    );
-    handleUpdateItemField(
-      targetId,
-      "gstRate",
-      Number(newItem.purchaseGstRate ?? newItem.gstRate ?? 0),
-    );
-    handleUpdateItemField(
-      targetId,
-      "isPurchaseTaxInclusive",
-      Boolean(newItem.isPurchaseTaxInclusive),
-    );
-    handleUpdateItemField(targetId, "mrp", Number(newItem.mrp || 0));
+      // ✅ edit mode — existing cart item field-gulo update kore dao
+      handleUpdateItemField(targetId, "name", newItem.name);
+      handleUpdateItemField(targetId, "hsn", newItem.hsn || "");
+      handleUpdateItemField(targetId, "unit", newItem.unit || "PCS");
+      handleUpdateItemField(
+        targetId,
+        "costPrice",
+        Number(newItem.costPrice || 0),
+      );
+      handleUpdateItemField(
+        targetId,
+        "gstRate",
+        Number(newItem.purchaseGstRate ?? newItem.gstRate ?? 0),
+      );
+      handleUpdateItemField(
+        targetId,
+        "isPurchaseTaxInclusive",
+        Boolean(newItem.isPurchaseTaxInclusive),
+      );
+      handleUpdateItemField(targetId, "mrp", Number(newItem.mrp || 0));
 
-    setAllProducts?.((prev) => [
-      newItem,
-      ...prev.filter((p) => p._id !== newItem._id),
-    ]);
-    setEditingCartItem(null);
-  } else {
-    setAllProducts?.((prev) => [newItem, ...prev]);
-    addToCart(newItem);
-  }
-  setNewItemPrefillName("");
-};
+      setAllProducts?.((prev) => [
+        newItem,
+        ...prev.filter((p) => p._id !== newItem._id),
+      ]);
+      setEditingCartItem(null);
+    } else {
+      setAllProducts?.((prev) => [newItem, ...prev]);
+      addToCart(newItem);
+    }
+    setNewItemPrefillName("");
+  };
 
   // -------------------------------
   // ✅ Number field helpers — free typing (0, 1, 10, decimals etc.)
@@ -521,24 +627,30 @@ export default function NewPurchaseFormPage({
               ref={vendorGridRef}
               className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
             >
-              {/* Mobile — typeahead */}
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 z-10" />
                 <input
                   value={vendorForm.mobile}
                   onChange={updateField("mobile")}
                   onFocus={() => setActiveField("mobile")}
+                  onKeyDown={handleVendorFieldKeyDown("mobile")}
                   maxLength={10}
                   placeholder="Mobile *"
                   className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
                 {activeField === "mobile" && vendorSuggestions.length > 0 && (
                   <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-56 overflow-y-auto">
-                    {vendorSuggestions.map((v) => (
+                    {vendorSuggestions.map((v, idx) => (
                       <div
                         key={v._id}
+                        ref={(el) => (vendorItemRefs.current[idx] = el)}
+                        onMouseEnter={() => setVendorHighlightIndex(idx)}
                         onClick={() => pickVendorSuggestion(v)}
-                        className="flex items-center justify-between px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0"
+                        className={`flex items-center justify-between px-3 py-2 text-sm cursor-pointer border-b border-slate-50 last:border-0 ${
+                          vendorHighlightIndex === idx
+                            ? "bg-blue-50"
+                            : "hover:bg-blue-50"
+                        }`}
                       >
                         <div className="min-w-0">
                           <p className="font-medium text-slate-800 truncate">
@@ -561,16 +673,23 @@ export default function NewPurchaseFormPage({
                   value={vendorForm.name}
                   onChange={updateField("name")}
                   onFocus={() => setActiveField("name")}
+                  onKeyDown={handleVendorFieldKeyDown("name")}
                   placeholder="Name"
                   className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
                 {activeField === "name" && vendorSuggestions.length > 0 && (
                   <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-56 overflow-y-auto">
-                    {vendorSuggestions.map((v) => (
+                    {vendorSuggestions.map((v, idx) => (
                       <div
                         key={v._id}
+                        ref={(el) => (vendorItemRefs.current[idx] = el)}
+                        onMouseEnter={() => setVendorHighlightIndex(idx)}
                         onClick={() => pickVendorSuggestion(v)}
-                        className="flex items-center justify-between px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0"
+                        className={`flex items-center justify-between px-3 py-2 text-sm cursor-pointer border-b border-slate-50 last:border-0 ${
+                          vendorHighlightIndex === idx
+                            ? "bg-blue-50"
+                            : "hover:bg-blue-50"
+                        }`}
                       >
                         <div className="min-w-0">
                           <p className="font-medium text-slate-800 truncate">
@@ -714,7 +833,7 @@ export default function NewPurchaseFormPage({
                       {item.name}
                     </td>
                     <td className="px-3 py-1.5 border-b border-slate-100 text-slate-500">
-                      {item.hsn || "-"}
+                      {item.hsn?.trim() || "-"}
                     </td>
                     <td className="px-3 py-1.5 border-b border-slate-100 text-slate-500">
                       {item.unit || "Pcs"}
@@ -763,7 +882,7 @@ export default function NewPurchaseFormPage({
                               "purchaseDiscountType",
                               (item.purchaseDiscountType || "amount") ===
                                 "amount"
-                                ? "percent"
+                                ? "percentage"
                                 : "amount",
                             )
                           }
@@ -771,7 +890,7 @@ export default function NewPurchaseFormPage({
                           className="w-8 h-8 shrink-0 flex items-center justify-center rounded-md border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
                         >
                           {(item.purchaseDiscountType || "amount") ===
-                          "percent" ? (
+                          "percentage" ? (
                             <Percent className="w-3.5 h-3.5" />
                           ) : (
                             "₹"
@@ -857,6 +976,7 @@ export default function NewPurchaseFormPage({
               storedata={storedata}
               purchaseNumber={purchaseNumber}
               isGstInvoice={isGstInvoice}
+              isMrpEnabled={isMrpEnabled}
               submitLabel={isEditMode ? "Update Purchase" : "Create Purchase"}
             />
           </CardContent>

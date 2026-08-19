@@ -1,7 +1,7 @@
 // components/dashboard/BusinessProfile.jsx
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { useFormik } from "formik";
 import * as Yup from "yup";
 import { toast } from "sonner";
@@ -51,7 +51,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import api from "../../utils/api";
 
 // =========================
-// Static data
+// Static data — registration page er sathe MILIYE deya holo (Bakery soho)
 // =========================
 const OWNERSHIP_TYPES = [
   "Sole Proprietorship",
@@ -64,13 +64,17 @@ const OWNERSHIP_TYPES = [
 ];
 
 const BUSINESS_TYPES = [
-  "Retail",
-  "Wholesale",
-  "Manufacturing",
-  "Services",
-  "E-commerce",
-  "Distributor",
-  "Other",
+  "Grocery / Retail",
+  "Restaurant / Café",
+  "Salon / Beauty",
+  "Service Provider",
+  "Wholesale / Distributor",
+  "Pharmacy",
+  "Electronics",
+  "Clothing / Fashion",
+  "Hardware Store",
+  "Bakery",
+  "Others",
 ];
 
 const INDIAN_STATES = [
@@ -102,10 +106,13 @@ const INDIAN_STATES = [
   "Uttar Pradesh",
   "Uttarakhand",
   "West Bengal",
+  "Andaman and Nicobar Islands",
+  "Chandigarh",
+  "Dadra and Nagar Haveli and Daman and Diu",
   "Delhi",
   "Jammu and Kashmir",
   "Ladakh",
-  "Chandigarh",
+  "Lakshadweep",
   "Puducherry",
 ];
 
@@ -311,7 +318,6 @@ export default function BusinessProfile() {
       signature: null,
     },
     validationSchema,
-    enableReinitialize: true,
     onSubmit: handleSave,
   });
 
@@ -385,7 +391,11 @@ export default function BusinessProfile() {
           : null;
 
         setOriginalData({ ...mapped, logo, signature });
-        formik.resetForm({ values: { ...mapped, logo, signature } });
+
+        // ✅ resetForm er bodole setValues — enableReinitialize soriye deya hoyeche,
+        // eta race-condition khoychilo jar karone businessName field khali dekhachilo
+        formik.setValues({ ...mapped, logo, signature });
+        formik.setTouched({});
       }
     } catch (err) {
       toast.error("Failed to load profile data");
@@ -469,11 +479,26 @@ export default function BusinessProfile() {
   };
 
   const handleCancel = () => {
-    formik.resetForm({
-      values: { ...originalData },
-    });
+    formik.setValues({ ...originalData });
+    formik.setTouched({});
     toast.info("Changes discarded");
   };
+
+  // ✅ Safe fallback — jodi kokhono emon business type ashe jeta list e nei,
+  // dropdown khali na dekhiye seta o ekta option hishebe dekhabe
+  const businessTypeOptions = useMemo(() => {
+    if (values.businessType && !BUSINESS_TYPES.includes(values.businessType)) {
+      return [values.businessType, ...BUSINESS_TYPES];
+    }
+    return BUSINESS_TYPES;
+  }, [values.businessType]);
+
+  const stateOptions = useMemo(() => {
+    if (values.state && !INDIAN_STATES.includes(values.state)) {
+      return [values.state, ...INDIAN_STATES];
+    }
+    return INDIAN_STATES;
+  }, [values.state]);
 
   if (loading) {
     return (
@@ -536,8 +561,8 @@ export default function BusinessProfile() {
                 >
                   <Input
                     value={values.businessName}
-                    disabled
-                    className="pl-10 bg-slate-50"
+                    readOnly
+                    className="pl-10 bg-slate-50 text-slate-900 cursor-not-allowed"
                   />
                 </Field>
 
@@ -554,7 +579,7 @@ export default function BusinessProfile() {
                       <SelectValue placeholder="Select business type" />
                     </SelectTrigger>
                     <SelectContent>
-                      {BUSINESS_TYPES.map((t) => (
+                      {businessTypeOptions.map((t) => (
                         <SelectItem key={t} value={t}>
                           {t}
                         </SelectItem>
@@ -711,7 +736,7 @@ export default function BusinessProfile() {
                       <SelectValue placeholder="Select state" />
                     </SelectTrigger>
                     <SelectContent className="max-h-64">
-                      {INDIAN_STATES.map((s) => (
+                      {stateOptions.map((s) => (
                         <SelectItem key={s} value={s}>
                           {s}
                         </SelectItem>

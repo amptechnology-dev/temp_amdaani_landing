@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import api from "../../utils/api";
 import { generateInvoiceHTML } from "../../utils/invoiceTemplate";
+import { useAuth } from "../../context/AuthContext";
 
 import InvoiceListPage from "./InvoiceList";
 import NewInvoiceFormPage from "./NewInvoiceFormPage";
@@ -63,6 +64,8 @@ function determineGstType(storeGst, customerGst, storeState, customerState) {
 // MAIN — orchestrates step navigation: list -> form -> items -> back to form
 // -------------------------------
 export default function SalesFlow() {
+  const { isMrpEnabled } = useAuth();
+
   // step: "list" | "form" | "items"
   const [step, setStep] = useState("list");
   const [invoiceRefreshKey, setInvoiceRefreshKey] = useState(0);
@@ -117,7 +120,15 @@ export default function SalesFlow() {
       const qty = Number(item.qty || 0);
       const sellingPriceRaw = Number(item.sellingPrice ?? item.price ?? 0);
       const discountType = item.discountType || "amount";
-      const rawDiscountInput = Number(item.discount || 0);
+
+      // ✅ clamp percent discount to 0-100 so it can never push price negative
+      let rawDiscountInput = Number(item.discount || 0);
+      if (discountType === "percent") {
+        rawDiscountInput = Math.min(Math.max(rawDiscountInput, 0), 100);
+      } else {
+        rawDiscountInput = Math.max(rawDiscountInput, 0);
+      }
+
       const itemDiscount =
         discountType === "percent"
           ? (sellingPriceRaw * rawDiscountInput) / 100
@@ -175,6 +186,7 @@ export default function SalesFlow() {
         baseRate,
         discount: rawDiscountInput,
         discountType,
+        mrp: Number(item.mrp || 0),
         taxableValue,
         gstAmount,
         total: Number(totalAmount),
@@ -247,7 +259,6 @@ export default function SalesFlow() {
   const fetchStoreData = async () => {
     try {
       const res = await api.get("/store");
-      console.log("STORE API RESPONSE:", res);
       const data = res?.data || {};
       setStoredata(data);
       return data;
@@ -259,7 +270,6 @@ export default function SalesFlow() {
   const fetchLastInvoice = async (storeInfo = storedata) => {
     try {
       const res = await api.get("/invoice/last");
-      console.log("Last invoice response:", res);
       const prefix = storeInfo?.settings?.invoicePrefix || "INV";
       const startNo = storeInfo?.settings?.invoiceStartNumber || 1;
       const currentFY = getFinancialYear();
@@ -319,7 +329,6 @@ export default function SalesFlow() {
   }, []);
 
   // ✅ Reconcile cart item IDs with actual product IDs after products load (edit mode)
-  // Mirrors RN AddItems.jsx behavior — matches by name+hsn if _id doesn't match any loaded product
   useEffect(() => {
     if (!isEditMode || allProducts.length === 0 || cartItems.length === 0)
       return;
@@ -389,8 +398,10 @@ export default function SalesFlow() {
         gstRate: Number(item.gstRate ?? 0),
         isTaxInclusive: item.isTaxInclusive ?? false,
         discount: Number(item.discount ?? 0),
+        discountType: item.discountType || "amount",
         hsn: item.hsn ?? "",
         unit: item.unit ?? "pcs",
+        mrp: Number(item.mrp ?? 0),
         qty: Number(item.quantity ?? item.qty ?? 0),
       }));
 
@@ -447,7 +458,9 @@ export default function SalesFlow() {
           isTaxInclusive: Boolean(product.isTaxInclusive),
           unit: product.unit || "PCS",
           hsn: product.hsn || "",
+          mrp: Number(product.mrp || 0),
           discount: 0,
+          discountType: "amount",
           qty: 1,
         },
       ];
@@ -464,7 +477,6 @@ export default function SalesFlow() {
     hasUserEditedPaid.current = false;
   };
 
-  // ✅ CartItems component er jonno full handlers (+/- ebong remove)
   const handleUpdateQuantities = (id, qty) => {
     if (qty < 1) {
       setCartItems((p) => p.filter((i) => i._id !== id));
@@ -535,6 +547,8 @@ export default function SalesFlow() {
           isTaxInclusive: !!item.isTaxInclusive,
           quantity: item.qty,
           discount: item.discount,
+          discountType: item.discountType || "amount",
+          mrp: item.mrp > 0 ? item.mrp : null,
           total: Number(item.total.toFixed(2)),
         })),
         subTotal: Number(invoiceCalculations.subtotal.toFixed(2)),
@@ -568,6 +582,7 @@ export default function SalesFlow() {
           Object.keys(afterStoredata).length > 0 ? afterStoredata : storedata,
         invoiceDate: new Date(),
         isGstInvoice,
+        isMrpEnabled,
         payment: {
           paid: payment.paid,
           due: payment.due,
@@ -579,7 +594,6 @@ export default function SalesFlow() {
       toast.success(isEditMode ? "Invoice updated!" : "Invoice created!");
       setInvoiceRefreshKey((k) => k + 1);
 
-      // ✅ RN flow er moto — submit korar por list page e ferot jao
       await resetFormState();
       setStep("list");
     } catch {
@@ -651,13 +665,12 @@ export default function SalesFlow() {
       payment={payment}
       handleCreateInvoice={handleCreateInvoice}
       isSubmitting={isSubmitting}
-      // ✅ InvoiceSummary component er jonno lagbe
       formValues={formValues}
       storedata={
         Object.keys(afterStoredata).length > 0 ? afterStoredata : storedata
       }
       isGstInvoice={isGstInvoice}
-      // ✅ CartItems component er jonno full handlers
+      isMrpEnabled={isMrpEnabled}
       handleUpdateQuantity={handleUpdateQuantities}
       handleUpdateItemField={handleUpdateItemField}
       handleRemoveItem={handleRemoveItem}

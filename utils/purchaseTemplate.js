@@ -14,6 +14,7 @@ export const generatePurchaseHTML = ({
   storedata,
   invoiceDate,
   isGstInvoice,
+  isMrpEnabled = true,
   isFreePlan = true,
   appBrand = { name: "AMDAANI", logoUrl: "" },
   payment = { paid: 0, due: 0, status: "unpaid" },
@@ -54,13 +55,14 @@ export const generatePurchaseHTML = ({
     .map((item, index) => {
       const qty = item.qty || item.quantity || 0;
       const costPrice = Number(item.costPrice ?? item.rate ?? item.price ?? 0);
-      const purchaseDiscount = Number(item.purchaseDiscount ?? item.discount ?? 0);
+      const purchaseDiscount = Number(
+        item.purchaseDiscount ?? item.discount ?? 0,
+      );
 
       const gstRate = item.gstRate || 0;
       const gstAmount = item.gstAmount || 0;
       const totalAmt = item.total || 0;
 
-      // Only show taxable value if GST rate > 0, otherwise force 0
       const taxableValue = gstRate > 0 ? item.taxableValue || 0 : 0;
       const isTaxInclusive = item.isPurchaseTaxInclusive || false;
       const mrp = item.mrp;
@@ -72,38 +74,42 @@ export const generatePurchaseHTML = ({
           : null;
 
       return `
-      <tr class="item-row">
-        <td class="sr-no">${index + 1}</td>
-        <td class="description">
-          <div class="item-name">${item.name}</div>
-          ${item.hsn ? `<div class="item-code">HSN: ${item.hsn}</div>` : ""}
-        </td>
-        <td class="qty">${qty}</td>
-        <td class="unit">${item.unit || "PCS"}</td>
-        <td class="mrp">&#8377;${mrp ? mrp.toFixed(2) : "&#8212;"}</td>
-        <td class="rate">&#8377;${costPrice.toFixed(2)}</td>
-        <td class="discount">
-          ${
-            totalDiscountAmt > 0
-              ? `&#8377;${totalDiscountAmt.toFixed(2)}${
-                  discountPercent ? ` (${discountPercent}%)` : ""
-                }`
-              : "&#8377;0.00 (0.00%)"
-          }
-        </td>
-        <td style="text-align:right;">&#8377;${taxableValue.toFixed(2)}</td>
-        <td class="gst-amount" style="text-align:right;">
-          ${
-            gstRate > 0
-              ? isTaxInclusive
-                ? `<span style="color:#888;">&#8377;${gstAmount.toFixed(2)} (${gstRate}%)</span>`
-                : `&#8377;${gstAmount.toFixed(2)} (${gstRate}%)`
-              : `&#8212;`
-          }
-        </td>
-        <td class="total-amount">&#8377;${totalAmt.toFixed(2)}</td>
-      </tr>
-    `;
+    <tr class="item-row">
+      <td class="sr-no">${index + 1}</td>
+      <td class="description">
+        <div class="item-name">${item.name}</div>
+        ${item.hsn ? `<div class="item-code">HSN: ${item.hsn}</div>` : ""}
+      </td>
+      <td class="qty">${qty}</td>
+      <td class="unit">${item.unit || "PCS"}</td>
+      ${
+        isMrpEnabled
+          ? `<td class="mrp">&#8377;${mrp ? mrp.toFixed(2) : "&#8212;"}</td>`
+          : ""
+      }
+      <td class="rate">&#8377;${costPrice.toFixed(2)}</td>
+      <td class="discount">
+        ${
+          totalDiscountAmt > 0
+            ? `&#8377;${totalDiscountAmt.toFixed(2)}${
+                discountPercent ? ` (${discountPercent}%)` : ""
+              }`
+            : "&#8377;0.00 (0.00%)"
+        }
+      </td>
+      <td style="text-align:right;">&#8377;${taxableValue.toFixed(2)}</td>
+      <td class="gst-amount" style="text-align:right;">
+        ${
+          gstRate > 0
+            ? isTaxInclusive
+              ? `<span style="color:#888;">&#8377;${gstAmount.toFixed(2)} (${gstRate}%)</span>`
+              : `&#8377;${gstAmount.toFixed(2)} (${gstRate}%)`
+            : `&#8212;`
+        }
+      </td>
+      <td class="total-amount">&#8377;${totalAmt.toFixed(2)}</td>
+    </tr>
+  `;
     })
     .join("");
 
@@ -114,14 +120,17 @@ export const generatePurchaseHTML = ({
   let gstBreakdownHTML = "";
   const isIgst = invoiceData?.isIgst === true;
 
-  for (const [rate, breakdown] of Object.entries(invoiceCalculations.gstBreakdown || {})) {
+  for (const [rate, breakdown] of Object.entries(
+    invoiceCalculations.gstBreakdown || {},
+  )) {
     if (parseFloat(rate) === 0) continue;
 
     const taxable = breakdown.taxableAmount || 0;
     const cgst = isIgst ? 0 : breakdown.cgstAmount || 0;
     const sgst = isIgst ? 0 : breakdown.sgstAmount || 0;
     const igst = isIgst
-      ? breakdown.igstAmount || (breakdown.cgstAmount || 0) + (breakdown.sgstAmount || 0)
+      ? breakdown.igstAmount ||
+        (breakdown.cgstAmount || 0) + (breakdown.sgstAmount || 0)
       : 0;
 
     gstBreakdownHTML += `
@@ -189,13 +198,17 @@ export const generatePurchaseHTML = ({
       storedata.bankDetails.branch ||
       storedata.bankDetails.upiId);
 
-  const rawGrandTotal = createdInvoice ? effectiveNetTotal : invoiceCalculations.netTotal;
+  const rawGrandTotal = createdInvoice
+    ? effectiveNetTotal
+    : invoiceCalculations.netTotal;
   const roundedGrandTotal = Math.round(rawGrandTotal);
-  const roundOffValue = Number.isFinite(effectiveRoundOff) ? effectiveRoundOff : 0;
+  const roundOffValue = Number.isFinite(effectiveRoundOff)
+    ? effectiveRoundOff
+    : 0;
 
   const upiString = storedata?.bankDetails?.upiId
     ? `upi://pay?pa=${storedata.bankDetails.upiId}&pn=${encodeURIComponent(
-        storedata?.name || "Merchant"
+        storedata?.name || "Merchant",
       )}&am=${roundedGrandTotal}&cu=INR`
     : "";
 
@@ -203,7 +216,7 @@ export const generatePurchaseHTML = ({
     ? `https://quickchart.io/qr?text=${encodeURIComponent(upiString)}`
     : "";
 
-  const colspanCount = 8;
+  const colspanCount = isMrpEnabled ? 8 : 7;
 
   const totalsRowCount =
     2 + // subtotal + total tax
@@ -382,7 +395,9 @@ export const generatePurchaseHTML = ({
                       : ""
                   }
                   ${
-                    formValues.customerName || formValues.partyName || formValues.vendorName
+                    formValues.customerName ||
+                    formValues.partyName ||
+                    formValues.vendorName
                       ? `<div>Name: ${formValues.customerName || formValues.partyName || formValues.vendorName}</div>`
                       : ""
                   }
@@ -394,7 +409,9 @@ export const generatePurchaseHTML = ({
                   ${
                     formValues.customerState || formValues.state
                       ? `<div>State: ${formValues.customerState || formValues.state}${
-                          formValues.customerPostalCode ? `, Pin: ${formValues.customerPostalCode}` : ""
+                          formValues.customerPostalCode
+                            ? `, Pin: ${formValues.customerPostalCode}`
+                            : ""
                         }</div>`
                       : ""
                   }
@@ -426,35 +443,35 @@ export const generatePurchaseHTML = ({
                 }
 
                 <table class="items-table">
-                  <thead>
-                    <tr>
-                      <th>Sl. No.</th>
-                      <th>Item Description</th>
-                      <th>Qty</th>
-                      <th>Unit</th>
-                      <th>MRP(&#8377;)</th>
-                      <th>Rate(&#8377;)</th>
-                      <th>Discount(&#8377;)</th>
-                      <th>Taxable Value(&#8377;)</th>
-                      <th>GST Amt.(%)</th>
-                      <th>Amount(&#8377;)</th>
-                    </tr>
-                  </thead>
+                   <thead>
+      <tr>
+      <th>Sl. No.</th>
+      <th>Item Description</th>
+      <th>Qty</th>
+      <th>Unit</th>
+      ${isMrpEnabled ? `<th>MRP(&#8377;)</th>` : ""}
+      <th>Rate(&#8377;)</th>
+      <th>Discount(&#8377;)</th>
+      <th>Taxable Value(&#8377;)</th>
+      <th>GST Amt.(%)</th>
+      <th>Amount(&#8377;)</th>
+    </tr>
+  </thead>
                   <tbody>
                     ${itemsHTML}
 
                     <tr class="summary-total-row" style="font-weight:bold; background:#f8f8f8;">
-                      <td></td>
-                      <td style="text-align:left;">Total</td>
-                      <td>${totalQty}</td>
-                      <td></td>
-                      <td></td>
-                      <td></td>
-                      <td class="discount">&#8377;${totalDiscount.toFixed(2)}</td>
-                      <td>&#8377;${totalTaxable.toFixed(2)}</td>
-                      <td class="gst-amount">&#8377;${totalGST.toFixed(2)}</td>
-                      <td class="total-amount">&#8377;${totalAmount.toFixed(2)}</td>
-                    </tr>
+  <td></td>
+  <td style="text-align:left;">Total</td>
+  <td>${totalQty}</td>
+  <td></td>
+  ${isMrpEnabled ? `<td></td>` : ""}
+  <td></td>
+  <td class="discount">&#8377;${totalDiscount.toFixed(2)}</td>
+  <td>&#8377;${totalTaxable.toFixed(2)}</td>
+  <td class="gst-amount">&#8377;${totalGST.toFixed(2)}</td>
+  <td class="total-amount">&#8377;${totalAmount.toFixed(2)}</td>
+</tr>
 
                     <tr class="totals-row no-break">
                       <td colspan="${colspanCount}" rowspan="${totalsRowCount}"
@@ -464,7 +481,8 @@ export const generatePurchaseHTML = ({
                         <div style="font-size:11px; font-weight:bold; color:#2c5aa0; margin-top:2px;">${amountInWords}</div>
 
                         ${
-                          invoiceData?.transactions && invoiceData.transactions.length > 0
+                          invoiceData?.transactions &&
+                          invoiceData.transactions.length > 0
                             ? `
                         <div style="margin-top:15px;">
                           <div style="font-weight:bold; color:#2c5aa0; padding:4px 0; font-size:12px; text-align:center; background:#f0f4ff;">Payment Summary</div>
@@ -483,11 +501,11 @@ export const generatePurchaseHTML = ({
                               <tr>
                                 <td style="border:1px solid #ddd; padding:6px; text-align:left;">${format(
                                   new Date(transaction.createdAt),
-                                  "dd-MMM-yyyy hh:mm a"
+                                  "dd-MMM-yyyy hh:mm a",
                                 )}</td>
                                 <td style="border:1px solid #ddd; padding:6px; text-align:right;">&#8377;${transaction.amount.toFixed(2)}</td>
                                 <td style="border:1px solid #ddd; padding:6px; text-align:center;">${transaction.paymentMethod.toUpperCase()}</td>
-                              </tr>`
+                              </tr>`,
                                 )
                                 .join("")}
                             </tbody>
@@ -498,7 +516,9 @@ export const generatePurchaseHTML = ({
                       </td>
                       <td class="label">Subtotal</td>
                       <td class="amount">&#8377;${
-                        createdInvoice ? Number(invoiceData?.subTotal).toFixed(2) : invoiceCalculations.subtotal.toFixed(2)
+                        createdInvoice
+                          ? Number(invoiceData?.subTotal).toFixed(2)
+                          : invoiceCalculations.subtotal.toFixed(2)
                       }</td>
                     </tr>
 
@@ -542,12 +562,16 @@ export const generatePurchaseHTML = ({
                       <td class="amount">&#8377;${
                         createdInvoice
                           ? Number(invoiceData?.grandTotal).toFixed(2)
-                          : (Number(rawGrandTotal) + Number(invoiceCalculations?.roundOff ?? 0)).toFixed(2)
+                          : (
+                              Number(rawGrandTotal) +
+                              Number(invoiceCalculations?.roundOff ?? 0)
+                            ).toFixed(2)
                       }</td>
                     </tr>
 
                     ${
-                      payment.status !== "paid" || Math.round(payment.due * 100) / 100 > 0.01
+                      payment.status !== "paid" ||
+                      Math.round(payment.due * 100) / 100 > 0.01
                         ? `
                     <tr class="payment-row no-break">
                       <td class="label">Paid Amount</td>
@@ -556,7 +580,9 @@ export const generatePurchaseHTML = ({
                     <tr class="payment-row no-break">
                       <td class="label">Due Amount</td>
                       <td class="amount" style="color:${
-                        Math.round(payment.due * 100) / 100 > 0.01 ? "#e53935" : "#000"
+                        Math.round(payment.due * 100) / 100 > 0.01
+                          ? "#e53935"
+                          : "#000"
                       };">&#8377;${payment.due.toFixed(2)}</td>
                     </tr>`
                         : ""
@@ -570,8 +596,8 @@ export const generatePurchaseHTML = ({
                       payment.status === "paid"
                         ? "Amount is Fully Paid"
                         : payment.status === "partial"
-                        ? "Amount is Partially Paid"
-                        : "Amount is Unpaid"
+                          ? "Amount is Partially Paid"
+                          : "Amount is Unpaid"
                     }
                   </span>
                 </div>
@@ -604,7 +630,10 @@ export const generatePurchaseHTML = ({
               </div>
 
               ${
-                !preview && Object.keys(invoiceCalculations.gstBreakdown || {}).some((r) => parseFloat(r) > 0)
+                !preview &&
+                Object.keys(invoiceCalculations.gstBreakdown || {}).some(
+                  (r) => parseFloat(r) > 0,
+                )
                   ? `
               <div class="gst-breakdown">
                 <div class="gst-breakdown-title">Tax Summary</div>

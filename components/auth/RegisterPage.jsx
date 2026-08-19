@@ -5,22 +5,322 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "../../context/ThemeContext";
 import { themeConfig } from "../../utils/ThemeConfig";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "../../context/AuthContext";
-import { ShieldCheck, ArrowLeft, Loader2 } from "lucide-react";
+import {
+  ShieldCheck,
+  ArrowLeft,
+  ArrowRight,
+  Loader2,
+  User,
+  Mail,
+  Phone,
+  Building2,
+  MapPin,
+  Search,
+  X,
+  Check,
+  ChevronDown,
+  FileCheck2,
+  Hash,
+} from "lucide-react";
 import Navigation from "../Navigation";
 
-/**
- * /auth/register/page.jsx
- *
- * 2-step simplified registration:
- *  - Step 1: Personal info (fullName*, phone*, email?)
- *  - Step 2: Business info (businessName*, businessType*, street*, city*, state*, pincode*)
- *  - GST toggle: If "Yes", gstNumber becomes required
- *
- * Uses themeConfig[theme] (same pattern as your other pages)
- */
+/* ---------------- static data ---------------- */
+const BUSINESS_TYPES = [
+  "Grocery / Retail",
+  "Restaurant / Café",
+  "Salon / Beauty",
+  "Service Provider",
+  "Wholesale / Distributor",
+  "Pharmacy",
+  "Electronics",
+  "Clothing / Fashion",
+  "Hardware Store",
+  "Bakery",
+  "Others",
+];
+
+const INDIAN_STATES = [
+  "Andhra Pradesh",
+  "Arunachal Pradesh",
+  "Assam",
+  "Bihar",
+  "Chhattisgarh",
+  "Goa",
+  "Gujarat",
+  "Haryana",
+  "Himachal Pradesh",
+  "Jharkhand",
+  "Karnataka",
+  "Kerala",
+  "Madhya Pradesh",
+  "Maharashtra",
+  "Manipur",
+  "Meghalaya",
+  "Mizoram",
+  "Nagaland",
+  "Odisha",
+  "Punjab",
+  "Rajasthan",
+  "Sikkim",
+  "Tamil Nadu",
+  "Telangana",
+  "Tripura",
+  "Uttar Pradesh",
+  "Uttarakhand",
+  "West Bengal",
+  "Andaman and Nicobar Islands",
+  "Chandigarh",
+  "Dadra and Nagar Haveli and Daman and Diu",
+  "Delhi",
+  "Jammu and Kashmir",
+  "Ladakh",
+  "Lakshadweep",
+  "Puducherry",
+];
+
+const STEPS = [
+  { key: "personal", label: "Personal", icon: User },
+  { key: "business", label: "Business", icon: Building2 },
+];
+
+/* ---------------- small building blocks ---------------- */
+function Field({ label, required, error, icon: Icon, children }) {
+  return (
+    <div className="w-full">
+      <label className="flex items-center gap-1.5 text-sm font-semibold mb-2">
+        {Icon && <Icon className="w-4 h-4 opacity-60" />}
+        {label}
+        {required && <span className="text-red-500">*</span>}
+      </label>
+      {children}
+      {error && <p className="text-xs text-red-500 mt-1.5 ml-0.5">{error}</p>}
+    </div>
+  );
+}
+
+function TextField({
+  value,
+  onChange,
+  placeholder,
+  error,
+  icon: Icon,
+  theme,
+  ...rest
+}) {
+  return (
+    <div className="relative">
+      {Icon && (
+        <Icon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 opacity-45 pointer-events-none" />
+      )}
+      <input
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        className={`w-full h-12 ${Icon ? "pl-10" : "pl-4"} pr-4 rounded-xl border text-[15px]
+          bg-black/[.015] dark:bg-white/5 ${theme.text}
+          ${error ? "border-red-500 focus:ring-red-500/30" : `${theme.outline} focus:ring-blue-500/30`}
+          focus:outline-none focus:ring-4 focus:border-blue-500 transition-all placeholder:opacity-40`}
+        {...rest}
+      />
+    </div>
+  );
+}
+
+function PickerButton({
+  value,
+  placeholder,
+  icon: Icon,
+  error,
+  onClick,
+  theme,
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full h-12 pl-10 pr-4 rounded-xl border text-left text-[15px] relative flex items-center
+        bg-black/[.015] dark:bg-white/5 ${theme.text}
+        ${error ? "border-red-500" : theme.outline}
+        hover:border-blue-500/50 focus:outline-none focus:ring-4 focus:ring-blue-500/30 transition-all`}
+    >
+      <Icon className="absolute left-3.5 w-4.5 h-4.5 opacity-45" />
+      <span className={value ? "" : "opacity-40"}>{value || placeholder}</span>
+      <ChevronDown className="absolute right-3.5 w-4 h-4 opacity-40" />
+    </button>
+  );
+}
+
+function PickerModal({
+  open,
+  onClose,
+  title,
+  items,
+  value,
+  onSelect,
+  searchPlaceholder,
+}) {
+  const [query, setQuery] = useState("");
+  useEffect(() => {
+    if (!open) setQuery("");
+  }, [open]);
+  const filtered = items.filter((i) =>
+    i.toLowerCase().includes(query.toLowerCase()),
+  );
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60]"
+          />
+          <motion.div
+            initial={{ opacity: 0, y: 30, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.97 }}
+            transition={{ duration: 0.18 }}
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[61] w-[92vw] max-w-md max-h-[75vh] rounded-2xl bg-white dark:bg-neutral-900 shadow-2xl flex flex-col overflow-hidden"
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-black/5 dark:border-white/10">
+              <h3 className="font-bold text-lg">{title}</h3>
+              <button
+                onClick={onClose}
+                className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="px-5 py-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 opacity-50" />
+                <input
+                  autoFocus
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={searchPlaceholder}
+                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-black/10 dark:border-white/10 bg-black/[.02] dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-blue-500/40 text-sm"
+                />
+              </div>
+            </div>
+            <div className="overflow-y-auto px-2 pb-4">
+              {filtered.length === 0 ? (
+                <p className="text-center text-sm opacity-50 py-8">
+                  No results found
+                </p>
+              ) : (
+                filtered.map((item) => {
+                  const selected = item === value;
+                  return (
+                    <button
+                      key={item}
+                      onClick={() => {
+                        onSelect(item);
+                        onClose();
+                      }}
+                      className={`w-full text-left px-4 py-3 rounded-xl flex items-center justify-between text-sm transition-colors ${
+                        selected
+                          ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold"
+                          : "hover:bg-black/[.03] dark:hover:bg-white/5"
+                      }`}
+                    >
+                      {item}
+                      {selected && <Check className="w-4 h-4" />}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function TermsModal({ open, onClose, onAccept }) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60]"
+          />
+          <motion.div
+            initial={{ opacity: 0, y: 40, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 30, scale: 0.97 }}
+            transition={{ duration: 0.2 }}
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[61] w-[92vw] max-w-lg max-h-[80vh] rounded-2xl bg-white dark:bg-neutral-900 shadow-2xl flex flex-col overflow-hidden"
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-black/5 dark:border-white/10">
+              <h3 className="font-bold text-lg flex items-center gap-2">
+                <FileCheck2 className="w-5 h-5 text-blue-500" /> Terms &amp;
+                Conditions
+              </h3>
+              <button
+                onClick={onClose}
+                className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="overflow-y-auto px-6 py-5 space-y-3 text-sm leading-relaxed opacity-80">
+              <p>
+                AMDAANI is a billing, invoicing and inventory management
+                platform provided by AMP Technology. By registering, you agree
+                to enter accurate business data and take full responsibility for
+                invoices, GST entries and reports generated using your data.
+              </p>
+              <p>
+                The app does not act as a chartered accountant, tax consultant
+                or legal advisor. All generated reports must be independently
+                verified before official or tax use.
+              </p>
+              <p>
+                Your business, contact and address information is used solely to
+                operate billing, invoicing and reporting features, and may be
+                shared with hosting, SMS/email and payment infrastructure
+                partners strictly for operational purposes.
+              </p>
+              <p>
+                Read the full policy at{" "}
+                <a
+                  href="/terms"
+                  target="_blank"
+                  className="text-blue-500 underline"
+                >
+                  amdaani.com/terms
+                </a>
+                .
+              </p>
+            </div>
+            <div className="px-6 py-4 border-t border-black/5 dark:border-white/10">
+              <button
+                onClick={onAccept}
+                className="w-full h-12 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 text-white font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+              >
+                <Check className="w-4.5 h-4.5" /> I Accept Terms &amp;
+                Conditions
+              </button>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/* ==================================================================== */
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -29,21 +329,17 @@ export default function RegisterPage() {
 
   const { theme } = useTheme();
   const currentTheme = themeConfig[theme];
-
   const { completeRegistration, authState } = useAuth();
 
-  // form state
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0); // 0 = personal, 1 = business
   const [isLoading, setIsLoading] = useState(false);
   const [errorMap, setErrorMap] = useState({});
   const [globalError, setGlobalError] = useState("");
 
-  // Personal
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState(phoneFromQuery || "");
   const [email, setEmail] = useState("");
 
-  // Business
   const [businessName, setBusinessName] = useState("");
   const [businessType, setBusinessType] = useState("");
   const [street, setStreet] = useState("");
@@ -51,42 +347,18 @@ export default function RegisterPage() {
   const [stateVal, setStateVal] = useState("");
   const [pincode, setPincode] = useState("");
 
-  // GST toggle
   const [hasGst, setHasGst] = useState(false);
   const [gstNumber, setGstNumber] = useState("");
 
-  // Basic list for business types and states (can be extended)
-  const businessTypes = [
-    "Grocery / Retail",
-    "Restaurant / Café",
-    "Salon / Beauty",
-    "Service Provider",
-    "Wholesale",
-    "Others",
-  ];
+  const [businessTypeOpen, setBusinessTypeOpen] = useState(false);
+  const [stateOpen, setStateOpen] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
-  const states = [
-    "Andhra Pradesh",
-    "Assam",
-    "Bihar",
-    "Gujarat",
-    "Karnataka",
-    "Maharashtra",
-    "Tamil Nadu",
-    "West Bengal",
-    "Delhi",
-    "Other",
-  ];
-
-  // Prefill phone if authState has something (temp flow)
   useEffect(() => {
-    // some flows may set phone in authState.tempPhone — support that if available
-    if (!phone && authState?.tempPhone) {
-      setPhone(authState.tempPhone);
-    }
+    if (!phone && authState?.tempPhone) setPhone(authState.tempPhone);
   }, [authState, phone]);
 
-  // Validation helpers
   const validators = {
     fullName: (v) =>
       typeof v === "string" && v.trim().length >= 3 && /^[a-zA-Z\s]+$/.test(v),
@@ -102,18 +374,15 @@ export default function RegisterPage() {
       !hasGst ||
       (typeof v === "string" &&
         v.trim().length > 0 &&
-        // lightweight GST pattern check (22AAAAA0000A1Z5) — not overly strict
         /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(
-          v.toUpperCase()
+          v.toUpperCase(),
         )),
   };
 
   const validateStep1 = () => {
     const e = {};
-    if (!validators.fullName(fullName)) {
-      e.fullName =
-        "Full name must be at least 3 letters and contain only alphabets.";
-    }
+    if (!validators.fullName(fullName))
+      e.fullName = "Full name must be at least 3 letters (alphabets only).";
     if (!validators.phone(phone))
       e.phone = "Enter a valid 10-digit Indian mobile.";
     if (!validators.email(email))
@@ -140,201 +409,212 @@ export default function RegisterPage() {
 
   const goNext = () => {
     setGlobalError("");
-    if (step === 1) {
-      if (validateStep1()) setStep(2);
-    }
+    if (step === 0 && validateStep1()) setStep(1);
   };
-
   const goBack = () => {
     setGlobalError("");
-    setStep((s) => Math.max(1, s - 1));
+    setStep((s) => Math.max(0, s - 1));
+  };
+
+  const handleAcceptTerms = () => {
+    setTermsAccepted(true);
+    setTermsOpen(false);
   };
 
   const handleSubmit = async () => {
     setGlobalError("");
-    if (!validateStep2()) {
+    if (!validateStep2()) return;
+    if (!termsAccepted) {
+      setTermsOpen(true);
       return;
     }
 
-    // Build FormData like RN did — backend expects 'storeData[...]' and 'userData[...]'
     const formData = new FormData();
-
-    // storeData
     formData.append("storeData[name]", businessName);
     formData.append("storeData[type]", businessType);
+    formData.append("storeData[email]", email);
     formData.append("storeData[address][street]", street);
     formData.append("storeData[address][city]", city);
     formData.append("storeData[address][state]", stateVal);
     formData.append("storeData[address][postalCode]", pincode);
     formData.append("storeData[address][country]", "IN");
-
-    // GST (conditional)
-    if (hasGst && gstNumber) {
+    if (hasGst && gstNumber)
       formData.append("storeData[gstNumber]", gstNumber.toUpperCase());
-    }
 
-    // userData
     formData.append("userData[phone]", phone);
     formData.append("userData[name]", fullName);
-    if (email) formData.append("userData[email]", email);
+    formData.append("userData[email]", email);
 
-    // Call completeRegistration from AuthContext (it expects multipart/form-data)
     setIsLoading(true);
     try {
       const res = await completeRegistration(formData);
-
-      // show server message in console for debugging
-      console.log("Register response:", res);
-
       if (res?.success) {
-        // completeRegistration inside AuthContext should update auth state & redirect;
-        // but if not, we redirect to dashboard
         router.push("/dashboard");
       } else {
         setGlobalError(res?.message || "Registration failed");
       }
     } catch (err) {
-      console.error("Registration error:", err);
       setGlobalError(err?.message || "Registration failed");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Small UI helpers
-  const fieldClass =
-    "w-full px-3 py-2 rounded-lg border focus:outline-none transition-all";
-  const labelClass = `text-sm font-medium mb-1 ${currentTheme.text}`;
-
   return (
     <>
       <Navigation noLanding={true} />
 
       <div
-        className={`${currentTheme.background} min-h-screen py-12  items-center flex align-center justify-center`}
+        className={`${currentTheme.background} min-h-screen py-10 px-4 flex items-center justify-center`}
       >
-        <div className="max-w-3xl w-full mx-auto px-4">
-          <div
-            className={`w-full rounded-2xl p-8 ${currentTheme.surface} border ${currentTheme.outline} shadow-md`}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-12 h-12 rounded-2xl flex items-center justify-center"
-                  style={{
-                    background:
-                      theme === "light"
-                        ? "linear-gradient(135deg, #1A73E8 0%, #4285F4 100%)"
-                        : "linear-gradient(135deg, #8AB4F8 0%, #669DF6 100%)",
-                  }}
-                >
-                  <ShieldCheck className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h1 className={`text-lg font-bold ${currentTheme.text}`}>
-                    Create your account
-                  </h1>
-                  <p className={`text-xs ${currentTheme.textSecondary}`}>
-                    {step === 1
-                      ? "Step 1 of 2 — Personal"
-                      : "Step 2 of 2 — Business"}
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <div className="text-right text-xs text-muted">
-                  <span className={`${currentTheme.textSecondary}`}>
-                    Secure & encrypted
-                  </span>
-                </div>
-              </div>
+        <div className="w-full max-w-2xl">
+          {/* Hero */}
+          <div className="text-center mb-6">
+            <div
+              className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 shadow-lg shadow-blue-500/20"
+              style={{
+                background:
+                  theme === "light"
+                    ? "linear-gradient(135deg, #1A73E8 0%, #4285F4 100%)"
+                    : "linear-gradient(135deg, #8AB4F8 0%, #669DF6 100%)",
+              }}
+            >
+              <ShieldCheck className="w-8 h-8 text-white" />
             </div>
+            <h1
+              className={`text-2xl md:text-3xl font-extrabold ${currentTheme.text}`}
+            >
+              Create your business account
+            </h1>
+            <p className={`text-sm mt-1 ${currentTheme.textSecondary}`}>
+              Set up AMDAANI — fast, secure and professional billing
+            </p>
+          </div>
 
-            {/* Steps content */}
-            <AnimatePresence mode="wait" initial={false}>
-              {step === 1 ? (
+          {/* Stepper */}
+          <div className="flex items-center justify-center gap-3 mb-6">
+            {STEPS.map((s, i) => {
+              const Icon = s.icon;
+              const active = i === step;
+              const done = i < step;
+              return (
+                <div key={s.key} className="flex items-center gap-3">
+                  <div className="flex flex-col items-center gap-1.5">
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                        done
+                          ? "bg-blue-500 text-white"
+                          : active
+                            ? "bg-blue-500 text-white ring-4 ring-blue-500/20"
+                            : `${currentTheme.surfaceVariant} ${currentTheme.textSecondary}`
+                      }`}
+                    >
+                      {done ? (
+                        <Check className="w-5 h-5" />
+                      ) : (
+                        <Icon className="w-5 h-5" />
+                      )}
+                    </div>
+                    <span
+                      className={`text-xs font-medium ${active ? currentTheme.text : currentTheme.textSecondary}`}
+                    >
+                      {s.label}
+                    </span>
+                  </div>
+                  {i < STEPS.length - 1 && (
+                    <div
+                      className={`w-16 md:w-24 h-1 rounded-full ${done ? "bg-blue-500" : currentTheme.surfaceVariant}`}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Card */}
+          <div
+            className={`rounded-3xl p-6 md:p-10 ${currentTheme.surface} border ${currentTheme.outline} shadow-xl`}
+          >
+            <AnimatePresence mode="wait">
+              {step === 0 ? (
                 <motion.div
                   key="step1"
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
                   transition={{ duration: 0.25 }}
+                  className="space-y-5"
                 >
-                  {/* Step 1 - Personal */}
-                  <div className="space-y-4">
-                    <div>
-                      <label className={labelClass}>Full name *</label>
-                      <input
-                        className={`${fieldClass} ${currentTheme.surface} ${currentTheme.text}`}
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        placeholder="e.g. Rahul Sharma"
-                      />
-                      {errorMap.fullName && (
-                        <p className="text-sm text-red-500 mt-1">
-                          {errorMap.fullName}
-                        </p>
-                      )}
-                    </div>
+                  <Field
+                    label="Full Name"
+                    required
+                    error={errorMap.fullName}
+                    icon={User}
+                  >
+                    <TextField
+                      theme={currentTheme}
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="e.g. Rahul Sharma"
+                      icon={User}
+                      error={errorMap.fullName}
+                    />
+                  </Field>
 
-                    <div>
-                      <label className={labelClass}>Phone number *</label>
-                      <input
-                        className={`${fieldClass} ${currentTheme.surface} ${currentTheme.text}`}
-                        value={phone}
-                        onChange={(e) =>
-                          setPhone(e.target.value.replace(/\D/g, ""))
-                        }
-                        maxLength={10}
-                        placeholder="9876543210"
-                        // If phone came from query we keep it readonly to avoid accidental change
-                        readOnly={!!phoneFromQuery}
-                      />
-                      {errorMap.phone && (
-                        <p className="text-sm text-red-500 mt-1">
-                          {errorMap.phone}
-                        </p>
-                      )}
-                    </div>
+                  <Field
+                    label="Phone Number"
+                    required
+                    error={errorMap.phone}
+                    icon={Phone}
+                  >
+                    <TextField
+                      theme={currentTheme}
+                      value={phone}
+                      onChange={(e) =>
+                        setPhone(e.target.value.replace(/\D/g, ""))
+                      }
+                      maxLength={10}
+                      placeholder="9876543210"
+                      icon={Phone}
+                      error={errorMap.phone}
+                      readOnly={!!phoneFromQuery}
+                    />
+                  </Field>
 
-                    <div>
-                      <label className={labelClass}>Email (optional)</label>
-                      <input
-                        className={`${fieldClass} ${currentTheme.surface} ${currentTheme.text}`}
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="name@company.com"
-                        type="email"
-                      />
-                      {errorMap.email && (
-                        <p className="text-sm text-red-500 mt-1">
-                          {errorMap.email}
-                        </p>
-                      )}
-                    </div>
+                  <Field
+                    label="Email Address"
+                    error={errorMap.email}
+                    icon={Mail}
+                  >
+                    <TextField
+                      theme={currentTheme}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="name@company.com"
+                      type="email"
+                      icon={Mail}
+                      error={errorMap.email}
+                    />
+                  </Field>
 
-                    <div className="flex items-center justify-between gap-3 mt-4">
-                      <div>{/* nothing */}</div>
+                  {globalError && (
+                    <p className="text-sm text-red-500">{globalError}</p>
+                  )}
 
-                      <div className="flex gap-3">
-                        <Button
-                          variant="ghost"
-                          onClick={() => router.push("/auth")}
-                          className="px-4 py-2"
-                        >
-                          Cancel
-                        </Button>
-
-                        <Button
-                          onClick={goNext}
-                          className={`px-4 py-2 ${currentTheme.buttonPrimary}`}
-                        >
-                          Continue
-                        </Button>
-                      </div>
-                    </div>
+                  <div className="flex justify-end gap-3 pt-2">
+                    <Button
+                      variant="ghost"
+                      onClick={() => router.push("/auth")}
+                      className="h-12 px-6 rounded-xl"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={goNext}
+                      className={`h-12 px-8 rounded-xl text-base font-semibold ${currentTheme.buttonPrimary} flex items-center gap-2`}
+                    >
+                      Continue <ArrowRight className="w-4 h-4" />
+                    </Button>
                   </div>
                 </motion.div>
               ) : (
@@ -344,128 +624,124 @@ export default function RegisterPage() {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
                   transition={{ duration: 0.25 }}
+                  className="space-y-5"
                 >
-                  {/* Step 2 - Business */}
-                  <div className="space-y-4">
-                    <div>
-                      <label className={labelClass}>Business name *</label>
-                      <input
-                        className={`${fieldClass} ${currentTheme.surface} ${currentTheme.text}`}
-                        value={businessName}
-                        onChange={(e) => setBusinessName(e.target.value)}
-                        placeholder="e.g. FreshMart Pvt Ltd"
-                      />
-                      {errorMap.businessName && (
-                        <p className="text-sm text-red-500 mt-1">
-                          {errorMap.businessName}
-                        </p>
-                      )}
-                    </div>
+                  <Field
+                    label="Business Name"
+                    required
+                    error={errorMap.businessName}
+                    icon={Building2}
+                  >
+                    <TextField
+                      theme={currentTheme}
+                      value={businessName}
+                      onChange={(e) => setBusinessName(e.target.value)}
+                      placeholder="e.g. FreshMart Pvt Ltd"
+                      icon={Building2}
+                      error={errorMap.businessName}
+                    />
+                  </Field>
 
-                    <div>
-                      <label className={labelClass}>Business type *</label>
-                      <select
-                        value={businessType}
-                        onChange={(e) => setBusinessType(e.target.value)}
-                        className={`${fieldClass} ${currentTheme.surface} ${currentTheme.text}`}
-                      >
-                        <option value="">Select business type</option>
-                        {businessTypes.map((b) => (
-                          <option key={b} value={b}>
-                            {b}
-                          </option>
-                        ))}
-                      </select>
-                      {errorMap.businessType && (
-                        <p className="text-sm text-red-500 mt-1">
-                          {errorMap.businessType}
-                        </p>
-                      )}
-                    </div>
+                  <Field
+                    label="Business Type"
+                    required
+                    error={errorMap.businessType}
+                    icon={Building2}
+                  >
+                    <PickerButton
+                      theme={currentTheme}
+                      icon={Building2}
+                      value={businessType}
+                      placeholder="Select business type"
+                      error={errorMap.businessType}
+                      onClick={() => setBusinessTypeOpen(true)}
+                    />
+                  </Field>
 
-                    <div>
-                      <label className={labelClass}>Street *</label>
-                      <input
-                        className={`${fieldClass} ${currentTheme.surface} ${currentTheme.text}`}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Field
+                      label="Street Address"
+                      required
+                      error={errorMap.street}
+                      icon={MapPin}
+                    >
+                      <TextField
+                        theme={currentTheme}
                         value={street}
                         onChange={(e) => setStreet(e.target.value)}
-                        placeholder="Street address"
+                        placeholder="123 MG Road"
+                        icon={MapPin}
+                        error={errorMap.street}
                       />
-                      {errorMap.street && (
-                        <p className="text-sm text-red-500 mt-1">
-                          {errorMap.street}
-                        </p>
-                      )}
-                    </div>
+                    </Field>
+                    <Field
+                      label="City"
+                      required
+                      error={errorMap.city}
+                      icon={MapPin}
+                    >
+                      <TextField
+                        theme={currentTheme}
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                        placeholder="Mumbai"
+                        icon={MapPin}
+                        error={errorMap.city}
+                      />
+                    </Field>
+                    <Field
+                      label="State"
+                      required
+                      error={errorMap.stateVal}
+                      icon={MapPin}
+                    >
+                      <PickerButton
+                        theme={currentTheme}
+                        icon={MapPin}
+                        value={stateVal}
+                        placeholder="Select state"
+                        error={errorMap.stateVal}
+                        onClick={() => setStateOpen(true)}
+                      />
+                    </Field>
+                    <Field
+                      label="Pincode"
+                      required
+                      error={errorMap.pincode}
+                      icon={Hash}
+                    >
+                      <TextField
+                        theme={currentTheme}
+                        value={pincode}
+                        onChange={(e) =>
+                          setPincode(e.target.value.replace(/\D/g, ""))
+                        }
+                        maxLength={6}
+                        placeholder="400001"
+                        icon={Hash}
+                        error={errorMap.pincode}
+                      />
+                    </Field>
+                  </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <div>
-                        <label className={labelClass}>City *</label>
-                        <input
-                          className={`${fieldClass} ${currentTheme.surface} ${currentTheme.text}`}
-                          value={city}
-                          onChange={(e) => setCity(e.target.value)}
-                          placeholder="City"
-                        />
-                        {errorMap.city && (
-                          <p className="text-sm text-red-500 mt-1">
-                            {errorMap.city}
-                          </p>
-                        )}
-                      </div>
-
-                      <div>
-                        <label className={labelClass}>State *</label>
-                        <select
-                          value={stateVal}
-                          onChange={(e) => setStateVal(e.target.value)}
-                          className={`${fieldClass} ${currentTheme.surface} ${currentTheme.text}`}
-                        >
-                          <option value="">Select state</option>
-                          {states.map((s) => (
-                            <option key={s} value={s}>
-                              {s}
-                            </option>
-                          ))}
-                        </select>
-                        {errorMap.stateVal && (
-                          <p className="text-sm text-red-500 mt-1">
-                            {errorMap.stateVal}
-                          </p>
-                        )}
-                      </div>
-
-                      <div>
-                        <label className={labelClass}>Pincode *</label>
-                        <input
-                          className={`${fieldClass} ${currentTheme.surface} ${currentTheme.text}`}
-                          value={pincode}
-                          onChange={(e) =>
-                            setPincode(e.target.value.replace(/\D/g, ""))
-                          }
-                          maxLength={6}
-                          placeholder="6-digit pincode"
-                        />
-                        {errorMap.pincode && (
-                          <p className="text-sm text-red-500 mt-1">
-                            {errorMap.pincode}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* GST toggle */}
-                    <div className="flex items-center gap-3 mt-2">
-                      <label className={`${currentTheme.text} font-medium`}>
-                        Do you have GST?
-                      </label>
-                      <div className="flex items-center gap-2">
+                  {/* GSTIN toggle */}
+                  <div
+                    className={`rounded-2xl border ${currentTheme.outline} p-4`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`font-semibold text-sm ${currentTheme.text}`}
+                      >
+                        Do you have a GSTIN?
+                      </span>
+                      <div className="flex gap-2">
                         <button
                           onClick={() => setHasGst(true)}
-                          className={`px-3 py-1 rounded ${
-                            hasGst ? "ring-2 ring-offset-1" : "opacity-60"
+                          className={`px-5 h-9 rounded-full text-sm font-semibold transition-all ${
+                            hasGst
+                              ? "bg-blue-500 text-white"
+                              : `${currentTheme.surfaceVariant} ${currentTheme.textSecondary}`
                           }`}
-                          aria-pressed={hasGst}
                         >
                           Yes
                         </button>
@@ -474,76 +750,100 @@ export default function RegisterPage() {
                             setHasGst(false);
                             setGstNumber("");
                           }}
-                          className={`px-3 py-1 rounded ${
-                            !hasGst ? "ring-2 ring-offset-1" : "opacity-60"
+                          className={`px-5 h-9 rounded-full text-sm font-semibold transition-all ${
+                            !hasGst
+                              ? "bg-blue-500 text-white"
+                              : `${currentTheme.surfaceVariant} ${currentTheme.textSecondary}`
                           }`}
-                          aria-pressed={!hasGst}
                         >
                           No
                         </button>
                       </div>
                     </div>
 
-                    {hasGst && (
-                      <div>
-                        <label className={labelClass}>GST Number *</label>
-                        <input
-                          className={`${fieldClass} ${currentTheme.surface} ${currentTheme.text}`}
-                          value={gstNumber}
-                          onChange={(e) =>
-                            setGstNumber(e.target.value.toUpperCase())
-                          }
-                          placeholder="22AAAAA0000A1Z5"
-                        />
-                        {errorMap.gstNumber && (
-                          <p className="text-sm text-red-500 mt-1">
-                            {errorMap.gstNumber}
-                          </p>
+                    <AnimatePresence>
+                      {hasGst && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="pt-4"
+                        >
+                          <TextField
+                            theme={currentTheme}
+                            value={gstNumber}
+                            onChange={(e) =>
+                              setGstNumber(e.target.value.toUpperCase())
+                            }
+                            placeholder="22AAAAA0000A1Z5"
+                            error={errorMap.gstNumber}
+                            maxLength={15}
+                          />
+                          {errorMap.gstNumber && (
+                            <p className="text-xs text-red-500 mt-1.5">
+                              {errorMap.gstNumber}
+                            </p>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  {/* Terms row */}
+                  <button
+                    type="button"
+                    onClick={() => setTermsOpen(true)}
+                    className={`w-full flex items-center justify-between rounded-2xl border ${currentTheme.outline} p-4 text-left hover:border-blue-500/50 transition-colors`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-6 h-6 rounded-md flex items-center justify-center border-2 ${
+                          termsAccepted
+                            ? "bg-blue-500 border-blue-500"
+                            : `${currentTheme.outline}`
+                        }`}
+                      >
+                        {termsAccepted && (
+                          <Check className="w-4 h-4 text-white" />
                         )}
                       </div>
-                    )}
-
-                    {globalError && (
-                      <p className="text-sm text-red-500 mt-2">{globalError}</p>
-                    )}
-
-                    <div className="flex items-center justify-between gap-3 mt-6">
-                      <div className="flex gap-3">
-                        <Button
-                          onClick={goBack}
-                          className="px-4 py-2"
-                          variant="ghost"
-                        >
-                          <div className="flex items-center gap-2">
-                            <ArrowLeft className="w-4 h-4" /> Back
-                          </div>
-                        </Button>
-                      </div>
-
-                      <div className="flex gap-3">
-                        <Button
-                          variant="ghost"
-                          onClick={() => router.push("/auth")}
-                          className="px-4 py-2"
-                        >
-                          Cancel
-                        </Button>
-
-                        <Button
-                          onClick={handleSubmit}
-                          className={`px-4 py-2 ${currentTheme.buttonPrimary} flex items-center gap-2`}
-                        >
-                          {isLoading ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Registering...
-                            </>
-                          ) : (
-                            "Register"
-                          )}
-                        </Button>
-                      </div>
+                      <span
+                        className={`text-sm font-medium ${currentTheme.text}`}
+                      >
+                        I agree to the Terms &amp; Conditions
+                      </span>
                     </div>
+                    <span className="text-xs text-blue-500 font-semibold">
+                      Read
+                    </span>
+                  </button>
+
+                  {globalError && (
+                    <p className="text-sm text-red-500">{globalError}</p>
+                  )}
+
+                  <div className="flex items-center justify-between gap-3 pt-2">
+                    <Button
+                      variant="ghost"
+                      onClick={goBack}
+                      className="h-12 px-6 rounded-xl flex items-center gap-2"
+                    >
+                      <ArrowLeft className="w-4 h-4" /> Back
+                    </Button>
+                    <Button
+                      onClick={handleSubmit}
+                      disabled={isLoading}
+                      className={`h-12 px-8 rounded-xl text-base font-semibold ${currentTheme.buttonPrimary} flex items-center gap-2`}
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />{" "}
+                          Registering...
+                        </>
+                      ) : (
+                        "Register"
+                      )}
+                    </Button>
                   </div>
                 </motion.div>
               )}
@@ -551,7 +851,7 @@ export default function RegisterPage() {
           </div>
 
           <p
-            className={`text-center text-xs mt-4 ${currentTheme.textSecondary}`}
+            className={`text-center text-xs mt-5 ${currentTheme.textSecondary}`}
           >
             By creating an account you agree to our{" "}
             <a href="/terms" className="underline">
@@ -565,6 +865,30 @@ export default function RegisterPage() {
           </p>
         </div>
       </div>
+
+      <PickerModal
+        open={businessTypeOpen}
+        onClose={() => setBusinessTypeOpen(false)}
+        title="Select Business Type"
+        items={BUSINESS_TYPES}
+        value={businessType}
+        onSelect={setBusinessType}
+        searchPlaceholder="Search business types..."
+      />
+      <PickerModal
+        open={stateOpen}
+        onClose={() => setStateOpen(false)}
+        title="Select State"
+        items={INDIAN_STATES}
+        value={stateVal}
+        onSelect={setStateVal}
+        searchPlaceholder="Search states..."
+      />
+      <TermsModal
+        open={termsOpen}
+        onClose={() => setTermsOpen(false)}
+        onAccept={handleAcceptTerms}
+      />
     </>
   );
 }

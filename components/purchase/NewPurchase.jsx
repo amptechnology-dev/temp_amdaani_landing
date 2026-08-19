@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { format } from "date-fns";
-
+import { useAuth } from "../../context/AuthContext";
 import api from "../../utils/api";
 import { generatePurchaseHTML } from "../../utils/purchaseTemplate";
 
@@ -35,6 +35,7 @@ function determineGstType(storeGst, vendorGst, storeState, vendorState) {
 
 export default function PurchaseFlow() {
   // step: "list" | "form" | "items"
+  const { isMrpEnabled } = useAuth();
   const [step, setStep] = useState("list");
   const [purchaseRefreshKey, setPurchaseRefreshKey] = useState(0);
 
@@ -81,7 +82,7 @@ export default function PurchaseFlow() {
       const discountType = item.purchaseDiscountType || "amount";
       const rawDiscountInput = Number(item.purchaseDiscount ?? 0);
       const purchaseDiscount =
-        discountType === "percent"
+        discountType === "percentage"
           ? (rawCostPrice * rawDiscountInput) / 100
           : rawDiscountInput;
       const netRate = Math.max(0, rawCostPrice - purchaseDiscount);
@@ -472,7 +473,7 @@ export default function PurchaseFlow() {
           const discountType = item.purchaseDiscountType || "amount";
           const rawDiscountInput = Number(item.purchaseDiscount ?? 0);
           const actualDiscountAmount =
-            discountType === "percent"
+            discountType === "percentage"
               ? (rawCostPrice * rawDiscountInput) / 100
               : rawDiscountInput;
 
@@ -523,6 +524,7 @@ export default function PurchaseFlow() {
         storedata,
         invoiceDate: new Date(),
         isGstInvoice,
+        isMrpEnabled,
         payment: {
           paid: payment.paid,
           due: payment.due,
@@ -536,10 +538,8 @@ export default function PurchaseFlow() {
 
       await resetFormState();
       setStep("list");
-    } catch(error) {
-      toast.error(
-        isEditMode ? error?.message : error?.message,
-      );
+    } catch (error) {
+      toast.error(isEditMode ? error?.message : error?.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -594,6 +594,7 @@ export default function PurchaseFlow() {
       formValues={formValues}
       storedata={storedata}
       isGstInvoice={isGstInvoice}
+      isMrpEnabled={isMrpEnabled}
       handleUpdateQuantity={handleUpdateQuantity}
       handleUpdateItemField={handleUpdateItemField}
       handleRemoveItem={handleRemoveItem}

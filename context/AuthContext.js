@@ -1,6 +1,13 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useMemo } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  useRef,
+} from "react";
 import api, { setAuthHandlers } from "../utils/api";
 import { extractErrorMessage } from "../utils/errorHandler";
 import { jwtDecode } from "jwt-decode";
@@ -35,6 +42,8 @@ export const permissions = {
 
 export let isBootstrapping = true;
 
+const REFRESH_BUFFER_MS = 60 * 1000;
+
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
@@ -55,12 +64,13 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
 
-  // Register handlers for API refresh system
+  const refreshPromiseRef = useRef(null);
+  const refreshTimerRef = useRef(null);
+
   useEffect(() => {
-    setAuthHandlers(updateAuthState, logout);
+    setAuthHandlers(updateAuthState, logout, refreshAccessToken);
   }, []);
 
-  // Restore auth from localStorage
   useEffect(() => {
     const bootstrap = async () => {
       try {
@@ -72,34 +82,31 @@ export const AuthProvider = ({ children }) => {
           const parsed = JSON.parse(storedAuth);
 
           if (parsed.accessToken) {
-            const decoded = jwtDecode(parsed.accessToken);
+            const decoded = safeDecode(parsed.accessToken);
+            const stillValid =
+              decoded && decoded.exp * 1000 > Date.now() + REFRESH_BUFFER_MS;
 
-            if (decoded.exp * 1000 > Date.now()) {
-              setAuthState({ ...parsed, isAuthenticated: true });
-            } else if (parsed.refreshToken) {
-              try {
-                const res = await api.post("/auth/refresh-tokens", {
-                  refreshToken: parsed.refreshToken,
-                });
-
-                if (res.success && res.data) {
-                  const updated = {
-                    ...parsed,
-                    accessToken: res.data.accessToken,
-                    refreshToken: res.data.refreshToken,
-                    isAuthenticated: true,
-                  };
-                  localStorage.setItem("auth", JSON.stringify(updated));
-                  setAuthState(updated);
-                }
-              } catch {
-                setAuthState({ isAuthenticated: false });
+            if (stillValid) {
+              const sessionOk = await verifySessionSilently(parsed.accessToken);
+              if (sessionOk) {
+                setAuthState({ ...parsed, isAuthenticated: true });
+                scheduleProactiveRefresh(parsed.accessToken);
+              } else if (parsed.refreshToken) {
+                await tryRefresh(parsed);
+              } else {
+                await hardLogoutLocalOnly();
               }
+            } else if (parsed.refreshToken) {
+              await tryRefresh(parsed);
+            } else {
+              await hardLogoutLocalOnly();
             }
+          } else if (parsed.tempToken) {
+            setAuthState({ ...parsed, isAuthenticated: false });
           }
         }
       } catch {
-        setAuthState({ isAuthenticated: false });
+        await hardLogoutLocalOnly();
       } finally {
         setLoading(false);
         isBootstrapping = false;
@@ -107,6 +114,10 @@ export const AuthProvider = ({ children }) => {
     };
 
     bootstrap();
+
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    };
   }, []);
 
   // Fetch user profile after login
@@ -115,7 +126,104 @@ export const AuthProvider = ({ children }) => {
       fetchUserProfile();
       fetchSubscription();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authState.isAuthenticated]);
+
+  const safeDecode = (token) => {
+    try {
+      return jwtDecode(token);
+    } catch {
+      return null;
+    }
+  };
+
+  const verifySessionSilently = async (accessToken) => {
+    try {
+      const res = await api.get("/auth/verify-session", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      return !!res.success;
+    } catch {
+      return false;
+    }
+  };
+
+  const refreshAccessToken = async (currentState) => {
+    const state = currentState || authState;
+
+    if (!state.refreshToken) {
+      await logout();
+      return null;
+    }
+
+    // Already ekta refresh cholche? seta e await koro, notun call na kore
+    if (refreshPromiseRef.current) {
+      return refreshPromiseRef.current;
+    }
+
+    refreshPromiseRef.current = (async () => {
+      try {
+        const res = await api.post("/auth/refresh-tokens", {
+          refreshToken: state.refreshToken,
+        });
+
+        if (res.success && res.data) {
+          const updated = {
+            ...state,
+            accessToken: res.data.accessToken,
+            refreshToken: res.data.refreshToken || state.refreshToken,
+            isAuthenticated: true,
+          };
+
+          await updateAuthState(updated);
+
+          Cookies.set("access_token", updated.accessToken);
+          Cookies.set("refresh_token", updated.refreshToken);
+
+          scheduleProactiveRefresh(updated.accessToken);
+
+          return updated.accessToken;
+        }
+
+        await logout();
+        return null;
+      } catch (err) {
+        await logout();
+        return null;
+      } finally {
+        refreshPromiseRef.current = null;
+      }
+    })();
+
+    return refreshPromiseRef.current;
+  };
+
+  const tryRefresh = async (parsed) => {
+    const newToken = await refreshAccessToken(parsed);
+    if (!newToken) {
+      await hardLogoutLocalOnly();
+    }
+  };
+
+  // ✅ token expire howar age e nijei refresh kore newa (proactive) — jate hঠাৎ 401 e logout na hoy
+  const scheduleProactiveRefresh = (accessToken) => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+
+    const decoded = safeDecode(accessToken);
+    if (!decoded?.exp) return;
+
+    const msUntilRefresh = decoded.exp * 1000 - Date.now() - REFRESH_BUFFER_MS;
+
+    if (msUntilRefresh <= 0) {
+      // already close to expiry — ekhoni refresh koro
+      refreshAccessToken();
+      return;
+    }
+
+    refreshTimerRef.current = setTimeout(() => {
+      refreshAccessToken();
+    }, msUntilRefresh);
+  };
 
   // Fetch subscription
   const fetchSubscription = async () => {
@@ -145,12 +253,11 @@ export const AuthProvider = ({ children }) => {
     try {
       const res = await api.get("/auth/me");
       if (res.success && res.data) {
-        const updated = {
-          ...authState,
-          user: res.data,
-        };
-        setAuthState(updated);
-        localStorage.setItem("auth", JSON.stringify(updated));
+        setAuthState((prev) => {
+          const updated = { ...prev, user: res.data };
+          localStorage.setItem("auth", JSON.stringify(updated));
+          return updated;
+        });
       }
     } catch (err) {
       console.log("[Auth] User fetch failed:", err);
@@ -172,8 +279,6 @@ export const AuthProvider = ({ children }) => {
       const res = await api.post("/auth/verify-otp", { phone, otp });
 
       if (res.success) {
-        console.log("OTP VERIFY RESPONSE:", res);
-
         // 1️⃣ USER EXISTS → DIRECT LOGIN
         if (res.data?.user) {
           const newAuth = {
@@ -190,16 +295,14 @@ export const AuthProvider = ({ children }) => {
           Cookies.set("refresh_token", res.data.tokens.refreshToken);
           Cookies.set("user", JSON.stringify(res.data.user));
 
-          // redirect to dashboard
-          router.push("/dashboard");
+          scheduleProactiveRefresh(newAuth.accessToken);
 
+          router.push("/dashboard");
           return res;
         }
 
         // 2️⃣ NEW USER → REGISTRATION FLOW
         if (res.data?.tempToken) {
-          console.log("TEMP TOKEN RECEIVED:", res.data.tempToken);
-
           await updateAuthState({
             isAuthenticated: false,
             user: null,
@@ -213,7 +316,6 @@ export const AuthProvider = ({ children }) => {
         }
       }
 
-      // ❌ OTP FAILED
       return res;
     } catch (err) {
       return { success: false, message: err.message };
@@ -239,6 +341,12 @@ export const AuthProvider = ({ children }) => {
           tempToken: null,
         };
         await updateAuthState(newAuth);
+
+        Cookies.set("access_token", res.data.tokens.accessToken);
+        Cookies.set("refresh_token", res.data.tokens.refreshToken);
+        Cookies.set("user", JSON.stringify(res.data.user));
+
+        scheduleProactiveRefresh(newAuth.accessToken);
       }
 
       return res;
@@ -247,9 +355,13 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Logout
-  const logout = async () => {
+  // ✅ শুধু local state/storage clear — backend call ছাড়া (bootstrap fail-safe এর জন্য)
+  const hardLogoutLocalOnly = async () => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     localStorage.removeItem("auth");
+    Cookies.remove("access_token");
+    Cookies.remove("refresh_token");
+    Cookies.remove("user");
     setAuthState({
       isAuthenticated: false,
       user: null,
@@ -257,8 +369,25 @@ export const AuthProvider = ({ children }) => {
       refreshToken: null,
       tempToken: null,
     });
+  };
 
-    router.push("/auth");
+  // ✅ Logout — এবার আসল /auth/logout API hit করে, তারপর local state clear করে redirect করে
+  const logout = async () => {
+    try {
+      if (authState.accessToken) {
+        await api.post(
+          "/auth/logout",
+          {},
+          { headers: { Authorization: `Bearer ${authState.accessToken}` } },
+        );
+      }
+    } catch (err) {
+      // API fail hole o local session clear kore dibo, user jate atke na thake
+      console.log("[Auth] Logout API failed:", err?.message);
+    } finally {
+      await hardLogoutLocalOnly();
+      router.push("/auth");
+    }
   };
 
   const hasPermission = (perm) => {
@@ -290,6 +419,7 @@ export const AuthProvider = ({ children }) => {
       verifyOtp,
       completeRegistration,
       logout,
+      refreshAccessToken,
       subscription,
       usage,
       subLoading,

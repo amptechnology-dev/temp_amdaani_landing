@@ -11,8 +11,6 @@ import {
   ShoppingBag,
   UserCircle2,
   Sparkles,
-  Search,
-  Trash2,
   FileText,
   MapPin,
   Building2,
@@ -20,6 +18,7 @@ import {
   Plus,
   Percent,
   X,
+  Trash2,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,15 +29,17 @@ import InvoiceSummary from "./InvoiceSummary";
 import AddItemFormModal from "./AddItemFormModal";
 
 // -------------------------------
-// Inline product combobox for the "add row" — uses a PORTAL so its dropdown
-// is never clipped by any ancestor's overflow-hidden/overflow-x-auto.
+// Inline product combobox for the "add row" — portal based dropdown,
+// arrow-key navigation (Up/Down/Enter/Escape) mirrors the Purchase flow.
 // -------------------------------
 function InlineProductCombobox({ products, onSelect, onCreateNew }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
+  const [highlightIndex, setHighlightIndex] = useState(-1);
   const inputRef = useRef(null);
   const dropdownRef = useRef(null);
+  const itemRefs = useRef([]);
 
   const updateCoords = () => {
     if (!inputRef.current) return;
@@ -90,16 +91,60 @@ function InlineProductCombobox({ products, onSelect, onCreateNew }) {
     (p) => p.name?.toLowerCase().trim() === query.trim().toLowerCase(),
   );
 
+  // ✅ Reset highlight whenever the visible list changes (new query / open)
+  useEffect(() => {
+    setHighlightIndex(-1);
+  }, [query, open]);
+
+  // ✅ Keep the highlighted row scrolled into view
+  useEffect(() => {
+    if (highlightIndex >= 0 && itemRefs.current[highlightIndex]) {
+      itemRefs.current[highlightIndex].scrollIntoView({ block: "nearest" });
+    }
+  }, [highlightIndex]);
+
   const pick = (product) => {
     onSelect(product);
     setQuery("");
     setOpen(false);
+    setHighlightIndex(-1);
   };
 
   const handleCreateNew = () => {
     onCreateNew(query.trim());
     setQuery("");
     setOpen(false);
+    setHighlightIndex(-1);
+  };
+
+  const showCreateRow = query.trim() && !exactMatch;
+  const totalRows = filtered.length + (showCreateRow ? 1 : 0);
+
+  const handleKeyDown = (e) => {
+    if (!open && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+      setOpen(true);
+      return;
+    }
+    if (!open) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightIndex((prev) => (prev + 1 >= totalRows ? 0 : prev + 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightIndex((prev) => (prev - 1 < 0 ? totalRows - 1 : prev - 1));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (highlightIndex === -1) return;
+      if (highlightIndex < filtered.length) {
+        pick(filtered[highlightIndex]);
+      } else if (showCreateRow) {
+        handleCreateNew();
+      }
+    } else if (e.key === "Escape") {
+      setOpen(false);
+      setHighlightIndex(-1);
+    }
   };
 
   return (
@@ -113,6 +158,7 @@ function InlineProductCombobox({ products, onSelect, onCreateNew }) {
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
+          onKeyDown={handleKeyDown}
           className="w-full max-w-[220px] h-8 px-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
         />
       </div>
@@ -131,11 +177,15 @@ function InlineProductCombobox({ products, onSelect, onCreateNew }) {
             }}
             className="bg-white border border-slate-200 rounded-md shadow-lg max-h-72 overflow-y-auto"
           >
-            {filtered.map((p) => (
+            {filtered.map((p, idx) => (
               <div
                 key={p._id}
+                ref={(el) => (itemRefs.current[idx] = el)}
+                onMouseEnter={() => setHighlightIndex(idx)}
                 onClick={() => pick(p)}
-                className="flex items-center justify-between px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0"
+                className={`flex items-center justify-between px-3 py-2 text-sm cursor-pointer border-b border-slate-50 last:border-0 ${
+                  highlightIndex === idx ? "bg-blue-50" : "hover:bg-blue-50"
+                }`}
               >
                 <div className="min-w-0">
                   <p className="font-medium text-slate-800 truncate">
@@ -157,11 +207,17 @@ function InlineProductCombobox({ products, onSelect, onCreateNew }) {
               </p>
             )}
 
-            {query.trim() && !exactMatch && (
+            {showCreateRow && (
               <button
                 type="button"
+                ref={(el) => (itemRefs.current[filtered.length] = el)}
+                onMouseEnter={() => setHighlightIndex(filtered.length)}
                 onClick={handleCreateNew}
-                className="w-full flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-blue-600 hover:bg-blue-50 border-t border-slate-100"
+                className={`w-full flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-blue-600 border-t border-slate-100 ${
+                  highlightIndex === filtered.length
+                    ? "bg-blue-50"
+                    : "hover:bg-blue-50"
+                }`}
               >
                 <Plus className="w-3.5 h-3.5" />
                 Create "{query.trim()}" as new product
@@ -213,6 +269,7 @@ export default function NewInvoiceFormPage({
   formValues,
   storedata,
   isGstInvoice,
+  isMrpEnabled = false,
   handleUpdateQuantity,
   handleUpdateItemField,
   handleRemoveItem,
@@ -241,6 +298,9 @@ export default function NewInvoiceFormPage({
   );
   // ✅ which field's typeahead dropdown is currently open: "name" | "mobile" | null
   const [activeField, setActiveField] = useState(null);
+  // ✅ keyboard highlight index shared between mobile/name dropdown (only one open at a time)
+  const [customerHighlightIndex, setCustomerHighlightIndex] = useState(-1);
+  const customerItemRefs = useRef([]);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [newItemPrefillName, setNewItemPrefillName] = useState("");
   const customerGridRef = useRef(null);
@@ -281,7 +341,6 @@ export default function NewInvoiceFormPage({
         gstNumber: selectedCustomer.gstNumber || "",
       });
 
-      // customers list-e match pele _id-o link kore dao (optional — locked na kore)
       const matched = customers.find((c) => c.mobile === selectedCustomer.mobile);
       if (matched) setSelectedCustomerId(matched._id);
     }
@@ -313,6 +372,23 @@ export default function NewInvoiceFormPage({
       .slice(0, 8);
   })();
 
+  // ✅ Reset highlight whenever active field or the query changes
+  useEffect(() => {
+    setCustomerHighlightIndex(-1);
+  }, [activeField, customerForm.mobile, customerForm.name]);
+
+  // ✅ Keep the highlighted row scrolled into view
+  useEffect(() => {
+    if (
+      customerHighlightIndex >= 0 &&
+      customerItemRefs.current[customerHighlightIndex]
+    ) {
+      customerItemRefs.current[customerHighlightIndex].scrollIntoView({
+        block: "nearest",
+      });
+    }
+  }, [customerHighlightIndex]);
+
   const pickCustomerSuggestion = (c) => {
     setSelectedCustomerId(c._id);
     setCustomerForm({
@@ -325,6 +401,7 @@ export default function NewInvoiceFormPage({
       gstNumber: c.gstNumber || "",
     });
     setActiveField(null);
+    setCustomerHighlightIndex(-1);
   };
 
   const handleClearCustomer = () => {
@@ -337,10 +414,43 @@ export default function NewInvoiceFormPage({
     setCustomerForm((prev) => ({ ...prev, [field]: v }));
 
     // ✅ jodi user select kora customer-er field change kore, detach kore dao
-    // (ar seta ekhon "new customer" hisebe treat hobe)
     if (selectedCustomerId) {
       const matched = customers.find((c) => c._id === selectedCustomerId);
       if (matched && matched[field] !== v) setSelectedCustomerId("");
+    }
+  };
+
+  // ✅ Arrow-key navigation for the mobile/name typeahead fields
+  const handleCustomerFieldKeyDown = (fieldName) => (e) => {
+    const isOpen = activeField === fieldName && customerSuggestions.length > 0;
+
+    if (!isOpen && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+      setActiveField(fieldName);
+      return;
+    }
+    if (!isOpen) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setCustomerHighlightIndex((prev) =>
+        prev + 1 >= customerSuggestions.length ? 0 : prev + 1,
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setCustomerHighlightIndex((prev) =>
+        prev - 1 < 0 ? customerSuggestions.length - 1 : prev - 1,
+      );
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (
+        customerHighlightIndex >= 0 &&
+        customerSuggestions[customerHighlightIndex]
+      ) {
+        pickCustomerSuggestion(customerSuggestions[customerHighlightIndex]);
+      }
+    } else if (e.key === "Escape") {
+      setActiveField(null);
+      setCustomerHighlightIndex(-1);
     }
   };
 
@@ -380,6 +490,15 @@ export default function NewInvoiceFormPage({
   const handleDecimalBlur = (id, field) => (e) => {
     const n = parseFloat(e.target.value);
     handleUpdateItemField(id, field, isNaN(n) ? 0 : n);
+  };
+
+  // ✅ Discount field — same free-typing behaviour, but on blur clamp to 0-100
+  // when discount type is "percent" so it can never push the price negative.
+  const handleDiscountBlur = (id, discountType) => (e) => {
+    let n = parseFloat(e.target.value);
+    if (isNaN(n) || n < 0) n = 0;
+    if (discountType === "percent" && n > 100) n = 100;
+    handleUpdateItemField(id, "discount", n);
   };
 
   if (isLoading) {
@@ -468,17 +587,24 @@ export default function NewInvoiceFormPage({
                   value={customerForm.mobile}
                   onChange={updateField("mobile")}
                   onFocus={() => setActiveField("mobile")}
+                  onKeyDown={handleCustomerFieldKeyDown("mobile")}
                   maxLength={10}
                   placeholder="Mobile *"
                   className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
                 {activeField === "mobile" && customerSuggestions.length > 0 && (
                   <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-56 overflow-y-auto">
-                    {customerSuggestions.map((c) => (
+                    {customerSuggestions.map((c, idx) => (
                       <div
                         key={c._id}
+                        ref={(el) => (customerItemRefs.current[idx] = el)}
+                        onMouseEnter={() => setCustomerHighlightIndex(idx)}
                         onClick={() => pickCustomerSuggestion(c)}
-                        className="flex items-center justify-between px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0"
+                        className={`flex items-center justify-between px-3 py-2 text-sm cursor-pointer border-b border-slate-50 last:border-0 ${
+                          customerHighlightIndex === idx
+                            ? "bg-blue-50"
+                            : "hover:bg-blue-50"
+                        }`}
                       >
                         <div className="min-w-0">
                           <p className="font-medium text-slate-800 truncate">
@@ -501,16 +627,23 @@ export default function NewInvoiceFormPage({
                   value={customerForm.name}
                   onChange={updateField("name")}
                   onFocus={() => setActiveField("name")}
+                  onKeyDown={handleCustomerFieldKeyDown("name")}
                   placeholder="Name"
                   className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
                 {activeField === "name" && customerSuggestions.length > 0 && (
                   <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-56 overflow-y-auto">
-                    {customerSuggestions.map((c) => (
+                    {customerSuggestions.map((c, idx) => (
                       <div
                         key={c._id}
+                        ref={(el) => (customerItemRefs.current[idx] = el)}
+                        onMouseEnter={() => setCustomerHighlightIndex(idx)}
                         onClick={() => pickCustomerSuggestion(c)}
-                        className="flex items-center justify-between px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0"
+                        className={`flex items-center justify-between px-3 py-2 text-sm cursor-pointer border-b border-slate-50 last:border-0 ${
+                          customerHighlightIndex === idx
+                            ? "bg-blue-50"
+                            : "hover:bg-blue-50"
+                        }`}
                       >
                         <div className="min-w-0">
                           <p className="font-medium text-slate-800 truncate">
@@ -645,88 +778,89 @@ export default function NewInvoiceFormPage({
                 </tr>
               </thead>
               <tbody>
-                {cartItems.map((item, i) => (
-                  <tr key={item._id} className="hover:bg-slate-50/60">
-                    <td className="px-3 py-1.5 border-b border-slate-100 text-slate-400">
-                      {i + 1}
-                    </td>
-                    <td className="px-3 py-1.5 border-b border-slate-100 font-medium text-slate-800">
-                      {item.name}
-                    </td>
-                    <td className="px-3 py-1.5 border-b border-slate-100 text-slate-500">
-                      {item.hsn || "-"}
-                    </td>
-                    <td className="px-3 py-1.5 border-b border-slate-100 text-slate-500">
-                      {item.unit || "Pcs"}
-                    </td>
-                    <td className="px-2 py-1.5 border-b border-slate-100">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={item.qty}
-                        onChange={handleQtyChange(item._id)}
-                        onBlur={handleQtyBlur(item._id)}
-                        className="w-16 h-8 text-center border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 mx-auto block"
-                      />
-                    </td>
-                    <td className="px-2 py-1.5 border-b border-slate-100">
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={item.price ?? item.sellingPrice ?? 0}
-                        onChange={handleDecimalChange(item._id, "sellingPrice")}
-                        onBlur={handleDecimalBlur(item._id, "sellingPrice")}
-                        className="w-20 h-8 text-right px-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </td>
-                    <td className="px-2 py-1.5 border-b border-slate-100">
-                      <div className="flex items-center gap-1">
+                {cartItems.map((item, i) => {
+                  const discountType = item.discountType || "amount";
+                  return (
+                    <tr key={item._id} className="hover:bg-slate-50/60">
+                      <td className="px-3 py-1.5 border-b border-slate-100 text-slate-400">
+                        {i + 1}
+                      </td>
+                      <td className="px-3 py-1.5 border-b border-slate-100 font-medium text-slate-800">
+                        {item.name}
+                      </td>
+                      <td className="px-3 py-1.5 border-b border-slate-100 text-slate-500">
+                        {item.hsn || "-"}
+                      </td>
+                      <td className="px-3 py-1.5 border-b border-slate-100 text-slate-500">
+                        {item.unit || "Pcs"}
+                      </td>
+                      <td className="px-2 py-1.5 border-b border-slate-100">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={item.qty}
+                          onChange={handleQtyChange(item._id)}
+                          onBlur={handleQtyBlur(item._id)}
+                          className="w-16 h-8 text-center border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 mx-auto block"
+                        />
+                      </td>
+                      <td className="px-2 py-1.5 border-b border-slate-100">
                         <input
                           type="text"
                           inputMode="decimal"
-                          value={item.discount ?? 0}
-                          onChange={handleDecimalChange(item._id, "discount")}
-                          onBlur={handleDecimalBlur(item._id, "discount")}
-                          className="w-16 h-8 text-right px-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          value={item.price ?? item.sellingPrice ?? 0}
+                          onChange={handleDecimalChange(item._id, "sellingPrice")}
+                          onBlur={handleDecimalBlur(item._id, "sellingPrice")}
+                          className="w-20 h-8 text-right px-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
+                      </td>
+                      <td className="px-2 py-1.5 border-b border-slate-100">
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={item.discount ?? 0}
+                            onChange={handleDecimalChange(item._id, "discount")}
+                            onBlur={handleDiscountBlur(item._id, discountType)}
+                            className="w-16 h-8 text-right px-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleUpdateItemField(
+                                item._id,
+                                "discountType",
+                                discountType === "amount" ? "percent" : "amount",
+                              )
+                            }
+                            title="Toggle discount type"
+                            className="w-8 h-8 shrink-0 flex items-center justify-center rounded-md border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                          >
+                            {discountType === "percent" ? (
+                              <Percent className="w-3.5 h-3.5" />
+                            ) : (
+                              "₹"
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                      <td className="px-3 py-1.5 border-b border-slate-100 text-right text-slate-500">
+                        {item.gstRate || 0}%
+                      </td>
+                      <td className="px-3 py-1.5 border-b border-slate-100 text-right font-semibold text-blue-600">
+                        ₹{Number(item.total ?? 0).toFixed(2)}
+                      </td>
+                      <td className="px-2 py-1.5 border-b border-slate-100 text-center">
                         <button
-                          type="button"
-                          onClick={() =>
-                            handleUpdateItemField(
-                              item._id,
-                              "discountType",
-                              (item.discountType || "amount") === "amount"
-                                ? "percent"
-                                : "amount",
-                            )
-                          }
-                          title="Toggle discount type"
-                          className="w-8 h-8 shrink-0 flex items-center justify-center rounded-md border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                          onClick={() => handleRemoveItem(item._id)}
+                          className="w-7 h-7 flex items-center justify-center rounded-full text-rose-400 hover:bg-rose-50 hover:text-rose-500"
                         >
-                          {(item.discountType || "amount") === "percent" ? (
-                            <Percent className="w-3.5 h-3.5" />
-                          ) : (
-                            "₹"
-                          )}
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
-                      </div>
-                    </td>
-                    <td className="px-3 py-1.5 border-b border-slate-100 text-right text-slate-500">
-                      {item.gstRate || 0}%
-                    </td>
-                    <td className="px-3 py-1.5 border-b border-slate-100 text-right font-semibold text-blue-600">
-                      ₹{Number(item.total ?? 0).toFixed(2)}
-                    </td>
-                    <td className="px-2 py-1.5 border-b border-slate-100 text-center">
-                      <button
-                        onClick={() => handleRemoveItem(item._id)}
-                        className="w-7 h-7 flex items-center justify-center rounded-full text-rose-400 hover:bg-rose-50 hover:text-rose-500"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  );
+                })}
 
                 {/* Add-row */}
                 <tr>
@@ -785,13 +919,14 @@ export default function NewInvoiceFormPage({
               storedata={storedata}
               invoiceNumber={invoiceNumber}
               isGstInvoice={isGstInvoice}
+              isMrpEnabled={isMrpEnabled}
               submitLabel={isEditMode ? "Update Invoice" : "Create Invoice"}
             />
           </CardContent>
         </Card>
       </div>
 
-      {/* নতুন item add করার modal — "+" button ba "Create as new product" theke */}
+      
       <AddItemFormModal
         open={showAddItemModal}
         onOpenChange={setShowAddItemModal}

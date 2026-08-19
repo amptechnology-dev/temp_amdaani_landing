@@ -31,6 +31,7 @@ export default function InvoiceSummary({
   storedata = {},
   invoiceNumber = "PREVIEW-0001",
   isGstInvoice = false,
+  isMrpEnabled = false,
   isFreePlan = true,
   appBrand = { name: "AMDAANI", logoUrl: "" },
   submitLabel = "Create Invoice",
@@ -53,7 +54,7 @@ export default function InvoiceSummary({
         paymentNote,
       },
       formValues,
-      cartItems, // ✅ computedItems (baseRate/taxableValue/gstAmount/total soho)
+      cartItems, // ✅ computedItems (baseRate/taxableValue/gstAmount/total/mrp soho)
       invoiceCalculations, // ✅ gstBreakdown, discountTotal, grandTotal soho pura object
       invoiceNumber,
       currentDate: format(now, "dd-MMM-yyyy"),
@@ -61,6 +62,7 @@ export default function InvoiceSummary({
       storedata,
       invoiceDate: now,
       isGstInvoice,
+      isMrpEnabled,
       isFreePlan,
       appBrand,
       payment: {

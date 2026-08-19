@@ -17,6 +17,9 @@ import {
   ChevronDown,
   Warehouse,
   Info,
+  PlusCircle,
+  MinusCircle,
+  Percent,
 } from "lucide-react";
 
 import {
@@ -54,6 +57,7 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import api from "../../utils/api";
+import { useAuth } from "../../context/AuthContext";
 
 const UNITS = [
   { name: "Piece", symbol: "pcs" },
@@ -69,6 +73,32 @@ const UNITS = [
 ];
 
 const COMMON_GST_RATES = [0, 5, 12, 18, 28];
+
+// ✅ Mirrors RN TaxSelectorBottomSheet's TAX_OPTIONS exactly
+const TAX_OPTIONS = [
+  {
+    id: "with_tax",
+    label: "Include Tax",
+    description: "Price includes applicable taxes",
+    Icon: PlusCircle,
+  },
+  {
+    id: "without_tax",
+    label: "Exclude Tax",
+    description: "Price excludes taxes (tax will be added)",
+    Icon: MinusCircle,
+  },
+];
+
+const defaultTaxOption = TAX_OPTIONS[1]; // without_tax — same default as RN
+
+// ✅ Mirrors RN TaxRateSelectorBottomSheet's preset GST rate list
+const GST_RATE_OPTIONS = COMMON_GST_RATES.map((r) => ({
+  id: String(r),
+  rate: r,
+  label: `${r}% GST`,
+  description: r === 0 ? "Nil rated / exempt goods" : `Standard ${r}% GST slab`,
+}));
 
 const isValidObjectId = (id) => /^[0-9a-fA-F]{24}$/.test(String(id || ""));
 
@@ -91,11 +121,14 @@ const unwrapList = (res) => {
 // ✅ ItemsPage er moto opening stock validation
 function validateOpeningStockValues(stockStr, valueStr, isEdit = false) {
   const errors = {};
-  const hasStock = stockStr !== "" && stockStr !== undefined && stockStr !== null;
-  const hasValue = valueStr !== "" && valueStr !== undefined && valueStr !== null;
+  const hasStock =
+    stockStr !== "" && stockStr !== undefined && stockStr !== null;
+  const hasValue =
+    valueStr !== "" && valueStr !== undefined && valueStr !== null;
 
   if (hasValue && !hasStock) {
-    errors.openingStock = "Opening stock quantity is required when value is entered";
+    errors.openingStock =
+      "Opening stock quantity is required when value is entered";
   }
 
   if (hasStock) {
@@ -129,6 +162,10 @@ const validationSchema = Yup.object().shape({
     .nullable()
     .positive("Purchase price must be positive")
     .typeError("Must be a number"),
+  mrp: Yup.number()
+    .nullable()
+    .positive("MRP must be positive")
+    .typeError("MRP must be a valid number"),
   discountPrice: Yup.number()
     .nullable()
     .min(0, "Discount cannot be negative")
@@ -787,6 +824,204 @@ function HsnCodeSection({ value, gstRate, onHsnSelect }) {
 }
 
 // =========================================================
+// ✅ Tax Option selector — mirrors RN TaxSelectorBottomSheet
+// (Include Tax / Exclude Tax)
+// =========================================================
+function TaxOptionSection({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const selected = TAX_OPTIONS.find((o) => o.id === value?.id) || defaultTaxOption;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={`flex items-center gap-1.5 px-3 h-9 rounded-full text-xs font-semibold border shrink-0 transition-colors ${
+            selected.id === "with_tax"
+              ? "bg-blue-600 text-white border-blue-600"
+              : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
+          }`}
+        >
+          <selected.Icon className="w-3.5 h-3.5" />
+          {selected.label}
+          <ChevronDown className="w-3 h-3" />
+        </button>
+      </PopoverTrigger>
+
+      <PopoverContent className="w-72 p-2" align="end">
+        <p className="text-xs font-semibold text-slate-500 px-1 pb-1.5">
+          Tax Option
+        </p>
+        <div className="space-y-1.5">
+          {TAX_OPTIONS.map((opt) => {
+            const isSelected = selected.id === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => {
+                  onChange(opt);
+                  setOpen(false);
+                }}
+                className={`w-full flex items-start gap-2.5 rounded-lg px-3 py-2.5 border text-left transition-colors ${
+                  isSelected
+                    ? "bg-blue-50 border-blue-300"
+                    : "bg-white border-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                <opt.Icon
+                  className={`w-4 h-4 mt-0.5 shrink-0 ${
+                    isSelected ? "text-blue-600" : "text-slate-400"
+                  }`}
+                />
+                <div className="min-w-0">
+                  <p
+                    className={`text-sm font-medium ${
+                      isSelected ? "text-blue-700" : "text-slate-800"
+                    }`}
+                  >
+                    {opt.label}
+                  </p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {opt.description}
+                  </p>
+                </div>
+                {isSelected && (
+                  <Check className="w-4 h-4 text-blue-600 shrink-0 ml-auto" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// =========================================================
+// ✅ Tax Rate selector — mirrors RN TaxRateSelectorBottomSheet
+// preset GST slabs + custom rate entry
+// =========================================================
+function TaxRateSection({ value, onChange, disabled }) {
+  const [open, setOpen] = useState(false);
+  const [customRate, setCustomRate] = useState(
+    value?.rate != null ? String(value.rate) : "",
+  );
+
+  useEffect(() => {
+    setCustomRate(value?.rate != null ? String(value.rate) : "");
+  }, [value]);
+
+  const applyCustomRate = () => {
+    const num = parseFloat(customRate);
+    if (isNaN(num) || num < 0 || num > 100) {
+      toast.error("Enter a valid GST rate between 0 and 100");
+      return;
+    }
+    onChange({ rate: num, label: `${num}% GST` });
+    setOpen(false);
+  };
+
+  return (
+    <div>
+      <Label>Tax Rate (GST %)</Label>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            disabled={disabled}
+            className="mt-1 w-full h-10 px-3 rounded-md border border-slate-200 bg-white flex items-center justify-between text-sm hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <span className={value ? "text-slate-800" : "text-slate-400"}>
+              {value ? value.label : "Select tax rate"}
+            </span>
+            <ChevronDown className="w-4 h-4 text-slate-400" />
+          </button>
+        </PopoverTrigger>
+
+        <PopoverContent className="w-80 p-2" align="start">
+          <p className="text-xs font-semibold text-slate-500 px-1 pb-1.5">
+            Common GST Rates
+          </p>
+          <div className="space-y-1.5 max-h-56 overflow-y-auto">
+            {GST_RATE_OPTIONS.map((opt) => {
+              const isSelected = value?.rate === opt.rate;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => {
+                    onChange({ rate: opt.rate, label: opt.label });
+                    setOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between rounded-lg px-3 py-2 border text-left transition-colors ${
+                    isSelected
+                      ? "bg-blue-50 border-blue-300"
+                      : "bg-white border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <p
+                      className={`text-sm font-medium ${
+                        isSelected ? "text-blue-700" : "text-slate-800"
+                      }`}
+                    >
+                      {opt.label}
+                    </p>
+                    <p className="text-xs text-slate-400">{opt.description}</p>
+                  </div>
+                  <span
+                    className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ml-2 ${
+                      isSelected
+                        ? "bg-blue-600 text-white"
+                        : "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {opt.rate}%
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <Separator className="my-2" />
+
+          <p className="text-xs font-semibold text-slate-500 px-1 pb-1.5">
+            Custom Rate
+          </p>
+          <div className="flex items-center gap-1.5 px-1 pb-1">
+            <div className="relative flex-1">
+              <Input
+                type="number"
+                placeholder="e.g. 3"
+                value={customRate}
+                onChange={(e) => setCustomRate(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    applyCustomRate();
+                  }
+                }}
+                className="h-9 pr-7"
+              />
+              <Percent className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              className="h-9"
+              onClick={applyCustomRate}
+            >
+              Apply
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
+// =========================================================
 // MAIN — Add / Edit Item Form Modal (shared, ItemsPage-style design)
 // =========================================================
 export default function AddItemFormModal({
@@ -797,6 +1032,7 @@ export default function AddItemFormModal({
   editItem = null,
 }) {
   const isEditMode = Boolean(editItem);
+  const { isMrpEnabled } = useAuth();
 
   // ✅ Modal jekhan theke-i khola hok na keno, fresh full product data
   // nijei fetch kore neyoya hoy — caller-er upor nirbhor kore na
@@ -861,6 +1097,39 @@ export default function AddItemFormModal({
   const activeItem = resolvedItem || editItem;
   const canUpdateExisting = isValidObjectId(activeItem?._id);
 
+  // ✅ Tax option / tax rate — independent selector state, mirrors RN's
+  // `selectedTaxOption` / `selectedTaxRate` Formik fields. Kept outside
+  // Formik values (like the category/hsn popovers) and synced into the
+  // submit payload directly, same pattern already used for `mrp`.
+  const [selectedTaxOption, setSelectedTaxOption] = useState(defaultTaxOption);
+  const [selectedTaxRate, setSelectedTaxRate] = useState(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    if (!activeItem) {
+      setSelectedTaxOption(defaultTaxOption);
+      setSelectedTaxRate(null);
+      return;
+    }
+
+    // ✅ Exactly mirrors RN AddItem.jsx initialValues derivation
+    const taxOption = activeItem.isTaxInclusive
+      ? TAX_OPTIONS[0] // with_tax
+      : defaultTaxOption; // without_tax
+
+    const taxRate =
+      activeItem.gstRate && Number(activeItem.gstRate) > 0
+        ? {
+            rate: Number(activeItem.gstRate),
+            label: `${activeItem.gstRate}% GST`,
+          }
+        : null;
+
+    setSelectedTaxOption(taxOption);
+    setSelectedTaxRate(taxRate);
+  }, [open, activeItem]);
+
   const initialValues = useMemo(() => {
     if (!activeItem) {
       return {
@@ -871,8 +1140,7 @@ export default function AddItemFormModal({
         category: "",
         salesPrice: "",
         purchasePrice: "",
-        isTaxInclusive: false,
-        gstRate: "",
+        mrp: "",
         discountType: "amount",
         discountPrice: "",
         openingStock: "",
@@ -915,10 +1183,11 @@ export default function AddItemFormModal({
       hsnCode: activeItem.hsn || "",
       unit: matchedUnit ? matchedUnit.name : "",
       category: categoryId,
-      salesPrice: activeItem.sellingPrice ? String(activeItem.sellingPrice) : "",
+      salesPrice: activeItem.sellingPrice
+        ? String(activeItem.sellingPrice)
+        : "",
       purchasePrice: activeItem.costPrice ? String(activeItem.costPrice) : "",
-      isTaxInclusive: !!activeItem.isTaxInclusive,
-      gstRate: activeItem.gstRate ? String(activeItem.gstRate) : "",
+      mrp: activeItem.mrp ? String(activeItem.mrp) : "",
       discountType: savedDiscountType,
       discountPrice: discountPriceDisplay,
       openingStock: fyStock?.stock > 0 ? String(fyStock.stock) : "",
@@ -957,6 +1226,8 @@ export default function AddItemFormModal({
         return;
       }
 
+      // ✅ GST rate/tax-inclusive now come from the dedicated selectors —
+      // same source of truth as RN (`selectedTaxRate.rate` / `selectedTaxOption.id`)
       const payload = {
         name: values.itemName,
         unit: values.unit,
@@ -965,8 +1236,9 @@ export default function AddItemFormModal({
         hsn: values.hsnCode || "",
         sellingPrice: salesPrice,
         costPrice: Number(values.purchasePrice) || 0,
-        gstRate: values.gstRate ? Number(values.gstRate) : 0,
-        isTaxInclusive: !!values.isTaxInclusive,
+        ...(isMrpEnabled ? { mrp: Number(values.mrp) || 0 } : {}),
+        gstRate: selectedTaxRate?.rate ? Number(selectedTaxRate.rate) : 0,
+        isTaxInclusive: selectedTaxOption?.id === "with_tax",
         discountPrice: discountValue,
         discountType: values.discountType,
         discountPercentage,
@@ -1001,7 +1273,8 @@ export default function AddItemFormModal({
       onItemCreated?.(savedItem);
     } catch (err) {
       const message =
-        err?.response?.data?.message || "Failed to save item. Please try again.";
+        err?.response?.data?.message ||
+        "Failed to save item. Please try again.";
       toast.error(message);
     } finally {
       setSubmitting(false);
@@ -1048,7 +1321,8 @@ export default function AddItemFormModal({
               const discountNum = Number(values.discountPrice) || 0;
               let finalPrice = salesPriceNum;
               if (values.discountType === "percentage") {
-                finalPrice = salesPriceNum - (salesPriceNum * discountNum) / 100;
+                finalPrice =
+                  salesPriceNum - (salesPriceNum * discountNum) / 100;
               } else {
                 finalPrice = salesPriceNum - discountNum;
               }
@@ -1098,7 +1372,9 @@ export default function AddItemFormModal({
                         </SelectContent>
                       </Select>
                       {touched.unit && errors.unit && (
-                        <p className="text-xs text-red-500 mt-1">{errors.unit}</p>
+                        <p className="text-xs text-red-500 mt-1">
+                          {errors.unit}
+                        </p>
                       )}
                     </div>
 
@@ -1122,21 +1398,28 @@ export default function AddItemFormModal({
 
                     <HsnCodeSection
                       value={values.hsnCode}
-                      gstRate={values.gstRate}
+                      gstRate={selectedTaxRate?.rate ?? values.gstRate}
                       onHsnSelect={(hsn) => {
                         if (!hsn) {
                           setFieldValue("hsnCode", "");
-                          setFieldValue("gstRate", "");
-                          setFieldValue("isTaxInclusive", false);
+                          setSelectedTaxRate(null);
+                          setSelectedTaxOption(defaultTaxOption);
                           return;
                         }
                         setFieldValue("hsnCode", hsn.code);
+
+                        // ✅ Exactly mirrors RN handleHsnCodeSelect:
+                        // sets the rate from HSN and always resets the
+                        // tax option to "Exclude Tax" (without_tax).
                         if (hsn.gstRate && Number(hsn.gstRate) > 0) {
-                          setFieldValue("gstRate", String(hsn.gstRate));
-                          setFieldValue("isTaxInclusive", false);
+                          setSelectedTaxRate({
+                            rate: Number(hsn.gstRate),
+                            label: `${hsn.gstRate}% GST`,
+                          });
+                          setSelectedTaxOption(defaultTaxOption);
                         } else {
-                          setFieldValue("gstRate", "");
-                          setFieldValue("isTaxInclusive", false);
+                          setSelectedTaxRate(null);
+                          setSelectedTaxOption(defaultTaxOption);
                         }
                       }}
                     />
@@ -1172,19 +1455,11 @@ export default function AddItemFormModal({
                           type="number"
                           className="flex-1"
                         />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setFieldValue("isTaxInclusive", !values.isTaxInclusive)
-                          }
-                          className={`flex items-center gap-1 px-2.5 rounded-full text-[11px] font-semibold border shrink-0 ${
-                            values.isTaxInclusive
-                              ? "bg-blue-600 text-white border-blue-600"
-                              : "bg-slate-100 text-slate-600 border-slate-200"
-                          }`}
-                        >
-                          {values.isTaxInclusive ? "Incl. Tax" : "Excl. Tax"}
-                        </button>
+                        {/* ✅ Tax Option selector — Include/Exclude Tax, same as RN inline button */}
+                        <TaxOptionSection
+                          value={selectedTaxOption}
+                          onChange={setSelectedTaxOption}
+                        />
                       </div>
                       {touched.salesPrice && errors.salesPrice && (
                         <p className="text-xs text-red-500 mt-1">
@@ -1195,14 +1470,11 @@ export default function AddItemFormModal({
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Tax Rate (GST %)</Label>
-                      <div className="mt-1 h-10 px-3 rounded-md border border-slate-200 bg-slate-50 flex items-center text-sm text-slate-600">
-                        {values.gstRate
-                          ? `${values.gstRate}% GST`
-                          : "Set via HSN code"}
-                      </div>
-                    </div>
+                    {/* ✅ Tax Rate selector — dedicated GST % popover (preset + custom) */}
+                    <TaxRateSection
+                      value={selectedTaxRate}
+                      onChange={setSelectedTaxRate}
+                    />
                     <div>
                       <Label>Discount on Sales</Label>
                       <div className="flex gap-2 mt-1">
@@ -1221,7 +1493,8 @@ export default function AddItemFormModal({
                               values.discountType === "amount"
                                 ? "percentage"
                                 : "amount";
-                            const currentInput = Number(values.discountPrice) || 0;
+                            const currentInput =
+                              Number(values.discountPrice) || 0;
                             let converted = currentInput;
                             if (
                               newType === "percentage" &&
@@ -1230,7 +1503,10 @@ export default function AddItemFormModal({
                               converted =
                                 salesPriceNum > 0
                                   ? parseFloat(
-                                      ((currentInput / salesPriceNum) * 100).toFixed(2),
+                                      (
+                                        (currentInput / salesPriceNum) *
+                                        100
+                                      ).toFixed(2),
                                     )
                                   : 0;
                             } else if (
@@ -1238,7 +1514,9 @@ export default function AddItemFormModal({
                               values.discountType === "percentage"
                             ) {
                               converted = parseFloat(
-                                ((salesPriceNum * currentInput) / 100).toFixed(2),
+                                ((salesPriceNum * currentInput) / 100).toFixed(
+                                  2,
+                                ),
                               );
                             }
                             setFieldValue("discountType", newType);
@@ -1260,6 +1538,25 @@ export default function AddItemFormModal({
                       Sales Price (After Discount): ₹{finalPrice.toFixed(2)}
                     </p>
                   ) : null}
+
+                  {isMrpEnabled && (
+                    <div>
+                      <Label>MRP (optional)</Label>
+                      <Input
+                        name="mrp"
+                        value={values.mrp}
+                        onChange={handleChange}
+                        placeholder="Enter MRP"
+                        type="number"
+                        className="mt-1"
+                      />
+                      {touched.mrp && errors.mrp && (
+                        <p className="text-xs text-red-500 mt-1">
+                          {errors.mrp}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {/* ---- Opening Stock — collapsible, ItemsPage-style ---- */}
                   <div className="pt-2">
@@ -1324,7 +1621,8 @@ export default function AddItemFormModal({
                         <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
                           <Info className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                           <p className="text-xs text-blue-700 italic">
-                            Opening stock value = Opening stock qty × Purchase rate
+                            Opening stock value = Opening stock qty × Purchase
+                            rate
                           </p>
                         </div>
 
