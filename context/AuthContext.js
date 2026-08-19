@@ -57,6 +57,8 @@ export const AuthProvider = ({ children }) => {
     tempToken: null,
   });
 
+  const authStateRef = useRef(authState);
+
   const [subscription, setSubscription] = useState(null);
   const [usage, setUsage] = useState(null);
   const [subLoading, setSubLoading] = useState(false);
@@ -66,6 +68,10 @@ export const AuthProvider = ({ children }) => {
 
   const refreshPromiseRef = useRef(null);
   const refreshTimerRef = useRef(null);
+
+  useEffect(() => {
+    authStateRef.current = authState;
+  }, [authState]);
 
   useEffect(() => {
     setAuthHandlers(updateAuthState, logout, refreshAccessToken);
@@ -149,14 +155,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   const refreshAccessToken = async (currentState) => {
-    const state = currentState || authState;
+    const state = currentState || authStateRef.current; // ✅ ref use করো
 
     if (!state.refreshToken) {
       await logout();
       return null;
     }
 
-    // Already ekta refresh cholche? seta e await koro, notun call na kore
     if (refreshPromiseRef.current) {
       return refreshPromiseRef.current;
     }
@@ -242,8 +247,8 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Update auth state & persist
   const updateAuthState = async (newState) => {
+    authStateRef.current = newState;
     setAuthState(newState);
     localStorage.setItem("auth", JSON.stringify(newState));
   };
@@ -371,18 +376,17 @@ export const AuthProvider = ({ children }) => {
     });
   };
 
-  // ✅ Logout — এবার আসল /auth/logout API hit করে, তারপর local state clear করে redirect করে
   const logout = async () => {
     try {
-      if (authState.accessToken) {
+      const currentToken = authStateRef.current.accessToken; // ✅ ref use করো
+      if (currentToken) {
         await api.post(
           "/auth/logout",
           {},
-          { headers: { Authorization: `Bearer ${authState.accessToken}` } },
+          { headers: { Authorization: `Bearer ${currentToken}` } },
         );
       }
     } catch (err) {
-      // API fail hole o local session clear kore dibo, user jate atke na thake
       console.log("[Auth] Logout API failed:", err?.message);
     } finally {
       await hardLogoutLocalOnly();
@@ -430,6 +434,7 @@ export const AuthProvider = ({ children }) => {
       isStockEnabled,
       isPurchaseOrderEnabled,
       isMrpEnabled,
+      hasCompletedOnboarding,
     }),
     [authState, loading, subscription, usage, subLoading],
   );
