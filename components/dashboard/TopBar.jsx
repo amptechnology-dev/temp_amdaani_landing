@@ -45,8 +45,6 @@ export default function Topbar({ theme, pageTitle = "Overview" }) {
     router.push("/dashboard/profile");
   };
 
-  // ✅ ekhon hard redirect na kore AuthContext er logout() call kora hocche —
-  // eta /auth/logout API hit korbe, tarpor local session clear kore /auth e pathabe
   const handleLogout = async () => {
     if (loggingOut) return;
     setShowUserMenu(false);
@@ -64,7 +62,7 @@ export default function Topbar({ theme, pageTitle = "Overview" }) {
         {/* Left: sidebar trigger + breadcrumb / page title */}
         <div className="flex items-center gap-3 min-w-0">
           <SidebarTrigger
-            className={`${theme.buttonTertiary} p-2 rounded-lg border ${theme.outline} shrink-0`}
+            className={`${theme.buttonTertiary} p-2 rounded-lg border ${theme.outline} shrink-0 cursor-pointer`}
           />
 
           <div className="hidden md:block h-6 w-px bg-slate-200 mx-1" />
@@ -75,7 +73,7 @@ export default function Topbar({ theme, pageTitle = "Overview" }) {
                 <BreadcrumbItem>
                   <BreadcrumbLink
                     href="/dashboard"
-                    className={`text-[12px] font-medium ${theme.textSecondary} hover:${theme.text} transition-colors`}
+                    className={`text-[12px] font-medium ${theme.textSecondary} hover:${theme.text} transition-colors cursor-pointer`}
                   >
                     Dashboard
                   </BreadcrumbLink>
@@ -100,7 +98,7 @@ export default function Topbar({ theme, pageTitle = "Overview" }) {
           {/* Theme toggle */}
           <button
             onClick={toggleTheme}
-            className={`p-2 rounded-lg border ${theme.outline} ${theme.buttonTertiary} transition-colors`}
+            className={`p-2 rounded-lg border ${theme.outline} ${theme.buttonTertiary} transition-colors cursor-pointer`}
             aria-label={`Switch to ${currentTheme === "light" ? "dark" : "light"} mode`}
           >
             {currentTheme === "light" ? (
@@ -114,7 +112,7 @@ export default function Topbar({ theme, pageTitle = "Overview" }) {
           <div className="relative" ref={notifRef}>
             <button
               onClick={() => setShowNotifications((v) => !v)}
-              className={`p-2 rounded-lg border ${theme.outline} ${theme.buttonTertiary} relative transition-colors`}
+              className={`p-2 rounded-lg border ${theme.outline} ${theme.buttonTertiary} relative transition-colors cursor-pointer`}
               aria-label="Notifications"
             >
               <Bell size={18} className={theme.text} />
@@ -132,7 +130,7 @@ export default function Topbar({ theme, pageTitle = "Overview" }) {
                 <div className={`px-4 py-2.5 border-b ${theme.outline} flex items-center justify-between`}>
                   <h3 className={`${theme.text} font-semibold text-[13.5px]`}>Notifications</h3>
                   {notifications.length > 0 && (
-                    <span className="text-[11px] font-medium text-blue-600">Mark all read</span>
+                    <span className="text-[11px] font-medium text-blue-600 cursor-pointer">Mark all read</span>
                   )}
                 </div>
                 {notifications.length === 0 ? (
@@ -155,7 +153,7 @@ export default function Topbar({ theme, pageTitle = "Overview" }) {
           <div className="relative" ref={userMenuRef}>
             <button
               onClick={() => setShowUserMenu((v) => !v)}
-              className={`flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 rounded-lg border ${theme.outline} ${theme.buttonTertiary} transition-colors`}
+              className={`flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 rounded-lg border ${theme.outline} ${theme.buttonTertiary} transition-colors cursor-pointer`}
               aria-label="User menu"
             >
               <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center shrink-0 ring-1 ring-blue-700/10">
@@ -175,14 +173,12 @@ export default function Topbar({ theme, pageTitle = "Overview" }) {
                 className={`absolute right-0 mt-2 w-52 ${theme.card} rounded-xl shadow-xl border ${theme.outline} py-1.5 z-50`}
               >
                 <div className={`px-3.5 py-2 border-b ${theme.outline} mb-1`}>
-                  <p className={`${theme.text} font-semibold text-[13px] truncate`}>
-                    {user?.name || "User"}
-                  </p>
+                  <p className={`${theme.text} font-semibold text-[13px] truncate`}>{user?.name || "User"}</p>
                   <p className={`${theme.textSecondary} text-[11.5px] truncate`}>{user?.email || ""}</p>
                 </div>
                 <button
                   onClick={handleProfileClick}
-                  className={`w-[calc(100%-8px)] flex items-center gap-2.5 text-left px-3.5 py-2 rounded-lg mx-1 hover:${theme.surfaceVariant} ${theme.text} text-[13px] font-medium transition-colors`}
+                  className={`w-[calc(100%-8px)] flex items-center gap-2.5 text-left px-3.5 py-2 rounded-lg mx-1 hover:${theme.surfaceVariant} ${theme.text} text-[13px] font-medium transition-colors cursor-pointer`}
                 >
                   <Settings size={15} className={theme.textSecondary} />
                   Profile Settings
@@ -190,7 +186,7 @@ export default function Topbar({ theme, pageTitle = "Overview" }) {
                 <button
                   onClick={handleLogout}
                   disabled={loggingOut}
-                  className="w-[calc(100%-8px)] flex items-center gap-2.5 text-left px-3.5 py-2 rounded-lg mx-1 hover:bg-red-50 text-red-600 text-[13px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-[calc(100%-8px)] flex items-center gap-2.5 text-left px-3.5 py-2 rounded-lg mx-1 hover:bg-red-50 text-red-600 text-[13px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
                   <LogOut size={15} />
                   {loggingOut ? "Logging out..." : "Logout"}
