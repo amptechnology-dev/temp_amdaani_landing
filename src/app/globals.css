@@ -5,10 +5,6 @@
 
 @custom-variant dark (&:is(.dark *));
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 body {
   background-color: var(--background);
 }
@@ -191,6 +187,7 @@ body {
   font-style: normal;
 }
 
-html, body {
+html,
+body {
   overflow-x: hidden;
 }
