@@ -21,6 +21,8 @@ import {
   Plus,
   Percent,
   X,
+  PlusCircle,
+  MinusCircle,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -90,12 +92,10 @@ function InlineProductCombobox({ products, onSelect, onCreateNew, onRefresh }) {
     (p) => p.name?.toLowerCase().trim() === query.trim().toLowerCase(),
   );
 
-  // ✅ Reset highlight whenever the visible list changes (new query / open)
   useEffect(() => {
     setHighlightIndex(-1);
   }, [query, open]);
 
-  // ✅ Keep the highlighted row scrolled into view
   useEffect(() => {
     if (highlightIndex >= 0 && itemRefs.current[highlightIndex]) {
       itemRefs.current[highlightIndex].scrollIntoView({ block: "nearest" });
@@ -116,7 +116,6 @@ function InlineProductCombobox({ products, onSelect, onCreateNew, onRefresh }) {
     setHighlightIndex(-1);
   };
 
-  // ✅ Total selectable rows = filtered products + optional "create new" row
   const showCreateRow = query.trim() && !exactMatch;
   const totalRows = filtered.length + (showCreateRow ? 1 : 0);
 
@@ -274,7 +273,6 @@ export default function NewPurchaseFormPage({
   isMrpEnabled = false,
   onRefreshProducts,
 }) {
-  console.log("NewPurchaseFormPage received storedata:", storedata);
   const [vendorForm, setVendorForm] = useState(() => ({
     ...emptyVendorForm,
     ...(selectedVendor
@@ -293,7 +291,6 @@ export default function NewPurchaseFormPage({
   const [selectedVendorId, setSelectedVendorId] = useState(
     selectedVendor?._id || "",
   );
-  // ✅ which field's typeahead dropdown is currently open: "name" | "mobile" | null
   const [activeField, setActiveField] = useState(null);
   const [vendorHighlightIndex, setVendorHighlightIndex] = useState(-1);
   const vendorItemRefs = useRef([]);
@@ -313,14 +310,11 @@ export default function NewPurchaseFormPage({
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
-  // ✅ EDIT MODE — jokhon vendor data load complete hoy (isLoading false hoy),
-  // selectedVendor prop theke vendorForm sorasori bhore dao — vendors list-e
-  // mobile match paoya jak ba na jak, form-e data thik e dekhabe.
   const editSeededRef = useRef(false);
 
   useEffect(() => {
     if (isLoading) {
-      editSeededRef.current = false; // next load-er jonno reset
+      editSeededRef.current = false;
       return;
     }
 
@@ -343,7 +337,6 @@ export default function NewPurchaseFormPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, isEditMode, selectedVendor, vendors]);
 
-  // ✅ Push vendorForm up to parent as selectedVendor whenever it changes
   useEffect(() => {
     const hasData = vendorForm.name || vendorForm.mobile;
     setSelectedVendor(
@@ -363,12 +356,10 @@ export default function NewPurchaseFormPage({
       .slice(0, 8);
   })();
 
-  // ✅ Reset highlight whenever field switches or the query changes
   useEffect(() => {
     setVendorHighlightIndex(-1);
   }, [activeField, vendorForm.mobile, vendorForm.name]);
 
-  // ✅ Keep the highlighted row scrolled into view
   useEffect(() => {
     if (
       vendorHighlightIndex >= 0 &&
@@ -469,11 +460,9 @@ export default function NewPurchaseFormPage({
       const freshProduct = res?.data?.data || res?.data;
 
       if (freshProduct) {
-        // ✅ freshProduct-er nijer real _id ke overwrite na kore rekhe dao —
-        // eta diyei AddItemFormModal PUT call korbe
         setEditingCartItem({
           ...freshProduct,
-          cartItemId: item._id, // ✅ cart row track korar jonno alada field
+          cartItemId: item._id,
         });
       } else {
         setEditingCartItem({ ...item, cartItemId: item._id });
@@ -492,7 +481,6 @@ export default function NewPurchaseFormPage({
     if (editingCartItem) {
       const targetId = editingCartItem.cartItemId || editingCartItem._id;
 
-      // ✅ edit mode — existing cart item field-gulo update kore dao
       handleUpdateItemField(targetId, "name", newItem.name);
       handleUpdateItemField(targetId, "hsn", newItem.hsn || "");
       handleUpdateItemField(targetId, "unit", newItem.unit || "PCS");
@@ -525,9 +513,6 @@ export default function NewPurchaseFormPage({
     setNewItemPrefillName("");
   };
 
-  // -------------------------------
-  // ✅ Number field helpers — free typing (0, 1, 10, decimals etc.)
-  // -------------------------------
   const handleQtyChange = (id) => (e) => {
     const v = e.target.value.replace(/[^\d]/g, "");
     handleUpdateItemField(id, "qty", v);
@@ -548,6 +533,23 @@ export default function NewPurchaseFormPage({
     handleUpdateItemField(id, field, isNaN(n) ? 0 : n);
   };
 
+  const handleGstRateBlur = (id) => (e) => {
+    let n = parseFloat(e.target.value);
+    if (isNaN(n) || n < 0) n = 0;
+    if (n > 100) n = 100;
+    handleUpdateItemField(id, "gstRate", n);
+  };
+
+  const handleHsnChange = (id) => (e) => {
+    handleUpdateItemField(id, "hsn", e.target.value);
+  };
+
+  const togglePurchaseTaxInclusive = (id, current) => () => {
+    handleUpdateItemField(id, "isPurchaseTaxInclusive", !current);
+  };
+
+  const addRowColSpan = isMrpEnabled ? 9 : 8;
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -557,7 +559,14 @@ export default function NewPurchaseFormPage({
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    // ✅ FIX — "min-w-0" jog kora holo. Layout-e ei page ta sombhoboto ekta
+    // flex container-er (sidebar + content) child, ar flex item-er default
+    // min-width: auto thake — mane ei div nijer content (table-er min-w-1100)
+    // er cheye choto hote "raji hoy na", fole pura flex container (sidebar shoho)
+    // prosस्रित hoye body-level horizontal scrollbar toiri kore. min-w-0 dile
+    // ei div flex container-e proper vabe shrink korte parbe, ar internal
+    // overflow-x-auto (table wrapper) e i shudhu scroll thakbe.
+    <div className="min-h-screen bg-slate-50 overflow-x-hidden w-full min-w-0">
       <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-5">
         {/* Header */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-4 flex flex-wrap items-center justify-between gap-4">
@@ -672,7 +681,6 @@ export default function NewPurchaseFormPage({
                 )}
               </div>
 
-              {/* Name — typeahead */}
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 z-10" />
                 <input
@@ -795,161 +803,227 @@ export default function NewPurchaseFormPage({
               </Button>
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-0 overflow-x-auto">
-            <table className="w-full text-sm border-collapse min-w-[900px]">
-              <thead>
-                <tr className="bg-slate-50 text-slate-500 text-xs">
-                  <th className="text-left font-medium px-3 py-2 border-b border-slate-100 w-10">
-                    #
-                  </th>
-                  <th className="text-left font-medium px-3 py-2 border-b border-slate-100">
-                    Product
-                  </th>
-                  <th className="text-left font-medium px-3 py-2 border-b border-slate-100 w-20">
-                    HSN
-                  </th>
-                  <th className="text-left font-medium px-3 py-2 border-b border-slate-100 w-16">
-                    Unit
-                  </th>
-                  <th className="text-center font-medium px-3 py-2 border-b border-slate-100 w-20">
-                    Qty
-                  </th>
-                  <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-24">
-                    Cost Price
-                  </th>
-                  <th className="text-center font-medium px-3 py-2 border-b border-slate-100 w-32">
-                    Discount
-                  </th>
-                  <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-16">
-                    GST%
-                  </th>
-                  <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-28">
-                    Total
-                  </th>
-                  <th className="w-10 border-b border-slate-100"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {cartItems.map((item, i) => (
-                  <tr key={item._id} className="hover:bg-slate-50/60">
-                    <td className="px-3 py-1.5 border-b border-slate-100 text-slate-400">
-                      {i + 1}
-                    </td>
-                    <td className="px-3 py-1.5 border-b border-slate-100 font-medium text-slate-800">
-                      {item.name}
-                    </td>
-                    <td className="px-3 py-1.5 border-b border-slate-100 text-slate-500">
-                      {item.hsn?.trim() || "-"}
-                    </td>
-                    <td className="px-3 py-1.5 border-b border-slate-100 text-slate-500">
-                      {item.unit || "Pcs"}
-                    </td>
-                    <td className="px-2 py-1.5 border-b border-slate-100">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={item.qty}
-                        onChange={handleQtyChange(item._id)}
-                        onBlur={handleQtyBlur(item._id)}
-                        className="w-16 h-8 text-center border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 mx-auto block"
-                      />
-                    </td>
-                    <td className="px-2 py-1.5 border-b border-slate-100">
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={item.costPrice ?? 0}
-                        onChange={handleDecimalChange(item._id, "costPrice")}
-                        onBlur={handleDecimalBlur(item._id, "costPrice")}
-                        className="w-20 h-8 text-right px-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </td>
-                    <td className="px-2 py-1.5 border-b border-slate-100">
-                      <div className="flex items-center gap-1">
+
+          <CardContent className="p-0 overflow-x-auto w-full min-w-0 no-scrollbar">
+            <div className="min-w-[1100px]">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 text-slate-500 text-xs">
+                    <th className="text-left font-medium px-3 py-2 border-b border-slate-100 w-10">
+                      #
+                    </th>
+                    <th className="text-left font-medium px-3 py-2 border-b border-slate-100">
+                      Product
+                    </th>
+                    <th className="text-left font-medium px-3 py-2 border-b border-slate-100 w-28">
+                      HSN
+                    </th>
+                    <th className="text-left font-medium px-3 py-2 border-b border-slate-100 w-16">
+                      Unit
+                    </th>
+                    <th className="text-center font-medium px-3 py-2 border-b border-slate-100 w-20">
+                      Qty
+                    </th>
+                    <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-36">
+                      Cost Price
+                    </th>
+                    <th className="text-center font-medium px-3 py-2 border-b border-slate-100 w-32">
+                      Discount
+                    </th>
+                    <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-20">
+                      GST%
+                    </th>
+                    {isMrpEnabled && (
+                      <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-24">
+                        MRP
+                      </th>
+                    )}
+                    <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-28">
+                      Total
+                    </th>
+                    <th className="w-16 border-b border-slate-100"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cartItems.map((item, i) => (
+                    <tr key={item._id} className="hover:bg-slate-50/60">
+                      <td className="px-3 py-1.5 border-b border-slate-100 text-slate-400">
+                        {i + 1}
+                      </td>
+                      <td className="px-3 py-1.5 border-b border-slate-100 font-medium text-slate-800">
+                        {item.name}
+                      </td>
+
+                      <td className="px-2 py-1.5 border-b border-slate-100">
+                        <input
+                          type="text"
+                          value={item.hsn || ""}
+                          onChange={handleHsnChange(item._id)}
+                          placeholder="HSN"
+                          className="w-24 h-8 px-2 text-xs border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </td>
+
+                      <td className="px-3 py-1.5 border-b border-slate-100 text-slate-500">
+                        {item.unit || "Pcs"}
+                      </td>
+                      <td className="px-2 py-1.5 border-b border-slate-100">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={item.qty}
+                          onChange={handleQtyChange(item._id)}
+                          onBlur={handleQtyBlur(item._id)}
+                          className="w-16 h-8 text-center border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 mx-auto block"
+                        />
+                      </td>
+
+                      <td className="px-2 py-1.5 border-b border-slate-100">
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={item.costPrice ?? 0}
+                            onChange={handleDecimalChange(item._id, "costPrice")}
+                            onBlur={handleDecimalBlur(item._id, "costPrice")}
+                            className="w-20 h-8 text-right px-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={togglePurchaseTaxInclusive(
+                              item._id,
+                              item.isPurchaseTaxInclusive,
+                            )}
+                            title={
+                              item.isPurchaseTaxInclusive
+                                ? "Tax Included — click to exclude"
+                                : "Tax Excluded — click to include"
+                            }
+                            className={`w-8 h-8 shrink-0 flex items-center justify-center rounded-md border text-[10px] font-semibold ${
+                              item.isPurchaseTaxInclusive
+                                ? "bg-blue-600 border-blue-600 text-white"
+                                : "bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-50"
+                            }`}
+                          >
+                            {item.isPurchaseTaxInclusive ? (
+                              <PlusCircle className="w-3.5 h-3.5" />
+                            ) : (
+                              <MinusCircle className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+
+                      <td className="px-2 py-1.5 border-b border-slate-100">
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={item.purchaseDiscount ?? 0}
+                            onChange={handleDecimalChange(
+                              item._id,
+                              "purchaseDiscount",
+                            )}
+                            onBlur={handleDecimalBlur(
+                              item._id,
+                              "purchaseDiscount",
+                            )}
+                            className="w-16 h-8 text-right px-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleUpdateItemField(
+                                item._id,
+                                "purchaseDiscountType",
+                                (item.purchaseDiscountType || "amount") ===
+                                  "amount"
+                                  ? "percentage"
+                                  : "amount",
+                              )
+                            }
+                            title="Toggle discount type"
+                            className="w-8 h-8 shrink-0 flex items-center justify-center rounded-md border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                          >
+                            {(item.purchaseDiscountType || "amount") ===
+                            "percentage" ? (
+                              <Percent className="w-3.5 h-3.5" />
+                            ) : (
+                              "₹"
+                            )}
+                          </button>
+                        </div>
+                      </td>
+
+                      <td className="px-2 py-1.5 border-b border-slate-100">
                         <input
                           type="text"
                           inputMode="decimal"
-                          value={item.purchaseDiscount ?? 0}
-                          onChange={handleDecimalChange(
-                            item._id,
-                            "purchaseDiscount",
-                          )}
-                          onBlur={handleDecimalBlur(
-                            item._id,
-                            "purchaseDiscount",
-                          )}
-                          className="w-16 h-8 text-right px-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          value={item.gstRate ?? 0}
+                          onChange={handleDecimalChange(item._id, "gstRate")}
+                          onBlur={handleGstRateBlur(item._id)}
+                          className="w-16 h-8 text-right px-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ml-auto block"
                         />
+                      </td>
+
+                      {isMrpEnabled && (
+                        <td className="px-2 py-1.5 border-b border-slate-100">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={item.mrp ?? 0}
+                            onChange={handleDecimalChange(item._id, "mrp")}
+                            onBlur={handleDecimalBlur(item._id, "mrp")}
+                            className="w-20 h-8 text-right px-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ml-auto block"
+                          />
+                        </td>
+                      )}
+
+                      <td className="px-3 py-1.5 border-b border-slate-100 text-right font-semibold text-blue-600">
+                        ₹{Number(item.total ?? 0).toFixed(2)}
+                      </td>
+                      <td className="px-2 py-1.5 border-b border-slate-100 text-center whitespace-nowrap">
                         <button
-                          type="button"
-                          onClick={() =>
-                            handleUpdateItemField(
-                              item._id,
-                              "purchaseDiscountType",
-                              (item.purchaseDiscountType || "amount") ===
-                                "amount"
-                                ? "percentage"
-                                : "amount",
-                            )
-                          }
-                          title="Toggle discount type"
-                          className="w-8 h-8 shrink-0 flex items-center justify-center rounded-md border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                          onClick={() => handleEditItem(item)}
+                          disabled={fetchingItemId === item._id}
+                          className="w-7 h-7 inline-flex items-center justify-center rounded-full text-blue-500 hover:bg-blue-50 hover:text-blue-600 disabled:opacity-50"
+                          title="Edit product master"
                         >
-                          {(item.purchaseDiscountType || "amount") ===
-                          "percentage" ? (
-                            <Percent className="w-3.5 h-3.5" />
+                          {fetchingItemId === item._id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
                           ) : (
-                            "₹"
+                            <Pencil className="w-3.5 h-3.5" />
                           )}
                         </button>
-                      </div>
-                    </td>
-                    <td className="px-3 py-1.5 border-b border-slate-100 text-right text-slate-500">
-                      {item.gstRate || 0}%
-                    </td>
-                    <td className="px-3 py-1.5 border-b border-slate-100 text-right font-semibold text-blue-600">
-                      ₹{Number(item.total ?? 0).toFixed(2)}
-                    </td>
-                    <td className="px-2 py-1.5 border-b border-slate-100 text-center">
-                      <button
-                        onClick={() => handleEditItem(item)}
-                        disabled={fetchingItemId === item._id}
-                        className="w-7 h-7 flex items-center justify-center rounded-full text-blue-500 hover:bg-blue-50 hover:text-blue-600 disabled:opacity-50"
-                        title="Edit item"
-                      >
-                        {fetchingItemId === item._id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Pencil className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                      <button
-                        onClick={() => handleRemoveItem(item._id)}
-                        className="w-7 h-7 flex items-center justify-center rounded-full text-rose-400 hover:bg-rose-50 hover:text-rose-500"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                        <button
+                          onClick={() => handleRemoveItem(item._id)}
+                          className="w-7 h-7 inline-flex items-center justify-center rounded-full text-rose-400 hover:bg-rose-50 hover:text-rose-500"
+                          title="Remove item"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
 
-                {/* Add-row */}
-                <tr>
-                  <td className="px-3 py-2 text-slate-300">
-                    {cartItems.length + 1}
-                  </td>
-                  <td className="px-2 py-2">
-                    <InlineProductCombobox
-                      products={products}
-                      onSelect={handleAddRow}
-                      onCreateNew={handleCreateNewProduct}
-                      onRefresh={onRefreshProducts}
-                    />
-                  </td>
-                  <td colSpan={8} className="px-3 py-2"></td>
-                </tr>
-              </tbody>
-            </table>
+                  {/* Add-row */}
+                  <tr>
+                    <td className="px-3 py-2 text-slate-300">
+                      {cartItems.length + 1}
+                    </td>
+                    <td className="px-2 py-2">
+                      <InlineProductCombobox
+                        products={products}
+                        onSelect={handleAddRow}
+                        onCreateNew={handleCreateNewProduct}
+                        onRefresh={onRefreshProducts}
+                      />
+                    </td>
+                    <td colSpan={addRowColSpan} className="px-3 py-2"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
 
             {cartItems.length > 0 && (
               <div className="flex justify-end px-3 py-2 border-t border-slate-100">
@@ -1000,6 +1074,16 @@ export default function NewPurchaseFormPage({
         initialItemName={newItemPrefillName}
         editItem={editingCartItem}
       />
+
+      <style jsx global>{`
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
     </div>
   );
 }
