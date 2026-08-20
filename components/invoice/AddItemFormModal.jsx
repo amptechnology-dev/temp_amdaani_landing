@@ -829,7 +829,8 @@ function HsnCodeSection({ value, gstRate, onHsnSelect }) {
 // =========================================================
 function TaxOptionSection({ value, onChange }) {
   const [open, setOpen] = useState(false);
-  const selected = TAX_OPTIONS.find((o) => o.id === value?.id) || defaultTaxOption;
+  const selected =
+    TAX_OPTIONS.find((o) => o.id === value?.id) || defaultTaxOption;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -1104,19 +1105,24 @@ export default function AddItemFormModal({
   const [selectedTaxOption, setSelectedTaxOption] = useState(defaultTaxOption);
   const [selectedTaxRate, setSelectedTaxRate] = useState(null);
 
+  const [selectedPurchaseTaxOption, setSelectedPurchaseTaxOption] =
+    useState(defaultTaxOption);
+  const [selectedPurchaseTaxRate, setSelectedPurchaseTaxRate] = useState(null);
+
   useEffect(() => {
     if (!open) return;
 
     if (!activeItem) {
       setSelectedTaxOption(defaultTaxOption);
       setSelectedTaxRate(null);
+      setSelectedPurchaseTaxOption(defaultTaxOption); // NEW
+      setSelectedPurchaseTaxRate(null); // NEW
       return;
     }
 
-    // ✅ Exactly mirrors RN AddItem.jsx initialValues derivation
     const taxOption = activeItem.isTaxInclusive
-      ? TAX_OPTIONS[0] // with_tax
-      : defaultTaxOption; // without_tax
+      ? TAX_OPTIONS[0]
+      : defaultTaxOption;
 
     const taxRate =
       activeItem.gstRate && Number(activeItem.gstRate) > 0
@@ -1128,6 +1134,23 @@ export default function AddItemFormModal({
 
     setSelectedTaxOption(taxOption);
     setSelectedTaxRate(taxRate);
+
+    const purchaseTaxOption = activeItem.isPurchaseTaxInclusive
+      ? TAX_OPTIONS[0]
+      : defaultTaxOption;
+
+    const purchaseGstRateValue =
+      activeItem.purchaseGstRate ?? activeItem.gstRate;
+    const purchaseTaxRate =
+      purchaseGstRateValue && Number(purchaseGstRateValue) > 0
+        ? {
+            rate: Number(purchaseGstRateValue),
+            label: `${purchaseGstRateValue}% GST`,
+          }
+        : null;
+
+    setSelectedPurchaseTaxOption(purchaseTaxOption);
+    setSelectedPurchaseTaxRate(purchaseTaxRate);
   }, [open, activeItem]);
 
   const initialValues = useMemo(() => {
@@ -1143,17 +1166,21 @@ export default function AddItemFormModal({
         mrp: "",
         discountType: "amount",
         discountPrice: "",
+        purchaseDiscountType: "amount",
+        purchaseDiscountPrice: "",
         openingStock: "",
         openingStockValue: "",
       };
     }
 
+    // ✅ Unit match
     const rawUnit = String(activeItem.unit || "").toLowerCase();
     const matchedUnit = UNITS.find(
       (u) =>
         u.symbol.toLowerCase() === rawUnit || u.name.toLowerCase() === rawUnit,
     );
 
+    // ✅ Category resolve
     let categoryId = "";
     if (activeItem.category && typeof activeItem.category === "object") {
       categoryId = isValidObjectId(activeItem.category._id)
@@ -1163,6 +1190,7 @@ export default function AddItemFormModal({
       categoryId = activeItem.category;
     }
 
+    // ✅ Sales discount derive
     const savedDiscountType = activeItem.discountType ?? "amount";
     const savedDiscountPercentage = Number(activeItem.discountPercentage ?? 0);
     const savedDiscountPrice = Number(activeItem.discountPrice ?? 0);
@@ -1173,6 +1201,24 @@ export default function AddItemFormModal({
           : ""
         : savedDiscountPrice > 0
           ? String(savedDiscountPrice)
+          : "";
+
+    // ✅ Purchase discount derive
+    const savedPurchaseDiscountType =
+      activeItem.purchaseDiscountType ?? "amount";
+    const savedPurchaseDiscountPercentage = Number(
+      activeItem.purchaseDiscountPercentage ?? 0,
+    );
+    const savedPurchaseDiscountAmount = Number(
+      activeItem.purchaseDiscount ?? 0,
+    );
+    const purchaseDiscountPriceDisplay =
+      savedPurchaseDiscountType === "percentage"
+        ? savedPurchaseDiscountPercentage > 0
+          ? String(savedPurchaseDiscountPercentage)
+          : ""
+        : savedPurchaseDiscountAmount > 0
+          ? String(savedPurchaseDiscountAmount)
           : "";
 
     const fyStock = activeItem.financialYearStock;
@@ -1190,6 +1236,8 @@ export default function AddItemFormModal({
       mrp: activeItem.mrp ? String(activeItem.mrp) : "",
       discountType: savedDiscountType,
       discountPrice: discountPriceDisplay,
+      purchaseDiscountType: savedPurchaseDiscountType,
+      purchaseDiscountPrice: purchaseDiscountPriceDisplay,
       openingStock: fyStock?.stock > 0 ? String(fyStock.stock) : "",
       openingStockValue: fyStock?.value > 0 ? String(fyStock.value) : "",
     };
@@ -1212,8 +1260,26 @@ export default function AddItemFormModal({
             ? parseFloat(((inputDiscount / salesPrice) * 100).toFixed(4))
             : 0;
 
-      // ✅ Opening stock validation — ItemsPage er moto add e >0 baddhotamulok,
-      // edit e 0 o cholbe
+      // ✅ NEW — purchase discount, exact same pattern হিসেবে sales discount এর মতো
+      const purchasePrice = Number(values.purchasePrice) || 0;
+      const inputPurchaseDiscount = Number(values.purchaseDiscountPrice) || 0;
+
+      const purchaseDiscountValue =
+        values.purchaseDiscountType === "percentage"
+          ? parseFloat(
+              ((purchasePrice * inputPurchaseDiscount) / 100).toFixed(2),
+            )
+          : inputPurchaseDiscount;
+
+      const purchaseDiscountPercentage =
+        values.purchaseDiscountType === "percentage"
+          ? inputPurchaseDiscount
+          : purchasePrice > 0
+            ? parseFloat(
+                ((inputPurchaseDiscount / purchasePrice) * 100).toFixed(4),
+              )
+            : 0;
+
       const stockErrors = validateOpeningStockValues(
         values.openingStock,
         values.openingStockValue,
@@ -1226,8 +1292,6 @@ export default function AddItemFormModal({
         return;
       }
 
-      // ✅ GST rate/tax-inclusive now come from the dedicated selectors —
-      // same source of truth as RN (`selectedTaxRate.rate` / `selectedTaxOption.id`)
       const payload = {
         name: values.itemName,
         unit: values.unit,
@@ -1235,13 +1299,24 @@ export default function AddItemFormModal({
         sku: values.itemCode || "",
         hsn: values.hsnCode || "",
         sellingPrice: salesPrice,
-        costPrice: Number(values.purchasePrice) || 0,
+        costPrice: purchasePrice,
         ...(isMrpEnabled ? { mrp: Number(values.mrp) || 0 } : {}),
+
+        // Sales-side tax
         gstRate: selectedTaxRate?.rate ? Number(selectedTaxRate.rate) : 0,
         isTaxInclusive: selectedTaxOption?.id === "with_tax",
         discountPrice: discountValue,
         discountType: values.discountType,
         discountPercentage,
+
+        // ✅ NEW — Purchase-side tax, product schema এর সাথে exact match
+        purchaseGstRate: selectedPurchaseTaxRate?.rate
+          ? Number(selectedPurchaseTaxRate.rate)
+          : 0,
+        isPurchaseTaxInclusive: selectedPurchaseTaxOption?.id === "with_tax",
+        purchaseDiscount: purchaseDiscountValue,
+        purchaseDiscountType: values.purchaseDiscountType,
+        purchaseDiscountPercentage,
       };
 
       const hasOpeningStock =
@@ -1328,6 +1403,19 @@ export default function AddItemFormModal({
               }
               if (finalPrice < 0) finalPrice = 0;
 
+              const purchasePriceNum = Number(values.purchasePrice) || 0;
+              const purchaseDiscountNum =
+                Number(values.purchaseDiscountPrice) || 0;
+              let finalPurchasePrice = purchasePriceNum;
+              if (values.purchaseDiscountType === "percentage") {
+                finalPurchasePrice =
+                  purchasePriceNum -
+                  (purchasePriceNum * purchaseDiscountNum) / 100;
+              } else {
+                finalPurchasePrice = purchasePriceNum - purchaseDiscountNum;
+              }
+              if (finalPurchasePrice < 0) finalPurchasePrice = 0;
+
               return (
                 <Form className="space-y-5">
                   {/* ---- Product Details ---- */}
@@ -1404,22 +1492,26 @@ export default function AddItemFormModal({
                           setFieldValue("hsnCode", "");
                           setSelectedTaxRate(null);
                           setSelectedTaxOption(defaultTaxOption);
+                          setSelectedPurchaseTaxRate(null); // NEW
+                          setSelectedPurchaseTaxOption(defaultTaxOption); // NEW
                           return;
                         }
                         setFieldValue("hsnCode", hsn.code);
 
-                        // ✅ Exactly mirrors RN handleHsnCodeSelect:
-                        // sets the rate from HSN and always resets the
-                        // tax option to "Exclude Tax" (without_tax).
                         if (hsn.gstRate && Number(hsn.gstRate) > 0) {
-                          setSelectedTaxRate({
+                          const rateObj = {
                             rate: Number(hsn.gstRate),
                             label: `${hsn.gstRate}% GST`,
-                          });
+                          };
+                          setSelectedTaxRate(rateObj);
                           setSelectedTaxOption(defaultTaxOption);
+                          setSelectedPurchaseTaxRate(rateObj); // NEW — same HSN, same GST rate
+                          setSelectedPurchaseTaxOption(defaultTaxOption); // NEW
                         } else {
                           setSelectedTaxRate(null);
                           setSelectedTaxOption(defaultTaxOption);
+                          setSelectedPurchaseTaxRate(null); // NEW
+                          setSelectedPurchaseTaxOption(defaultTaxOption); // NEW
                         }
                       }}
                     />
@@ -1432,18 +1524,32 @@ export default function AddItemFormModal({
                   </div>
                   <Separator />
 
+                  {/* Purchase Price + Sales Price, each with their own Tax Option toggle */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>Purchase Price (optional)</Label>
-                      <Input
-                        name="purchasePrice"
-                        value={values.purchasePrice}
-                        onChange={handleChange}
-                        placeholder="Enter purchase price"
-                        type="number"
-                        className="mt-1"
-                      />
+                      <div className="flex gap-2 mt-1">
+                        <Input
+                          name="purchasePrice"
+                          value={values.purchasePrice}
+                          onChange={handleChange}
+                          placeholder="Enter purchase price"
+                          type="number"
+                          className="flex-1"
+                        />
+                        {/* ✅ Purchase Tax Option — independent from Sales */}
+                        <TaxOptionSection
+                          value={selectedPurchaseTaxOption}
+                          onChange={setSelectedPurchaseTaxOption}
+                        />
+                      </div>
+                      {touched.purchasePrice && errors.purchasePrice && (
+                        <p className="text-xs text-red-500 mt-1">
+                          {errors.purchasePrice}
+                        </p>
+                      )}
                     </div>
+
                     <div>
                       <Label>Sales Price *</Label>
                       <div className="flex gap-2 mt-1">
@@ -1455,7 +1561,6 @@ export default function AddItemFormModal({
                           type="number"
                           className="flex-1"
                         />
-                        {/* ✅ Tax Option selector — Include/Exclude Tax, same as RN inline button */}
                         <TaxOptionSection
                           value={selectedTaxOption}
                           onChange={setSelectedTaxOption}
@@ -1469,12 +1574,82 @@ export default function AddItemFormModal({
                     </div>
                   </div>
 
+                  {/* Tax rates, side-by-side — Purchase GST% and Sales GST% independent */}
                   <div className="grid grid-cols-2 gap-4">
-                    {/* ✅ Tax Rate selector — dedicated GST % popover (preset + custom) */}
+                    <TaxRateSection
+                      value={selectedPurchaseTaxRate}
+                      onChange={setSelectedPurchaseTaxRate}
+                    />
                     <TaxRateSection
                       value={selectedTaxRate}
                       onChange={setSelectedTaxRate}
                     />
+                  </div>
+
+                  {/* Discounts, side-by-side */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Discount on Purchase</Label>
+                      <div className="flex gap-2 mt-1">
+                        <Input
+                          name="purchaseDiscountPrice"
+                          value={values.purchaseDiscountPrice}
+                          onChange={handleChange}
+                          placeholder="0"
+                          type="number"
+                          className="flex-1"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newType =
+                              values.purchaseDiscountType === "amount"
+                                ? "percentage"
+                                : "amount";
+                            const currentInput =
+                              Number(values.purchaseDiscountPrice) || 0;
+                            const priceForConversion =
+                              Number(values.purchasePrice) || 0;
+                            let converted = currentInput;
+                            if (
+                              newType === "percentage" &&
+                              values.purchaseDiscountType === "amount"
+                            ) {
+                              converted =
+                                priceForConversion > 0
+                                  ? parseFloat(
+                                      (
+                                        (currentInput / priceForConversion) *
+                                        100
+                                      ).toFixed(2),
+                                    )
+                                  : 0;
+                            } else if (
+                              newType === "amount" &&
+                              values.purchaseDiscountType === "percentage"
+                            ) {
+                              converted = parseFloat(
+                                (
+                                  (priceForConversion * currentInput) /
+                                  100
+                                ).toFixed(2),
+                              );
+                            }
+                            setFieldValue("purchaseDiscountType", newType);
+                            setFieldValue(
+                              "purchaseDiscountPrice",
+                              converted > 0 ? String(converted) : "",
+                            );
+                          }}
+                          className="flex items-center gap-1 px-2.5 rounded-full text-[11px] font-semibold border shrink-0 bg-slate-100 text-slate-600 border-slate-200"
+                        >
+                          {values.purchaseDiscountType === "percentage"
+                            ? "%"
+                            : "₹"}
+                        </button>
+                      </div>
+                    </div>
+
                     <div>
                       <Label>Discount on Sales</Label>
                       <div className="flex gap-2 mt-1">
@@ -1532,6 +1707,13 @@ export default function AddItemFormModal({
                       </div>
                     </div>
                   </div>
+
+                  {values.purchasePrice && values.purchaseDiscountPrice ? (
+                    <p className="text-sm text-slate-600 font-medium">
+                      Purchase Price (After Discount): ₹
+                      {finalPurchasePrice.toFixed(2)}
+                    </p>
+                  ) : null}
 
                   {values.salesPrice && values.discountPrice ? (
                     <p className="text-sm text-slate-600 font-medium">

@@ -31,7 +31,7 @@ import PurchaseSummary from "./PurchaseSummary";
 import AddItemFormModal from "../../components/invoice/AddItemFormModal";
 import api from "../../utils/api";
 
-function InlineProductCombobox({ products, onSelect, onCreateNew }) {
+function InlineProductCombobox({ products, onSelect, onCreateNew, onRefresh }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
@@ -147,6 +147,11 @@ function InlineProductCombobox({ products, onSelect, onCreateNew }) {
     }
   };
 
+  const handleFocus = () => {
+    setOpen(true);
+    onRefresh?.();
+  };
+
   return (
     <div className="relative w-full">
       <div className="relative">
@@ -157,7 +162,7 @@ function InlineProductCombobox({ products, onSelect, onCreateNew }) {
             setQuery(e.target.value);
             setOpen(true);
           }}
-          onFocus={() => setOpen(true)}
+          onFocus={handleFocus}
           onKeyDown={handleKeyDown}
           className="w-full max-w-[220px] h-8 px-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
         />
@@ -267,6 +272,7 @@ export default function NewPurchaseFormPage({
   handleRemoveItem,
   handleClearCart,
   isMrpEnabled = false,
+  onRefreshProducts,
 }) {
   console.log("NewPurchaseFormPage received storedata:", storedata);
   const [vendorForm, setVendorForm] = useState(() => ({
@@ -937,6 +943,7 @@ export default function NewPurchaseFormPage({
                       products={products}
                       onSelect={handleAddRow}
                       onCreateNew={handleCreateNewProduct}
+                      onRefresh={onRefreshProducts}
                     />
                   </td>
                   <td colSpan={8} className="px-3 py-2"></td>

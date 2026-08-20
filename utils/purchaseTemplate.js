@@ -24,6 +24,18 @@ export const generatePurchaseHTML = ({
     ? new Date()
     : parsedInvoiceDate;
 
+  // ✅ Helper — item er discount type (amount/percentage) onujayi
+  // actual ₹ discount ber kore dey, ekbare shobjaygay ekই logic
+  // (PurchaseFlow.js er invoiceCalculations er shathe consistent)
+  const getPerUnitDiscountAmount = (item) => {
+    const costPrice = Number(item.costPrice ?? item.rate ?? item.price ?? 0);
+    const discountType = item.purchaseDiscountType || "amount";
+    const rawDiscountInput = Number(item.purchaseDiscount ?? item.discount ?? 0);
+    return discountType === "percentage"
+      ? (costPrice * rawDiscountInput) / 100
+      : rawDiscountInput;
+  };
+
   // -------------------------------
   // Totals accumulation (purchase-specific fields, unchanged from RN logic)
   // -------------------------------
@@ -38,7 +50,10 @@ export const generatePurchaseHTML = ({
     const gstRate = item.gstRate || 0;
     const gstAmount = item.gstAmount || 0;
     const total = item.total || 0;
-    const perUnitDiscount = Number(item.purchaseDiscount ?? item.discount ?? 0);
+
+    // ✅ FIX — discountType onujayi actual ₹ discount ber koro,
+    // raw input value (jeta percentage o hote pare) sorasori na dhore
+    const perUnitDiscount = getPerUnitDiscountAmount(item);
     const discount = perUnitDiscount * qty;
 
     // Only accumulate taxable value if GST rate > 0
@@ -55,9 +70,14 @@ export const generatePurchaseHTML = ({
     .map((item, index) => {
       const qty = item.qty || item.quantity || 0;
       const costPrice = Number(item.costPrice ?? item.rate ?? item.price ?? 0);
-      const purchaseDiscount = Number(
+
+      // ✅ FIX — discountType onujayi actual ₹ discount ebong
+      // shothik percentage ber koro
+      const discountType = item.purchaseDiscountType || "amount";
+      const rawDiscountInput = Number(
         item.purchaseDiscount ?? item.discount ?? 0,
       );
+      const perUnitDiscountAmount = getPerUnitDiscountAmount(item);
 
       const gstRate = item.gstRate || 0;
       const gstAmount = item.gstAmount || 0;
@@ -67,11 +87,18 @@ export const generatePurchaseHTML = ({
       const isTaxInclusive = item.isPurchaseTaxInclusive || false;
       const mrp = item.mrp;
 
-      const totalDiscountAmt = purchaseDiscount * qty;
+      const totalDiscountAmt = perUnitDiscountAmount * qty;
+
+      // ✅ FIX — percentage mode e thakle raw input-ই actual %,
+      // amount mode e thakle costPrice diye reverse-calculate koro
       const discountPercent =
-        costPrice > 0 && purchaseDiscount > 0
-          ? ((purchaseDiscount / costPrice) * 100).toFixed(2)
-          : null;
+        discountType === "percentage"
+          ? rawDiscountInput > 0
+            ? rawDiscountInput.toFixed(2)
+            : null
+          : costPrice > 0 && perUnitDiscountAmount > 0
+            ? ((perUnitDiscountAmount / costPrice) * 100).toFixed(2)
+            : null;
 
       return `
     <tr class="item-row">

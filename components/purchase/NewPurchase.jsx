@@ -218,7 +218,6 @@ export default function PurchaseFlow() {
     try {
       const res = await api.get("/store");
       const data = res?.data || {};
-      console.log("Fetched store data:", data);
       setStoredata(data);
       return data;
     } catch {
@@ -295,6 +294,7 @@ export default function PurchaseFlow() {
     setExistingPurchaseId(null);
     const store = await fetchStoreData();
     await fetchNextPurchaseNumber();
+    await fetchAllProducts(); // ✅ প্রতিবার fresh product data আনো
     return store;
   };
 
@@ -310,6 +310,7 @@ export default function PurchaseFlow() {
     setStep("form");
     try {
       await fetchStoreData();
+      await fetchAllProducts();
       const res = await api.get(`/purchase/id/${purchaseId}`);
       const full = res?.data;
       if (!full) {
@@ -372,6 +373,17 @@ export default function PurchaseFlow() {
         return prev.map((p) =>
           p._id === product._id ? { ...p, qty: p.qty + 1 } : p,
         );
+
+      // ✅ FIX — product-এ যেভাবে discount saved আছে (type অনুযায়ী
+      // amount বা percentage), ঠিক সেভাবেই cart-এ বসাও। আগে এখানে
+      // হার্ডকোড 0 / "amount" বসানো ছিল, যেটা product-এর real
+      // purchase discount data সম্পূর্ণ ignore করে দিচ্ছিল।
+      const purchaseDiscountType = product.purchaseDiscountType || "amount";
+      const purchaseDiscountDisplayValue =
+        purchaseDiscountType === "percentage"
+          ? Number(product.purchaseDiscountPercentage || 0)
+          : Number(product.purchaseDiscount || 0);
+
       return [
         ...prev,
         {
@@ -379,8 +391,8 @@ export default function PurchaseFlow() {
           product: product._id,
           name: product.name,
           costPrice: Number(product.costPrice || 0),
-          purchaseDiscount: 0,
-          purchaseDiscountType: "amount",
+          purchaseDiscount: purchaseDiscountDisplayValue, // ✅ FIX
+          purchaseDiscountType, // ✅ FIX
           gstRate: Number(product.purchaseGstRate ?? product.gstRate ?? 0),
           isPurchaseTaxInclusive: Boolean(product.isPurchaseTaxInclusive),
           unit: product.unit || "PCS",
@@ -599,6 +611,7 @@ export default function PurchaseFlow() {
       handleUpdateItemField={handleUpdateItemField}
       handleRemoveItem={handleRemoveItem}
       handleClearCart={handleClearCart}
+      onRefreshProducts={fetchAllProducts}
     />
   );
 }

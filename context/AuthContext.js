@@ -42,7 +42,8 @@ export const permissions = {
 
 export let isBootstrapping = true;
 
-const REFRESH_BUFFER_MS = 60 * 1000;
+const REFRESH_BUFFER_MS = 2 * 60 * 1000;
+const MAX_TIMEOUT_MS = 24 * 60 * 60 * 1000;
 
 const AuthContext = createContext();
 
@@ -126,13 +127,36 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
-  // Fetch user profile after login
+  useEffect(() => {
+    const revalidateOnFocus = () => {
+      if (document.visibilityState !== "visible") return;
+      const token = authStateRef.current.accessToken;
+      if (!token) return;
+
+      const decoded = safeDecode(token);
+      if (!decoded?.exp) return;
+
+      const expiresIn = decoded.exp * 1000 - Date.now();
+      if (expiresIn <= REFRESH_BUFFER_MS) {
+        refreshAccessToken();
+      } else {
+        scheduleProactiveRefresh(token);
+      }
+    };
+
+    document.addEventListener("visibilitychange", revalidateOnFocus);
+    window.addEventListener("focus", revalidateOnFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", revalidateOnFocus);
+      window.removeEventListener("focus", revalidateOnFocus);
+    };
+  }, []);
+
   useEffect(() => {
     if (authState.isAuthenticated) {
       fetchUserProfile();
       fetchSubscription();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authState.isAuthenticated]);
 
   const safeDecode = (token) => {
@@ -155,7 +179,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const refreshAccessToken = async (currentState) => {
-    const state = currentState || authStateRef.current; // ✅ ref use করো
+    const state = currentState || authStateRef.current;
 
     if (!state.refreshToken) {
       await logout();
@@ -190,10 +214,22 @@ export const AuthProvider = ({ children }) => {
           return updated.accessToken;
         }
 
+        // Backend explicitly bললো refresh token invalid → এখানেই logout ঠিক আছে
         await logout();
         return null;
       } catch (err) {
-        await logout();
+        const status = err?.response?.status;
+
+        // ✅ শুধু 401/403 (refresh token সত্যিই invalid/expired/reused) হলেই logout
+        if (status === 401 || status === 403) {
+          await logout();
+        } else {
+          // ❌ Network drop, timeout, 500 ইত্যাদি transient error — logout করবো না
+          console.log(
+            "[Auth] Refresh failed (transient), keeping session:",
+            err?.message,
+          );
+        }
         return null;
       } finally {
         refreshPromiseRef.current = null;
@@ -210,7 +246,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ✅ token expire howar age e nijei refresh kore newa (proactive) — jate hঠাৎ 401 e logout na hoy
   const scheduleProactiveRefresh = (accessToken) => {
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
 
@@ -220,14 +255,14 @@ export const AuthProvider = ({ children }) => {
     const msUntilRefresh = decoded.exp * 1000 - Date.now() - REFRESH_BUFFER_MS;
 
     if (msUntilRefresh <= 0) {
-      // already close to expiry — ekhoni refresh koro
       refreshAccessToken();
       return;
     }
 
+    const delay = Math.min(msUntilRefresh, MAX_TIMEOUT_MS);
     refreshTimerRef.current = setTimeout(() => {
       refreshAccessToken();
-    }, msUntilRefresh);
+    }, delay);
   };
 
   // Fetch subscription
