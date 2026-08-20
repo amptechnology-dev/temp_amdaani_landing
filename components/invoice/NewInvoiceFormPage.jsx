@@ -19,6 +19,7 @@ import {
   Percent,
   X,
   Trash2,
+  Pencil,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -305,6 +306,11 @@ export default function NewInvoiceFormPage({
   const [newItemPrefillName, setNewItemPrefillName] = useState("");
   const customerGridRef = useRef(null);
 
+  // ✅ NEW — jokhon pencil icon click hoy kono existing cart item-e, ei state-e
+  // sei item-take rakha hoy — AddItemFormModal ta tokhon "editItem" pabe ar
+  // full Add/Edit Item form-ta pre-filled edit mode-e khulbe (Image 2 style).
+  const [editingCartItem, setEditingCartItem] = useState(null);
+
   useEffect(() => {
     const onClickOutside = (e) => {
       if (
@@ -341,7 +347,9 @@ export default function NewInvoiceFormPage({
         gstNumber: selectedCustomer.gstNumber || "",
       });
 
-      const matched = customers.find((c) => c.mobile === selectedCustomer.mobile);
+      const matched = customers.find(
+        (c) => c.mobile === selectedCustomer.mobile,
+      );
       if (matched) setSelectedCustomerId(matched._id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -459,6 +467,7 @@ export default function NewInvoiceFormPage({
   };
 
   const handleCreateNewProduct = (typedName) => {
+    setEditingCartItem(null);
     setNewItemPrefillName(typedName);
     setShowAddItemModal(true);
   };
@@ -467,6 +476,50 @@ export default function NewInvoiceFormPage({
     setAllProducts?.((prev) => [newItem, ...prev]);
     addToCart(newItem);
     setNewItemPrefillName("");
+  };
+
+  // ✅ NEW — jokhon "Edit Item" form theke ekta EXISTING cart item update kore
+  // save deya hoy: (1) product master already update hoye geche AddItemFormModal
+  // er nijer PUT call diye, (2) ekhon shei fresh product data theke cart line
+  // item-er discount/GST/price ইত্যাদি abar bose jabe — thik addToCart() er moto
+  // logic diye.
+  const handleCartItemUpdated = (updatedProduct) => {
+    if (!editingCartItem || !updatedProduct) return;
+    const cartItemId = editingCartItem._id;
+
+    // ✅ allProducts list-eo notun data sync kore rakhi
+    setAllProducts?.((prev) =>
+      prev.map((p) => (p._id === updatedProduct._id ? updatedProduct : p)),
+    );
+
+    const productDiscountType =
+      updatedProduct.discountType === "percentage" ? "percent" : "amount";
+    const productDiscountValue =
+      productDiscountType === "percent"
+        ? Number(updatedProduct.discountPercentage || 0)
+        : Number(updatedProduct.discountPrice || 0);
+
+    handleUpdateItemField(cartItemId, "name", updatedProduct.name);
+    handleUpdateItemField(
+      cartItemId,
+      "sellingPrice",
+      Number(updatedProduct.sellingPrice || 0),
+    );
+    handleUpdateItemField(
+      cartItemId,
+      "gstRate",
+      Number(updatedProduct.gstRate || 0),
+    );
+    handleUpdateItemField(
+      cartItemId,
+      "isTaxInclusive",
+      Boolean(updatedProduct.isTaxInclusive),
+    );
+    handleUpdateItemField(cartItemId, "unit", updatedProduct.unit || "PCS");
+    handleUpdateItemField(cartItemId, "hsn", updatedProduct.hsn || "");
+    handleUpdateItemField(cartItemId, "mrp", Number(updatedProduct.mrp || 0));
+    handleUpdateItemField(cartItemId, "discount", productDiscountValue);
+    handleUpdateItemField(cartItemId, "discountType", productDiscountType);
   };
 
   // -------------------------------
@@ -733,6 +786,7 @@ export default function NewInvoiceFormPage({
                 size="sm"
                 variant="outline"
                 onClick={() => {
+                  setEditingCartItem(null);
                   setNewItemPrefillName("");
                   setShowAddItemModal(true);
                 }}
@@ -774,7 +828,7 @@ export default function NewInvoiceFormPage({
                   <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-28">
                     Total
                   </th>
-                  <th className="w-10 border-b border-slate-100"></th>
+                  <th className="w-16 border-b border-slate-100"></th>
                 </tr>
               </thead>
               <tbody>
@@ -809,7 +863,10 @@ export default function NewInvoiceFormPage({
                           type="text"
                           inputMode="decimal"
                           value={item.price ?? item.sellingPrice ?? 0}
-                          onChange={handleDecimalChange(item._id, "sellingPrice")}
+                          onChange={handleDecimalChange(
+                            item._id,
+                            "sellingPrice",
+                          )}
                           onBlur={handleDecimalBlur(item._id, "sellingPrice")}
                           className="w-20 h-8 text-right px-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
@@ -830,7 +887,9 @@ export default function NewInvoiceFormPage({
                               handleUpdateItemField(
                                 item._id,
                                 "discountType",
-                                discountType === "amount" ? "percent" : "amount",
+                                discountType === "amount"
+                                  ? "percent"
+                                  : "amount",
                               )
                             }
                             title="Toggle discount type"
@@ -850,13 +909,26 @@ export default function NewInvoiceFormPage({
                       <td className="px-3 py-1.5 border-b border-slate-100 text-right font-semibold text-blue-600">
                         ₹{Number(item.total ?? 0).toFixed(2)}
                       </td>
-                      <td className="px-2 py-1.5 border-b border-slate-100 text-center">
-                        <button
-                          onClick={() => handleRemoveItem(item._id)}
-                          className="w-7 h-7 flex items-center justify-center rounded-full text-rose-400 hover:bg-rose-50 hover:text-rose-500"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                      <td className="px-2 py-1.5 border-b border-slate-100">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => {
+                              setEditingCartItem(item);
+                              setShowAddItemModal(true);
+                            }}
+                            className="w-7 h-7 flex items-center justify-center rounded-full text-blue-500 hover:bg-blue-50 hover:text-blue-600"
+                            title="Edit item"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleRemoveItem(item._id)}
+                            className="w-7 h-7 flex items-center justify-center rounded-full text-rose-400 hover:bg-rose-50 hover:text-rose-500"
+                            title="Remove item"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -926,12 +998,22 @@ export default function NewInvoiceFormPage({
         </Card>
       </div>
 
-      
       <AddItemFormModal
         open={showAddItemModal}
-        onOpenChange={setShowAddItemModal}
-        onItemCreated={handleNewProductCreated}
-        initialItemName={newItemPrefillName}
+        onOpenChange={(v) => {
+          setShowAddItemModal(v);
+          if (!v) setEditingCartItem(null);
+        }}
+        editItem={editingCartItem}
+        initialItemName={editingCartItem ? "" : newItemPrefillName}
+        onItemCreated={(savedItem) => {
+          if (editingCartItem) {
+            handleCartItemUpdated(savedItem);
+            setEditingCartItem(null);
+          } else {
+            handleNewProductCreated(savedItem);
+          }
+        }}
       />
     </div>
   );

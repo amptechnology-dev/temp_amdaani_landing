@@ -378,9 +378,10 @@ export default function SalesFlow() {
     setStep("form");
   };
 
-  const handleEditInvoice = async (invoiceId) => {
+  // ✅ targetStep: "form" (default, full invoice edit) | "items" (jump straight to item picker)
+  const handleEditInvoice = async (invoiceId, targetStep = "form") => {
     setIsFormLoading(true);
-    setStep("form");
+    setStep(targetStep);
     try {
       const store = await fetchStoreData();
       const res = await api.get(`/invoice/id/${invoiceId}`);
@@ -441,6 +442,8 @@ export default function SalesFlow() {
   // -------------------------------
   // Cart handlers (used inside AddItemsPage)
   // -------------------------------
+
+  // ✅ Product select korle discount + GST product er nijer settings theke bose jabe
   const addToCart = (product) => {
     setCartItems((prev) => {
       const existing = prev.find((p) => p._id === product._id);
@@ -448,6 +451,15 @@ export default function SalesFlow() {
         return prev.map((p) =>
           p._id === product._id ? { ...p, qty: p.qty + 1 } : p,
         );
+
+      // Product schema-r discountType "amount" | "percentage" — cart e "amount" | "percent" use hoy
+      const productDiscountType =
+        product.discountType === "percentage" ? "percent" : "amount";
+      const productDiscountValue =
+        productDiscountType === "percent"
+          ? Number(product.discountPercentage || 0)
+          : Number(product.discountPrice || 0);
+
       return [
         ...prev,
         {
@@ -459,8 +471,8 @@ export default function SalesFlow() {
           unit: product.unit || "PCS",
           hsn: product.hsn || "",
           mrp: Number(product.mrp || 0),
-          discount: 0,
-          discountType: "amount",
+          discount: productDiscountValue,
+          discountType: productDiscountType,
           qty: 1,
         },
       ];
@@ -613,7 +625,8 @@ export default function SalesFlow() {
       <InvoiceListPage
         refreshKey={invoiceRefreshKey}
         onCreateNew={handleStartNewInvoice}
-        onEditInvoice={handleEditInvoice}
+        onEditInvoice={(invoiceId) => handleEditInvoice(invoiceId, "form")}
+        onEditItems={(invoiceId) => handleEditInvoice(invoiceId, "items")}
       />
     );
   }

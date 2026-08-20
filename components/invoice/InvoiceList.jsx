@@ -131,7 +131,8 @@ export default function InvoiceListPage({ refreshKey, onCreateNew, onEditInvoice
             {filteredInvoices.map((inv) => (
               <div
                 key={inv._id}
-                className="bg-white border border-slate-200 rounded-2xl p-4 relative hover:shadow-md transition-shadow"
+                onClick={() => onEditInvoice(inv._id)}
+                className="bg-white border border-slate-200 rounded-2xl p-4 relative hover:shadow-md hover:border-blue-200 transition-all cursor-pointer"
               >
                 <div className="flex justify-between items-start gap-2">
                   <div className="min-w-0">
@@ -163,7 +164,10 @@ export default function InvoiceListPage({ refreshKey, onCreateNew, onEditInvoice
                 </div>
 
                 <button
-                  onClick={() => onEditInvoice(inv._id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEditInvoice(inv._id);
+                  }}
                   className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100"
                   title="Edit invoice"
                 >
