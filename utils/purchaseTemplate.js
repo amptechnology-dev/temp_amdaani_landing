@@ -17,6 +17,7 @@ export const generatePurchaseHTML = ({
   isMrpEnabled = true,
   isFreePlan = true,
   appBrand = { name: "AMDAANI", logoUrl: "" },
+  pageFormat = "a4", // ✅ NEW — "a4" | "a5"
   payment = { paid: 0, due: 0, status: "unpaid" },
 }) => {
   const parsedInvoiceDate = invoiceDate ? new Date(invoiceDate) : new Date();
@@ -24,9 +25,16 @@ export const generatePurchaseHTML = ({
     ? new Date()
     : parsedInvoiceDate;
 
+  // ✅ NEW — invoiceTemplate.js er shathe consistent A4/A5 logic
+  const isA5 = pageFormat === "a5";
+  const pageSize = isA5 ? "A5" : "A4";
+  const invoiceContainerWidth = isA5 ? "520px" : "800px";
+  const showPaymentSummary = !isA5; // amount-in-words cell er nichey payment history table
+  const showTaxSummary = !isA5; // GST breakdown block
+  const showPaymentDetails = !isA5; // paid/due rows + status badge
+
   // ✅ Helper — item er discount type (amount/percentage) onujayi
   // actual ₹ discount ber kore dey, ekbare shobjaygay ekই logic
-  // (PurchaseFlow.js er invoiceCalculations er shathe consistent)
   const getPerUnitDiscountAmount = (item) => {
     const costPrice = Number(item.costPrice ?? item.rate ?? item.price ?? 0);
     const discountType = item.purchaseDiscountType || "amount";
@@ -37,7 +45,7 @@ export const generatePurchaseHTML = ({
   };
 
   // -------------------------------
-  // Totals accumulation (purchase-specific fields, unchanged from RN logic)
+  // Totals accumulation
   // -------------------------------
   let totalQty = 0;
   let totalDiscount = 0;
@@ -51,12 +59,9 @@ export const generatePurchaseHTML = ({
     const gstAmount = item.gstAmount || 0;
     const total = item.total || 0;
 
-    // ✅ FIX — discountType onujayi actual ₹ discount ber koro,
-    // raw input value (jeta percentage o hote pare) sorasori na dhore
     const perUnitDiscount = getPerUnitDiscountAmount(item);
     const discount = perUnitDiscount * qty;
 
-    // Only accumulate taxable value if GST rate > 0
     const taxableValue = gstRate > 0 ? Number(item.taxableValue || 0) : 0;
 
     totalQty += qty;
@@ -71,8 +76,6 @@ export const generatePurchaseHTML = ({
       const qty = item.qty || item.quantity || 0;
       const costPrice = Number(item.costPrice ?? item.rate ?? item.price ?? 0);
 
-      // ✅ FIX — discountType onujayi actual ₹ discount ebong
-      // shothik percentage ber koro
       const discountType = item.purchaseDiscountType || "amount";
       const rawDiscountInput = Number(
         item.purchaseDiscount ?? item.discount ?? 0,
@@ -89,8 +92,6 @@ export const generatePurchaseHTML = ({
 
       const totalDiscountAmt = perUnitDiscountAmount * qty;
 
-      // ✅ FIX — percentage mode e thakle raw input-ই actual %,
-      // amount mode e thakle costPrice diye reverse-calculate koro
       const discountPercent =
         discountType === "percentage"
           ? rawDiscountInput > 0
@@ -187,7 +188,7 @@ export const generatePurchaseHTML = ({
   `;
 
   // -------------------------------
-  // Effective totals (createdInvoice trusts DB, else live calc)
+  // Effective totals
   // -------------------------------
   const effectiveDiscountTotal = createdInvoice
     ? Number(invoiceData?.discountTotal || 0)
@@ -250,7 +251,7 @@ export const generatePurchaseHTML = ({
     1 + // net total
     (effectiveDiscountTotal > 0 ? 1 : 0) +
     (Number(roundOffValue) !== 0 ? 1 : 0) +
-    (payment.status !== "paid" || payment.due > 0 ? 2 : 0);
+    (showPaymentDetails && (payment.status !== "paid" || payment.due > 0) ? 2 : 0);
 
   return /*html*/ `
   <!DOCTYPE html>
@@ -262,15 +263,13 @@ export const generatePurchaseHTML = ({
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body { font-family: 'Arial', sans-serif; font-size: 11px; line-height: 1.3; color: #000; background: #fff; padding: 8px; }
-      .invoice-container { max-width: 800px; margin: 0 auto; border: 1px solid #000; background: #fff; }
+      .invoice-container { max-width: ${invoiceContainerWidth}; margin: 0 auto; border: 1px solid #000; background: #fff; }
       :root { --brand: #2c5aa0; }
 
-      /* Brand strip */
       .brand-strip { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; border-bottom: 1px solid #000; background: #f9fafc; }
       .brand-left { display: flex; align-items: center; gap: 6px; font-size: 10px; color: #555; }
       .brand-app-logo { height: 14px; width: auto; }
 
-      /* Header (company info + badge) */
       .header-grid { display: flex; justify-content: space-between; align-items: flex-start; padding: 14px 16px; border-bottom: 1.5px solid #000; background: #ffffff; flex-wrap: wrap; gap: 12px; }
       .header-left { display: flex; flex-direction: row; align-items: flex-start; gap: 10px; flex: 1; min-width: 220px; }
       .logo-wrap { display: flex; align-items: flex-start; justify-content: center; flex-shrink: 0; }
@@ -282,7 +281,6 @@ export const generatePurchaseHTML = ({
       .meta-block { display: flex; flex-direction: column; align-items: flex-end; text-align: right; justify-content: center; min-width: 180px; }
       .invoice-badge { font-weight: 700; font-size: 14px; padding: 6px 12px; border-radius: 6px; text-transform: uppercase; background: var(--brand); color: #fff; border: 1px solid #000; letter-spacing: 0.4px; text-align: center; margin-bottom: 4px; }
 
-      /* Vendor + purchase meta row */
       .invoice-info { display: flex; border-bottom: 1px solid #000; }
       .invoice-info-left, .invoice-info-right { flex: 1; padding: 10px; }
       .invoice-info-left { border-right: 1px solid #000; }
@@ -290,7 +288,6 @@ export const generatePurchaseHTML = ({
       .info-label { min-width: 90px; font-weight: bold; }
       .customer-title { font-weight: bold; font-size: 12px; margin-bottom: 2px; color: #2c5aa0; }
 
-      /* Items table */
       .items-table { width: 100%; border-collapse: collapse; font-size: 10px; }
       .items-table th { background: #2c5aa0; color: white; padding: 8px 4px; border: 1px solid #000; font-size: 9px; }
       .items-table td { padding: 6px 4px; border: 1px solid #000; text-align: center; }
@@ -299,14 +296,12 @@ export const generatePurchaseHTML = ({
       .items-table td.rate, .items-table td.mrp, .items-table td.discount,
       .items-table td.gst-amount, .items-table td.total-amount { text-align: right !important; }
 
-      /* GST breakdown */
       .gst-breakdown { margin-top: 10px; border-top: 1px solid #000; }
       .gst-breakdown-title { padding: 4px 0; font-size: 12px; text-align: center; color: #2c5aa0; background: #f0f4ff; border: 1px solid #000; border-bottom: none; }
       .gst-table { width: 100%; border-collapse: collapse; font-size: 9px; }
       .gst-table th, .gst-table td { padding: 6px 8px; border: 1px solid #000; text-align: center; }
       .gst-table th { background: #2c5aa0; color: white; }
 
-      /* Totals rows */
       .items-table .totals-row td, .items-table .grand-total-row td { border: 1px solid #000; font-size: 10px; padding: 6px 8px; }
       .amount-words-cell { font-size: 10px; background: #fafafa; color: #000; }
       .items-table .label { text-align: left; font-weight: 600; background: #f8f8f8; }
@@ -316,14 +311,12 @@ export const generatePurchaseHTML = ({
       .payment-row .amount { text-align: right !important; font-weight: 600; }
       .no-break { page-break-inside: avoid; }
 
-      /* Payment status badge */
       .payment-status-container { text-align: right; margin-top: 4px; margin-right: 8px; }
       .payment-status { display: inline-block; padding: 2px 14px; border-radius: 20px; font-weight: 600; font-size: 8px; text-transform: capitalize; font-style: italic; letter-spacing: 0.5px; color: #fff; }
       .payment-status.paid { background-color: #43a047; }
       .payment-status.partial { background-color: #fb8c00; }
       .payment-status.unpaid { background-color: #e53935; }
 
-      /* Footer (bank + signature) */
       .footer-section { display: flex; border-top: 1px solid #000; margin-top: 10px; min-height: 80px; justify-content: flex-end; }
       .terms-section { flex: 1; padding: 10px; border-right: 1px solid #000; }
       .signature-section { width: 220px; padding: 10px; text-align: center; }
@@ -331,7 +324,6 @@ export const generatePurchaseHTML = ({
       .section-title { font-weight: bold; margin-bottom: 6px; font-size: 11px; color: #2c5aa0; }
       .signature-line { border-top: 1px solid #000; margin-top: 40px; padding-top: 4px; font-size: 10px; font-weight: bold; }
 
-      /* Watermark */
       .items-table-wrap { position: relative; }
       .items-table-watermark { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 2; }
       .items-table-watermark .text { font-family: Arial, sans-serif; font-weight: 800; font-size: clamp(36px, 10vw, 96px); letter-spacing: 0.5em; text-transform: uppercase; color: rgba(0,0,0,0.08); transform: rotate(-28deg); user-select: none; white-space: nowrap; }
@@ -353,7 +345,7 @@ export const generatePurchaseHTML = ({
         .page-break { page-break-before: always; }
         .no-break { page-break-inside: avoid; }
         .brand-strip, .header-grid, .footer-section { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-        @page { size: A4; margin: 6mm; }
+        @page { size: ${pageSize}; margin: 6mm; }
       }
     </style>
   </head>
@@ -508,6 +500,7 @@ export const generatePurchaseHTML = ({
                         <div style="font-size:11px; font-weight:bold; color:#2c5aa0; margin-top:2px;">${amountInWords}</div>
 
                         ${
+                          showPaymentSummary &&
                           invoiceData?.transactions &&
                           invoiceData.transactions.length > 0
                             ? `
@@ -597,8 +590,9 @@ export const generatePurchaseHTML = ({
                     </tr>
 
                     ${
-                      payment.status !== "paid" ||
-                      Math.round(payment.due * 100) / 100 > 0.01
+                      showPaymentDetails &&
+                      (payment.status !== "paid" ||
+                        Math.round(payment.due * 100) / 100 > 0.01)
                         ? `
                     <tr class="payment-row no-break">
                       <td class="label">Paid Amount</td>
@@ -617,6 +611,9 @@ export const generatePurchaseHTML = ({
                   </tbody>
                 </table>
 
+                ${
+                  showPaymentDetails
+                    ? `
                 <div class="payment-status-container">
                   <span class="payment-status ${payment.status?.toLowerCase()}">
                     ${
@@ -653,11 +650,14 @@ export const generatePurchaseHTML = ({
                   }
                 </div>`
                     : ""
+                }`
+                    : ""
                 }
               </div>
 
               ${
                 !preview &&
+                showTaxSummary &&
                 Object.keys(invoiceCalculations.gstBreakdown || {}).some(
                   (r) => parseFloat(r) > 0,
                 )

@@ -32,6 +32,9 @@ export default function PurchaseSummary({
   const [previewHtml, setPreviewHtml] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
 
+  // ✅ NEW — same print preference invoice o purchase dutoyate apply hobe
+  const pageFormat = storedata?.settings?.printMode === "a5" ? "a5" : "a4";
+
   const handlePreview = () => {
     if (!cartItems?.length) return;
 
@@ -50,6 +53,7 @@ export default function PurchaseSummary({
       invoiceDate: now,
       isGstInvoice,
       isMrpEnabled,
+      pageFormat, // ✅ NEW
       payment: {
         paid: payment?.paid ?? 0,
         due: payment?.due ?? 0,
@@ -83,9 +87,7 @@ export default function PurchaseSummary({
           {isLoading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              {submitLabel === "Update Purchase"
-                ? "Updating..."
-                : "Creating..."}
+              {submitLabel === "Update Purchase" ? "Updating..." : "Creating..."}
             </>
           ) : (
             <>

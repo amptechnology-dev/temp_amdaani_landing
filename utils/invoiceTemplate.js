@@ -44,7 +44,6 @@ export const generateInvoiceHTML = ({
     const isTaxInclusive = item.isTaxInclusive || false;
     const total = item.total || 0;
 
-    // ✅ FIX: percent/amount দুটোই সঠিকভাবে ₹ এ resolve হচ্ছে এখন
     let discount = resolveItemDiscountInRupees(item);
 
     if (isTaxInclusive && gstRate > 0) {
@@ -54,7 +53,6 @@ export const generateInvoiceHTML = ({
 
     totalQty += qty;
     totalDiscount += discount;
-    // ✅ Only accumulate taxable if GST rate > 0 (same as purchase)
     totalTaxable += gstRate > 0 ? item.taxableValue || 0 : 0;
     totalGST += gstAmount;
     totalAmount += total;
@@ -69,11 +67,8 @@ export const generateInvoiceHTML = ({
       const totalAmount = item.total || 0;
       const isTaxInclusive = item.isTaxInclusive || false;
 
-      // ✅ Only show taxable value if GST rate > 0, otherwise 0 (same as purchase)
       const taxableValue = gstRate > 0 ? item.taxableValue || 0 : 0;
 
-      // ✅ FIX: discountType-aware — % discount হলে ₹ এ কনভার্ট করে নিচ্ছে,
-      // তারপর tax-inclusive হলে ex-tax terms এ নামিয়ে আনছে (baseRate কলামের সাথে মেলানোর জন্য)
       let perItemDiscount = resolveItemDiscountInRupees(item);
       if (isTaxInclusive && gstRate > 0) {
         perItemDiscount = perItemDiscount / (1 + gstRate / 100);
@@ -233,12 +228,10 @@ export const generateInvoiceHTML = ({
     ((invoiceCalculations?.discountTotal ?? 0) > 0 ? 1 : 0) +
     (roundOffValue ?? 0 > 0 ? 1 : 0);
 
-  // ✅ Filter out zero-amount transactions
   const nonZeroTransactions = (invoiceData?.transactions || []).filter(
     t => Number(t.amount || 0) > 0,
   );
 
-  // ✅ colspan: 5 base cols + discount(1) + if GST: taxable(1) + gst(1)
   const colspanCount = (isGstInvoice ? 7 : 5) + (isMrpEnabled ? 1 : 0);
 
   return /*html*/ `
@@ -503,7 +496,6 @@ export const generateInvoiceHTML = ({
                   <tbody>
                     ${itemsHTML}
 
-                    <!-- Summary Totals Row -->
                     <tr class="summary-total-row" style="font-weight:bold; background:#f8f8f8;">
                       <td></td>
                       <td style="text-align:left;">Total</td>
@@ -529,7 +521,6 @@ export const generateInvoiceHTML = ({
                       )}</td>
                     </tr>
 
-                    <!-- Amount in Words + Totals -->
                     <tr class="totals-row no-break">
                       <td colspan="${colspanCount}" rowspan="${totalsRowCount}"
                         class="amount-words-cell"
@@ -714,6 +705,7 @@ export const generateInvoiceHTML = ({
               ${
                 !preview &&
                 isGstInvoice &&
+                showTaxSummary &&
                 Object.keys(invoiceCalculations.gstBreakdown).some(
                   r => parseFloat(r) > 0,
                 )

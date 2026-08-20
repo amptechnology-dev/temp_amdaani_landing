@@ -21,11 +21,7 @@ export default function InvoiceSummary({
   handleCreateInvoice,
   isLoading,
   disabled,
-
-  // ✅ single source of truth for paid/due/status — computed once in parent
   payment,
-
-  // Preview er jonno lagbe (parent theke pass hoy)
   cartItems = [],
   formValues = {},
   storedata = {},
@@ -39,13 +35,16 @@ export default function InvoiceSummary({
   const [previewHtml, setPreviewHtml] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
 
+  // ✅ NEW — store-e save kora print preference (a4 / a5), default a4
+  const pageFormat = storedata?.settings?.printMode === "a5" ? "a5" : "a4";
+
   const handlePreview = () => {
-    if (!cartItems?.length) return; // empty cart guard
+    if (!cartItems?.length) return;
 
     const now = new Date();
 
     const html = generateInvoiceHTML({
-      preview: false, // full header/footer soho actual invoice er moto dekhabe
+      preview: false,
       createdInvoice: false,
       invoiceData: {
         transactions: [],
@@ -54,8 +53,8 @@ export default function InvoiceSummary({
         paymentNote,
       },
       formValues,
-      cartItems, // ✅ computedItems (baseRate/taxableValue/gstAmount/total/mrp soho)
-      invoiceCalculations, // ✅ gstBreakdown, discountTotal, grandTotal soho pura object
+      cartItems,
+      invoiceCalculations,
       invoiceNumber,
       currentDate: format(now, "dd-MMM-yyyy"),
       currentTime: format(now, "hh:mm a"),
@@ -65,6 +64,7 @@ export default function InvoiceSummary({
       isMrpEnabled,
       isFreePlan,
       appBrand,
+      pageFormat, // ✅ NEW
       payment: {
         paid: payment?.paid ?? 0,
         due: payment?.due ?? 0,
@@ -78,7 +78,6 @@ export default function InvoiceSummary({
 
   return (
     <div className="space-y-4">
-      {/* Actions */}
       <div className="flex gap-2">
         <Button
           variant="outline"
@@ -110,7 +109,6 @@ export default function InvoiceSummary({
         </Button>
       </div>
 
-      {/* Preview Dialog */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-3xl w-full h-[85vh] p-0 flex flex-col overflow-hidden">
           <DialogHeader className="px-4 py-2 border-b shrink-0">

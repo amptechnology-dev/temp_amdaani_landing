@@ -42,7 +42,8 @@ export default function PrintPreference() {
     try {
       setLoading(true);
       const res = await api.get("/store");
-      const current = res?.data?.settings?.printMode || "a4";
+      const body = res?.success !== undefined ? res : res?.data;
+      const current = body?.data?.settings?.printMode || "a4";
       setMode(current);
       setSavedMode(current);
     } catch (err) {
@@ -55,36 +56,50 @@ export default function PrintPreference() {
   };
 
   const handleSave = async () => {
-    if (!mode) {
-      toast.error("Please select a print format");
-      return;
-    }
-    if (mode === savedMode) {
-      toast.info("No changes to save");
-      return;
-    }
+  if (!mode) {
+    toast.error("Please select a print format");
+    return;
+  }
+  if (mode === savedMode) {
+    toast.info("No changes to save");
+    return;
+  }
 
-    setSaving(true);
-    try {
-      const formData = new FormData();
-      formData.append("settings[printMode]", mode);
+  setSaving(true);
+  try {
+    const formData = new FormData();
+    formData.append("settings", JSON.stringify({ printMode: mode }));
 
-      const res = await api.put("/store/update-my-store", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+    const res = await api.put("/store/update-my-store", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
 
-      if (res.success) {
-        toast.success(`Print format set to ${mode.toUpperCase()}`);
-        setSavedMode(mode);
+    // handles both cases: axios wrapper returns full response,
+    // OR an interceptor already unwraps to response.data
+    const body = res?.success !== undefined ? res : res?.data;
+
+    if (body?.success) {
+      const updatedMode = body?.data?.settings?.printMode;
+
+      if (updatedMode) {
+        toast.success(`Print format set to ${updatedMode.toUpperCase()}`);
+        setMode(updatedMode);
+        setSavedMode(updatedMode);
       } else {
-        toast.error(res.message || "Failed to save print preference");
+        toast.warning(
+          "Saved, but server didn't confirm the print format. Please re-check settings."
+        );
       }
-    } catch (err) {
-      toast.error("Failed to save print preference");
-    } finally {
-      setSaving(false);
+    } else {
+      toast.error(body?.message || "Failed to save print preference");
     }
-  };
+  } catch (err) {
+    const errBody = err?.response?.data;
+    toast.error(errBody?.message || "Failed to save print preference");
+  } finally {
+    setSaving(false);
+  }
+};
 
   if (loading) {
     return (
@@ -110,7 +125,9 @@ export default function PrintPreference() {
             <Printer className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Print Preference</h1>
+            <h1 className="text-2xl font-bold text-slate-900">
+              Print Preference
+            </h1>
             <p className="text-sm text-slate-400">
               Choose the default paper size for invoices &amp; purchase bills
             </p>
@@ -149,10 +166,14 @@ export default function PrintPreference() {
                     />
                   </div>
 
-                  <p className={`font-bold ${isActive ? "text-blue-700" : "text-slate-800"}`}>
+                  <p
+                    className={`font-bold ${isActive ? "text-blue-700" : "text-slate-800"}`}
+                  >
                     {item.label}
                   </p>
-                  <p className="text-xs text-slate-400 mt-1">{item.dimensions}</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {item.dimensions}
+                  </p>
                   <p className="text-sm text-slate-500 mt-2 leading-snug">
                     {item.description}
                   </p>
