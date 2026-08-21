@@ -220,10 +220,10 @@ export default function LoginScreen() {
   }[step];
 
   return (
-    <>
+    <div className={`h-screen flex flex-col overflow-hidden ${currentTheme.background}`}>
       <Navigation noLanding={true} />
 
-      <section className={`min-h-[calc(100vh-64px)] flex items-center justify-center p-4 ${currentTheme.background}`}>
+      <section className="flex-1 min-h-0 flex items-center justify-center p-4 overflow-y-auto">
         <div className="max-w-md w-full">
           <div className="text-center mb-5">
             <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-3 shadow-lg shadow-blue-500/20 bg-white ring-1 ring-slate-200/70 overflow-hidden relative">
@@ -469,6 +469,6 @@ export default function LoginScreen() {
       </section>
 
       <TermsModal open={termsOpen} onClose={() => setTermsOpen(false)} />
-    </>
+    </div>
   );
 }
