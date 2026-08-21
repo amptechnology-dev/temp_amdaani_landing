@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import {
   Calendar,
-  CalendarX2,
   FileText,
   FileSpreadsheet,
   RefreshCw,
@@ -355,210 +354,170 @@ export default function ProductReportPage() {
   const hasMore = cursorRef.current < allProductsRef.current.length;
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto">
-      {/* ---------------- HEADER ---------------- */}
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => window.history.back()}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <h1 className="text-lg font-bold text-slate-900">Product Report</h1>
+    <div className="h-full flex flex-col overflow-hidden bg-slate-50/40">
+      <div className="px-4 md:px-6 pt-4 pb-3 shrink-0">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <button onClick={() => window.history.back()} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <h1 className="text-lg font-bold text-slate-900">Product Report</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={exportPDF} disabled={!products.length || loading} className="h-9 px-3 rounded-lg border border-slate-200 text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium">
+              <FileText className="w-4 h-4" />PDF
+            </button>
+            <button onClick={exportExcel} disabled={!products.length || loading} className="h-9 px-3 rounded-lg border border-slate-200 text-emerald-600 hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium">
+              <FileSpreadsheet className="w-4 h-4" />Excel
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={exportPDF}
-            disabled={!products.length || loading}
-            className="h-9 px-3 rounded-lg border border-slate-200 text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium"
-          >
-            <FileText className="w-4 h-4" />
-            PDF
-          </button>
-          <button
-            onClick={exportExcel}
-            disabled={!products.length || loading}
-            className="h-9 px-3 rounded-lg border border-slate-200 text-emerald-600 hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium"
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            Excel
+
+        {/* Single-row filter toolbar */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-3 flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <div className="relative">
+              <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+              <input type="date" value={toInputDate(startDate)} max={toInputDate(new Date())}
+                onChange={(e) => setStartDate(e.target.value ? new Date(e.target.value) : null)}
+                className="h-9 w-[150px] pl-8 pr-2 rounded-lg border border-slate-200 text-[13px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
+            </div>
+            <span className="text-slate-300 text-xs">–</span>
+            <div className="relative">
+              <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+              <input type="date" value={toInputDate(endDate)} max={toInputDate(new Date())}
+                onChange={(e) => setEndDate(e.target.value ? new Date(e.target.value) : null)}
+                className="h-9 w-[150px] pl-8 pr-2 rounded-lg border border-slate-200 text-[13px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
+            </div>
+          </div>
+
+          <div className="h-6 w-px bg-slate-200 shrink-0" />
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button onClick={applyThisYear} className="h-9 px-3 rounded-lg border border-slate-200 text-[12.5px] font-medium text-slate-600 hover:bg-slate-50">
+              This Year
+            </button>
+            <button onClick={applyThisMonth} className="h-9 px-3 rounded-lg border border-slate-200 text-[12.5px] font-medium text-slate-600 hover:bg-slate-50">
+              This Month
+            </button>
+            <button onClick={applyPreviousMonth} className="h-9 px-3 rounded-lg border border-slate-200 text-[12.5px] font-medium text-slate-600 hover:bg-slate-50">
+              Prev Month
+            </button>
+          </div>
+
+          <button onClick={fetchProducts} disabled={!startDate || !endDate || loading}
+            className="h-9 px-4 ml-auto shrink-0 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-[13px] font-semibold flex items-center gap-2 transition-colors">
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+            {loading ? "Loading..." : "Generate"}
           </button>
         </div>
       </div>
 
-      {/* ---------------- FILTERS ---------------- */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-4 mb-5 space-y-3.5">
-        {/* Date range */}
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-            <input
-              type="date"
-              value={toInputDate(startDate)}
-              max={toInputDate(new Date())}
-              onChange={(e) => setStartDate(e.target.value ? new Date(e.target.value) : null)}
-              className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-            />
+      {/* ---------------- CONTENT (scrolls internally) ---------------- */}
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-4">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+            <RefreshCw className="w-6 h-6 animate-spin mb-2" />
+            <span className="text-sm">Loading...</span>
           </div>
-          <div className="relative flex-1">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-            <input
-              type="date"
-              value={toInputDate(endDate)}
-              max={toInputDate(new Date())}
-              onChange={(e) => setEndDate(e.target.value ? new Date(e.target.value) : null)}
-              className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-            />
+        ) : products.length === 0 ? (
+          <div className="flex items-center justify-center py-20 text-slate-400 text-sm text-center">
+            No records. Select a date range and Generate.
           </div>
-          <button
-            onClick={clearDates}
-            disabled={loading || (!startDate && !endDate)}
-            title="Clear dates"
-            className="h-10 w-10 shrink-0 rounded-xl border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <CalendarX2 className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Quick range row */}
-        <div className="flex gap-2">
-          <button
-            onClick={applyThisYear}
-            className="flex-1 h-9 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50"
-          >
-            This Year
-          </button>
-          <button
-            onClick={applyThisMonth}
-            className="flex-1 h-9 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50"
-          >
-            This Month
-          </button>
-          <button
-            onClick={applyPreviousMonth}
-            className="flex-1 h-9 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50"
-          >
-            Prev Month
-          </button>
-        </div>
-
-        {/* Generate */}
-        <button
-          onClick={fetchProducts}
-          disabled={!startDate || !endDate || loading}
-          className="w-full h-10 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-sm font-semibold flex items-center justify-center gap-2 transition-colors"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          {loading ? "Loading..." : "Generate"}
-        </button>
-      </div>
-
-      {/* ---------------- CONTENT ---------------- */}
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-          <RefreshCw className="w-6 h-6 animate-spin mb-2" />
-          <span className="text-sm">Loading...</span>
-        </div>
-      ) : products.length === 0 ? (
-        <div className="flex items-center justify-center py-20 text-slate-400 text-sm text-center">
-          No records. Select a date range and Generate.
-        </div>
-      ) : (
-        <>
-          {/* Summary */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
-            <SummaryCard label="Range" value={formattedRange} small />
-            <SummaryCard label="Records" value={totals.count} />
-            <SummaryCard label="Quantity" value={totals.quantity} />
-            <SummaryCard label="GST" value={currency(totals.gstTotal)} />
-            <SummaryCard label="Grand Total" value={currency(totals.grandTotal)} highlight />
-          </div>
-
-          {/* Table */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
-                    <th className="text-left font-semibold px-4 py-3">Invoice No</th>
-                    <th className="text-left font-semibold px-4 py-3">Date</th>
-                    <th className="text-left font-semibold px-4 py-3">Product</th>
-                    <th className="text-left font-semibold px-4 py-3">Unit</th>
-                    <th className="text-right font-semibold px-4 py-3">Qty</th>
-                    <th className="text-right font-semibold px-4 py-3">Price</th>
-                    <th className="text-right font-semibold px-4 py-3">GST%</th>
-                    <th className="text-right font-semibold px-4 py-3">Line Total</th>
-                    <th className="text-right font-semibold px-4 py-3">Grand Total</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {products.map((p, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3 font-semibold text-slate-800 whitespace-nowrap">
-                        #{p.invoiceNumber || p._id}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
-                        {p.date
-                          ? new Date(p.date).toLocaleDateString("en-IN", {
-                              day: "2-digit",
-                              month: "short",
-                              year: "numeric",
-                            })
-                          : "-"}
-                      </td>
-                      <td className="px-4 py-3 text-slate-700 flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-md bg-blue-50 flex items-center justify-center shrink-0">
-                          <Package className="w-3.5 h-3.5 text-blue-500" />
-                        </span>
-                        {p.product || "-"}
-                      </td>
-                      <td className="px-4 py-3 text-slate-500">{p.unit || "-"}</td>
-                      <td className="px-4 py-3 text-right text-slate-700">{p.quantity ?? "-"}</td>
-                      <td className="px-4 py-3 text-right text-slate-600">{currency(p.price)}</td>
-                      <td className="px-4 py-3 text-right text-slate-500">{p.gstRate ?? 0}%</td>
-                      <td className="px-4 py-3 text-right text-slate-600">{currency(p.lineTotal)}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-slate-800">
-                        {currency(p.grandTotal)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        ) : (
+          <>
+            {/* Summary */}
+            <div className="bg-white border border-slate-200/80 rounded-2xl px-5 py-3.5 mb-4">
+              <div className="text-xs text-slate-400 mb-2">{formattedRange}</div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <SummaryStat label="Records" value={String(totals.count)} />
+                <SummaryStat label="Quantity" value={String(totals.quantity)} />
+                <SummaryStat label="GST" value={currency(totals.gstTotal)} accent="text-red-600" />
+                <SummaryStat label="Grand Total" value={currency(totals.grandTotal)} accent="text-blue-600" bold />
+              </div>
             </div>
 
-            {hasMore && (
-              <div className="p-4 border-t border-slate-100 flex justify-center">
-                <button
-                  onClick={handleLoadMore}
-                  disabled={loadingMore}
-                  className="h-9 px-5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-                >
-                  {loadingMore ? "Loading..." : "Load More"}
-                </button>
+            {/* Table */}
+            <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden mb-4">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+                      <th className="text-left font-semibold px-4 py-3">Invoice No</th>
+                      <th className="text-left font-semibold px-4 py-3">Date</th>
+                      <th className="text-left font-semibold px-4 py-3">Product</th>
+                      <th className="text-left font-semibold px-4 py-3">Unit</th>
+                      <th className="text-right font-semibold px-4 py-3">Qty</th>
+                      <th className="text-right font-semibold px-4 py-3">Price</th>
+                      <th className="text-right font-semibold px-4 py-3">GST%</th>
+                      <th className="text-right font-semibold px-4 py-3">Line Total</th>
+                      <th className="text-right font-semibold px-4 py-3">Grand Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {products.map((p, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-3 font-semibold text-slate-800 whitespace-nowrap">
+                          #{p.invoiceNumber || p._id}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
+                          {p.date
+                            ? new Date(p.date).toLocaleDateString("en-IN", {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                              })
+                            : "-"}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700 flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-md bg-blue-50 flex items-center justify-center shrink-0">
+                            <Package className="w-3.5 h-3.5 text-blue-500" />
+                          </span>
+                          {p.product || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-slate-500">{p.unit || "-"}</td>
+                        <td className="px-4 py-3 text-right text-slate-700">{p.quantity ?? "-"}</td>
+                        <td className="px-4 py-3 text-right text-slate-600">{currency(p.price)}</td>
+                        <td className="px-4 py-3 text-right text-slate-500">{p.gstRate ?? 0}%</td>
+                        <td className="px-4 py-3 text-right text-slate-600">{currency(p.lineTotal)}</td>
+                        <td className="px-4 py-3 text-right font-semibold text-slate-800">
+                          {currency(p.grandTotal)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            )}
-          </div>
-        </>
-      )}
+
+              {hasMore && (
+                <div className="p-4 border-t border-slate-100 flex justify-center">
+                  <button
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                    className="h-9 px-5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {loadingMore ? "Loading..." : "Load More"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
 
 // -----------------------------------------
-// Summary card
+// Summary stat
 // -----------------------------------------
-function SummaryCard({ label, value, small, highlight }) {
+function SummaryStat({ label, value, accent, bold }) {
   return (
-    <div className="bg-white border border-slate-200/80 rounded-xl px-4 py-3">
+    <div>
       <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1">
         {label}
       </div>
-      <div
-        className={`font-bold truncate ${
-          highlight ? "text-blue-600 text-lg" : "text-slate-800"
-        } ${small ? "text-sm" : "text-lg"}`}
-      >
+      <div className={`${bold ? "text-lg" : "text-base"} font-bold ${accent || "text-slate-800"} truncate`}>
         {value}
       </div>
     </div>

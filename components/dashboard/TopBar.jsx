@@ -2,7 +2,15 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Sun, Moon, User, ChevronDown, LogOut, Settings } from "lucide-react";
+import {
+  Bell,
+  Sun,
+  Moon,
+  User,
+  ChevronDown,
+  LogOut,
+  Settings,
+} from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -57,7 +65,9 @@ export default function Topbar({ theme, pageTitle = "Overview" }) {
   };
 
   return (
-    <header className={`sticky top-0 z-40 ${theme.surface} border-b ${theme.outline}`}>
+    <header
+      className={`sticky top-0 z-40 ${theme.surface} border-b ${theme.outline}`}
+    >
       <div className="px-5 md:px-7 h-16 flex items-center justify-between gap-4">
         {/* Left: sidebar trigger + breadcrumb / page title */}
         <div className="flex items-center gap-3 min-w-0">
@@ -80,21 +90,31 @@ export default function Topbar({ theme, pageTitle = "Overview" }) {
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  <span className={`text-[12px] font-medium ${theme.textSecondary}`}>{pageTitle}</span>
+                  <span
+                    className={`text-[12px] font-medium ${theme.textSecondary}`}
+                  >
+                    {pageTitle}
+                  </span>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
-            <h1 className={`text-[15px] font-bold ${theme.text} leading-tight truncate mt-0.5`}>
+            <h1
+              className={`text-[15px] font-bold ${theme.text} leading-tight truncate mt-0.5`}
+            >
               {pageTitle}
             </h1>
           </div>
 
           {/* Mobile page title */}
-          <h1 className={`md:hidden text-[15px] font-bold ${theme.text} truncate`}>{pageTitle}</h1>
+          <h1
+            className={`md:hidden text-[15px] font-bold ${theme.text} truncate`}
+          >
+            {pageTitle}
+          </h1>
         </div>
 
         {/* Right: controls */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
           {/* Theme toggle */}
           <button
             onClick={toggleTheme}
@@ -127,16 +147,24 @@ export default function Topbar({ theme, pageTitle = "Overview" }) {
               <div
                 className={`absolute right-0 mt-2 w-80 ${theme.card} rounded-xl shadow-xl border ${theme.outline} py-2 z-50`}
               >
-                <div className={`px-4 py-2.5 border-b ${theme.outline} flex items-center justify-between`}>
-                  <h3 className={`${theme.text} font-semibold text-[13.5px]`}>Notifications</h3>
+                <div
+                  className={`px-4 py-2.5 border-b ${theme.outline} flex items-center justify-between`}
+                >
+                  <h3 className={`${theme.text} font-semibold text-[13.5px]`}>
+                    Notifications
+                  </h3>
                   {notifications.length > 0 && (
-                    <span className="text-[11px] font-medium text-blue-600 cursor-pointer">Mark all read</span>
+                    <span className="text-[11px] font-medium text-blue-600 cursor-pointer">
+                      Mark all read
+                    </span>
                   )}
                 </div>
                 {notifications.length === 0 ? (
                   <div className="px-4 py-10 text-center">
                     <Bell size={22} className="mx-auto mb-2 text-slate-300" />
-                    <p className={`${theme.textSecondary} text-[13px]`}>No new notifications</p>
+                    <p className={`${theme.textSecondary} text-[13px]`}>
+                      No new notifications
+                    </p>
                   </div>
                 ) : (
                   <div className="max-h-96 overflow-y-auto">
@@ -146,6 +174,15 @@ export default function Topbar({ theme, pageTitle = "Overview" }) {
               </div>
             )}
           </div>
+
+          {/* Settings */}
+          <button
+            onClick={() => router.push("/dashboard/settings")}
+            className={`p-2 rounded-lg border ${theme.outline} ${theme.buttonTertiary} transition-colors cursor-pointer hidden sm:flex items-center justify-center`}
+            aria-label="Settings"
+          >
+            <Settings size={18} className={theme.text} />
+          </button>
 
           <div className="w-px h-6 bg-slate-200 mx-1 hidden sm:block" />
 
@@ -159,7 +196,9 @@ export default function Topbar({ theme, pageTitle = "Overview" }) {
               <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center shrink-0 ring-1 ring-blue-700/10">
                 <User size={15} className="text-white" strokeWidth={2.25} />
               </div>
-              <span className={`hidden md:inline ${theme.text} font-semibold text-[13px]`}>
+              <span
+                className={`hidden md:inline ${theme.text} font-semibold text-[13px]`}
+              >
                 {user?.name || "User"}
               </span>
               <ChevronDown
@@ -173,15 +212,23 @@ export default function Topbar({ theme, pageTitle = "Overview" }) {
                 className={`absolute right-0 mt-2 w-52 ${theme.card} rounded-xl shadow-xl border ${theme.outline} py-1.5 z-50`}
               >
                 <div className={`px-3.5 py-2 border-b ${theme.outline} mb-1`}>
-                  <p className={`${theme.text} font-semibold text-[13px] truncate`}>{user?.name || "User"}</p>
-                  <p className={`${theme.textSecondary} text-[11.5px] truncate`}>{user?.email || ""}</p>
+                  <p
+                    className={`${theme.text} font-semibold text-[13px] truncate`}
+                  >
+                    {user?.name || "User"}
+                  </p>
+                  <p
+                    className={`${theme.textSecondary} text-[11.5px] truncate`}
+                  >
+                    {user?.email || ""}
+                  </p>
                 </div>
                 <button
                   onClick={handleProfileClick}
                   className={`w-[calc(100%-8px)] flex items-center gap-2.5 text-left px-3.5 py-2 rounded-lg mx-1 hover:${theme.surfaceVariant} ${theme.text} text-[13px] font-medium transition-colors cursor-pointer`}
                 >
-                  <Settings size={15} className={theme.textSecondary} />
-                  Profile Settings
+                  <User size={15} className={theme.textSecondary} />
+                  Profile
                 </button>
                 <button
                   onClick={handleLogout}

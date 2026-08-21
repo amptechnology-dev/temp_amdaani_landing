@@ -15,12 +15,11 @@ import {
   X,
   Clock,
   History,
-  ChevronDown,
-  ChevronUp,
   Loader2,
   Sparkles,
   PlusCircle,
   Package,
+  BarChart3,
   Gift,
 } from "lucide-react";
 
@@ -52,7 +51,6 @@ export default function PricingPage() {
   const [lastSubscription, setLastSubscription] = useState(null);
   const [upcomingSubscription, setUpcomingSubscription] = useState(null);
   const [activeTab, setActiveTab] = useState("regular");
-  const [expandedPlan, setExpandedPlan] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -150,6 +148,9 @@ export default function PricingPage() {
       return a.price - b.price;
     });
 
+  const regularPlans = filteredPlans.filter((p) => p.planType !== "topup");
+  const topupPlans = filteredPlans.filter((p) => p.planType === "topup");
+
   const formatCurrency = (amount) =>
     new Intl.NumberFormat("en-IN", {
       style: "currency",
@@ -160,10 +161,13 @@ export default function PricingPage() {
   if (loading) {
     return (
       <div className={`min-h-screen w-full ${currentTheme.background}`}>
-        <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-4">
+        <div className="max-w-7xl mx-auto p-6 md:p-8 space-y-6">
           <Skeleton className="h-10 w-64" />
-          <Skeleton className="h-64 w-full rounded-2xl" />
-          <Skeleton className="h-64 w-full rounded-2xl" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <Skeleton className="h-96 w-full rounded-2xl" />
+            <Skeleton className="h-96 w-full rounded-2xl" />
+            <Skeleton className="h-96 w-full rounded-2xl" />
+          </div>
         </div>
       </div>
     );
@@ -171,81 +175,81 @@ export default function PricingPage() {
 
   return (
     <div className={`min-h-screen w-full ${currentTheme.background}`}>
-      <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-6">
+      <div className="max-w-7xl mx-auto p-6 md:p-8 space-y-6">
         {/* HEADER */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between"
+          className="flex items-center justify-between flex-wrap gap-3"
         >
           <div>
-            <h1 className={`text-2xl md:text-3xl font-bold ${currentTheme.text}`}>
+            <h1 className={`text-2xl md:text-[26px] font-bold ${currentTheme.text}`}>
               Choose Your Plan
             </h1>
             <p className={`mt-1 text-sm ${currentTheme.textSecondary}`}>
               Manage your subscription and usage limits
             </p>
           </div>
-          {hasActivePaidPlan && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push("/dashboard/pricing/plan-details")}
-            >
-              <History className="w-4 h-4 mr-2" />
-              Plan History
-            </Button>
-          )}
+          <div className="flex items-center gap-3">
+            {hasActivePaidPlan && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push("/dashboard/pricing/plan-details")}
+              >
+                <History className="w-4 h-4 mr-2" />
+                Plan History
+              </Button>
+            )}
+            {hasActivePaidPlan && (
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="bg-slate-100 p-1 h-10 rounded-xl">
+                  <TabsTrigger
+                    value="regular"
+                    className="rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white flex items-center gap-1.5 text-[13px] px-4"
+                  >
+                    <Package className="w-3.5 h-3.5" />
+                    Subscription
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="topup"
+                    className="rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white flex items-center gap-1.5 text-[13px] px-4"
+                  >
+                    <PlusCircle className="w-3.5 h-3.5" />
+                    Top-Up
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            )}
+          </div>
         </motion.div>
-
-        {/* TABS: Subscription vs Top-up */}
-        {hasActivePaidPlan && (
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="w-full grid grid-cols-2 bg-slate-100 p-1 h-12 rounded-xl">
-              <TabsTrigger
-                value="regular"
-                className="rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white flex items-center gap-2"
-              >
-                <Package className="w-4 h-4" />
-                Subscription
-              </TabsTrigger>
-              <TabsTrigger
-                value="topup"
-                className="rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white flex items-center gap-2"
-              >
-                <PlusCircle className="w-4 h-4" />
-                Top-Up
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        )}
 
         {/* Upcoming subscription banner */}
         {upcomingSubscription && activeTab === "regular" && (
           <Card className="rounded-2xl border-blue-200 bg-blue-50">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-slate-800">
-                    {upcomingSubscription.plan?.name || upcomingSubscription.planName}
-                  </h3>
-                  <Badge className="bg-blue-600">
-                    <Clock className="w-3 h-3 mr-1" />
-                    Upcoming
-                  </Badge>
-                </div>
-                <span className="font-bold text-blue-700">
-                  {formatCurrency(upcomingSubscription.price)}
+            <CardContent className="p-4 flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-3">
+                <h3 className="font-bold text-slate-800">
+                  {upcomingSubscription.plan?.name || upcomingSubscription.planName}
+                </h3>
+                <Badge className="bg-blue-600">
+                  <Clock className="w-3 h-3 mr-1" />
+                  Upcoming
+                </Badge>
+                <span className="text-xs text-slate-500">
+                  Starts{" "}
+                  {upcomingSubscription.startDate
+                    ? format(new Date(upcomingSubscription.startDate), "dd MMM yyyy")
+                    : "-"}{" "}
+                  · Ends{" "}
+                  {upcomingSubscription.endDate
+                    ? format(new Date(upcomingSubscription.endDate), "dd MMM yyyy")
+                    : "-"}
                 </span>
               </div>
-              <div className="flex items-center justify-between text-xs text-slate-500">
-                <span>
-                  Starts: {upcomingSubscription.startDate ? format(new Date(upcomingSubscription.startDate), "dd MMM yyyy") : "-"}
-                </span>
-                <span>
-                  Ends: {upcomingSubscription.endDate ? format(new Date(upcomingSubscription.endDate), "dd MMM yyyy") : "-"}
-                </span>
-              </div>
+              <span className="font-bold text-blue-700">
+                {formatCurrency(upcomingSubscription.price)}
+              </span>
             </CardContent>
           </Card>
         )}
@@ -254,7 +258,7 @@ export default function PricingPage() {
         {activeTab === "topup" &&
         currentSubscription?.planName?.toLowerCase() === "free" ? (
           <Card className="rounded-2xl border-slate-200">
-            <CardContent className="p-8 text-center">
+            <CardContent className="p-10 text-center">
               <p className="font-bold text-slate-800 mb-2">
                 Top-ups not available for Free plan
               </p>
@@ -265,44 +269,51 @@ export default function PricingPage() {
           </Card>
         ) : filteredPlans.length === 0 ? (
           <Card className="rounded-2xl border-slate-200">
-            <CardContent className="p-8 text-center">
+            <CardContent className="p-10 text-center">
               <p className="font-bold text-slate-800 mb-2">
                 No {activeTab === "regular" ? "subscription" : "top-up"} plans available
               </p>
               <p className="text-sm text-slate-400">Check back later for new offerings.</p>
             </CardContent>
           </Card>
+        ) : activeTab === "topup" ? (
+          /* ── Top-up plans: compact grid ── */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {topupPlans.map((plan) => (
+              <Card key={plan._id} className="rounded-2xl border-slate-200 hover:border-blue-300 transition-colors">
+                <CardContent className="p-5 flex flex-col h-full">
+                  <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center mb-3">
+                    <Gift className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <h3 className="font-bold text-slate-800">{plan.name}</h3>
+                  <p className="text-blue-600 font-semibold mt-1 text-[14px]">
+                    +{plan.usageLimits?.invoices} invoices
+                  </p>
+                  <p className="text-xs text-slate-400 mt-0.5 mb-4">
+                    Valid until plan expiry
+                  </p>
+                  <div className="mt-auto flex items-center justify-between pt-3 border-t border-slate-100">
+                    <span className="text-lg font-extrabold text-slate-800">
+                      {formatCurrency(plan.price)}
+                    </span>
+                    <Button size="sm" onClick={() => handleGetPlan(plan)}>
+                      <PlusCircle className="w-4 h-4 mr-1.5" />
+                      Add
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         ) : (
-          <div className="space-y-4">
-            {filteredPlans.map((plan) => {
-              if (plan.planType === "topup") {
-                return (
-                  <Card key={plan._id} className="rounded-2xl border-slate-200">
-                    <CardContent className="p-4 flex items-center justify-between gap-4">
-                      <div>
-                        <h3 className="font-bold text-slate-800">{plan.name}</h3>
-                        <p className="text-blue-600 font-semibold mt-1">
-                          +{plan.usageLimits?.invoices} invoices
-                        </p>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          Valid until plan expiry
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-lg font-extrabold text-slate-800">
-                          {formatCurrency(plan.price)}
-                        </span>
-                        <Button size="sm" onClick={() => handleGetPlan(plan)}>
-                          <PlusCircle className="w-4 h-4 mr-1.5" />
-                          Add
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              }
-
-              const isExpanded = expandedPlan === plan.name;
+          /* ── Regular subscription plans: side-by-side comparison grid ── */
+          <div
+            className="grid grid-cols-1 gap-5"
+            style={{
+              gridTemplateColumns: `repeat(${Math.min(regularPlans.length, 3)}, minmax(0, 1fr))`,
+            }}
+          >
+            {regularPlans.map((plan) => {
               const isCurrentPlan = plan.isCurrentPlan;
               const isPremium = plan.name === "Standard";
               let daysLeft = null;
@@ -320,22 +331,23 @@ export default function PricingPage() {
               return (
                 <Card
                   key={plan._id}
-                  className={`rounded-2xl overflow-hidden cursor-pointer transition-all ${
+                  className={`rounded-2xl overflow-hidden flex flex-col ${
                     isCurrentPlan
                       ? "border-2 border-blue-600 bg-blue-50/50"
-                      : "border-slate-200 hover:border-slate-300"
+                      : isPremium
+                      ? "border-2 border-blue-200 shadow-md"
+                      : "border-slate-200"
                   }`}
-                  onClick={() => !isCurrentPlan && setExpandedPlan(isExpanded ? null : plan.name)}
                 >
-                  {isPremium && (
+                  {isPremium && !isCurrentPlan && (
                     <div className="bg-blue-600 text-white text-center py-1.5 text-xs font-bold tracking-wide">
                       <Sparkles className="w-3 h-3 inline mr-1" />
                       MOST POPULAR
                     </div>
                   )}
-                  <CardContent className="p-5">
+                  <CardContent className="p-6 flex flex-col flex-1">
                     <div className="flex items-center justify-between mb-1">
-                      <h3 className="text-xl font-bold text-slate-800">{plan.name}</h3>
+                      <h3 className="text-lg font-bold text-slate-800">{plan.name}</h3>
                       {isCurrentPlan && (
                         <Badge className="bg-blue-600">
                           <Check className="w-3 h-3 mr-1" />
@@ -344,131 +356,142 @@ export default function PricingPage() {
                       )}
                     </div>
                     {plan.description && (
-                      <p className="text-sm text-slate-500 mb-3">{plan.description}</p>
+                      <p className="text-[13px] text-slate-500 mb-4 leading-relaxed">
+                        {plan.description}
+                      </p>
                     )}
 
                     {/* Price block */}
                     <div
-                      className={`rounded-xl p-4 flex items-center justify-between mb-3 ${
+                      className={`rounded-xl p-4 mb-3 ${
                         isCurrentPlan ? "bg-white" : "bg-blue-50"
                       }`}
                     >
-                      <div className="flex items-baseline gap-2">
+                      <div className="flex items-baseline justify-between">
                         <div>
-                          <span className="text-3xl font-extrabold text-blue-600">
+                          <span className="text-[26px] font-extrabold text-blue-600 leading-none">
                             {formatCurrency(plan.price)}
                           </span>
-                          <p className="text-[10px] text-slate-400">Excluding GST</p>
+                          {plan.durationDays > 0 && (
+                            <span className="text-[13px] text-slate-500 ml-1">
+                              /{plan.durationDays} days
+                            </span>
+                          )}
+                          <p className="text-[10px] text-slate-400 mt-1">Excluding GST</p>
                         </div>
-                        {plan.durationDays > 0 && (
-                          <span className="text-sm text-slate-500">/{plan.durationDays} days</span>
+                        {isCurrentPlan && daysLeft !== null && (
+                          <span className="text-[12.5px] font-semibold text-slate-600 shrink-0">
+                            {daysLeft >= 0
+                              ? `${daysLeft} day${daysLeft === 1 ? "" : "s"} left`
+                              : "Expiring soon"}
+                          </span>
                         )}
                       </div>
-                      {isCurrentPlan && daysLeft !== null && (
-                        <span className="text-sm font-semibold text-slate-600">
-                          {daysLeft >= 0 ? `${daysLeft} day${daysLeft === 1 ? "" : "s"} left` : "Expiring soon"}
-                        </span>
-                      )}
                     </div>
 
                     {/* Usage limits */}
                     {plan.usageLimits && (
-                      <div className="rounded-xl bg-slate-100 p-3 flex items-center justify-between mb-2">
-                        <div>
-                          <p className="text-sm font-medium text-slate-700">
-                            📊{" "}
-                            {isCurrentPlan && currentSubscription?.usageLimits?.unlimited
-                              ? "Unlimited invoices"
-                              : isCurrentPlan && currentSubscription?.usageLimits?.invoices !== undefined
-                              ? `${currentSubscription.usageLimits.invoices} invoices`
-                              : plan.usageLimits.unlimited
-                              ? "Unlimited invoices"
-                              : `${plan.usageLimits.invoices} invoices`}
-                          </p>
-                          {isCurrentPlan && currentSubscription?.topUps?.length > 0 && (
-                            <p className="text-xs text-slate-500 mt-1">
-                              🎁 Top-up: +
-                              {currentSubscription.topUps.reduce(
-                                (sum, t) => sum + t.usageLimits.invoices,
-                                0,
-                              )}{" "}
-                              invoices
+                      <div className="rounded-xl bg-slate-100 p-3 flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          <BarChart3 className="w-4 h-4 text-slate-500 shrink-0" />
+                          <div>
+                            <p className="text-[13px] font-medium text-slate-700">
+                              {isCurrentPlan && currentSubscription?.usageLimits?.unlimited
+                                ? "Unlimited invoices"
+                                : isCurrentPlan &&
+                                  currentSubscription?.usageLimits?.invoices !== undefined
+                                ? `${currentSubscription.usageLimits.invoices} invoices`
+                                : plan.usageLimits.unlimited
+                                ? "Unlimited invoices"
+                                : `${plan.usageLimits.invoices} invoices`}
                             </p>
-                          )}
+                            {isCurrentPlan && currentSubscription?.topUps?.length > 0 && (
+                              <p className="text-[11px] text-slate-500 mt-0.5">
+                                <Gift className="w-3 h-3 inline mr-1 text-blue-500" />
+                                Top-up: +
+                                {currentSubscription.topUps.reduce(
+                                  (sum, t) => sum + t.usageLimits.invoices,
+                                  0,
+                                )}{" "}
+                                invoices
+                              </p>
+                            )}
+                          </div>
                         </div>
                         {isCurrentPlan && plan.usageLimits.unlimited !== true && (
-                          <Badge variant="outline" className="bg-white">
-                            {(currentSubscription?.usageLimits?.invoices || plan.usageLimits.invoices) -
-                              (usage?.invoicesUsed || 0)}{" "}
+                          <Badge variant="outline" className="bg-white shrink-0">
+                            {(currentSubscription?.usageLimits?.invoices ||
+                              plan.usageLimits.invoices) - (usage?.invoicesUsed || 0)}{" "}
                             left
                           </Badge>
                         )}
                       </div>
                     )}
 
-                    {/* Expanded features */}
-                    {isExpanded && plan.featuresDetails?.length > 0 && (
+                    {/* Features — always visible on desktop, no click-to-expand */}
+                    {plan.featuresDetails?.length > 0 && (
                       <>
-                        <Separator className="my-4" />
-                        <h4 className="font-bold text-slate-800 mb-3">What's included</h4>
-                        <div className="space-y-2.5 mb-4">
+                        <Separator className="mb-4" />
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
+                          What's included
+                        </p>
+                        <div className="space-y-2.5 mb-5 flex-1">
                           {plan.featuresDetails.map((feature, i) => (
                             <div key={i} className="flex items-start gap-2.5">
                               <div
                                 className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                                  feature.available ? "bg-blue-100 text-blue-600" : "bg-red-100 text-red-500"
+                                  feature.available
+                                    ? "bg-blue-100 text-blue-600"
+                                    : "bg-red-100 text-red-500"
                                 }`}
                               >
-                                {feature.available ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                                {feature.available ? (
+                                  <Check className="w-3 h-3" />
+                                ) : (
+                                  <X className="w-3 h-3" />
+                                )}
                               </div>
                               <div>
                                 <p
-                                  className={`text-sm ${
-                                    feature.available ? "text-slate-700" : "text-red-500 opacity-60"
+                                  className={`text-[13px] leading-snug ${
+                                    feature.available
+                                      ? "text-slate-700"
+                                      : "text-red-500 opacity-60"
                                   }`}
                                 >
                                   {feature.name}
                                 </p>
                                 {feature.note && (
-                                  <p className="text-xs text-slate-400">{feature.note}</p>
+                                  <p className="text-[11px] text-slate-400">{feature.note}</p>
                                 )}
                               </div>
                             </div>
                           ))}
                         </div>
-
-                        {(plan.name === "Free" || !isCurrentPlan) && (
-                          <>
-                            {plan.name === "Free" ? (
-                              !isCurrentPlan && (
-                                <Button className="w-full" onClick={(e) => { e.stopPropagation(); handleFreePlan(); }}>
-                                  Activate Free Plan
-                                </Button>
-                              )
-                            ) : (
-                              !isCurrentPlan && (
-                                <Button
-                                  className="w-full"
-                                  variant={isPremium ? "default" : "secondary"}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleGetPlan(plan);
-                                  }}
-                                >
-                                  {isExpiredLast ? "Renew" : `Get ${plan.name}`}
-                                </Button>
-                              )
-                            )}
-                          </>
-                        )}
                       </>
                     )}
 
-                    {!isExpanded && !isCurrentPlan && (
-                      <p className="text-center text-xs font-semibold text-blue-600 mt-2">
-                        Tap to see details {isExpanded ? <ChevronUp className="inline w-3 h-3" /> : <ChevronDown className="inline w-3 h-3" />}
-                      </p>
-                    )}
+                    {/* CTA — always visible at bottom, pinned via mt-auto */}
+                    <div className="mt-auto">
+                      {isCurrentPlan ? (
+                        <div className="text-center text-[12.5px] font-semibold text-blue-600 py-2 bg-blue-100/60 rounded-lg">
+                          <Crown className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />
+                          Your Current Plan
+                        </div>
+                      ) : plan.name === "Free" ? (
+                        <Button className="w-full" onClick={() => handleFreePlan()}>
+                          Activate Free Plan
+                        </Button>
+                      ) : (
+                        <Button
+                          className="w-full"
+                          variant={isPremium ? "default" : "secondary"}
+                          onClick={() => handleGetPlan(plan)}
+                        >
+                          {isExpiredLast ? "Renew" : `Get ${plan.name}`}
+                        </Button>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               );

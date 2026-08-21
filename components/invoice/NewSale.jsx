@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import api from "../../utils/api";
 import { generateInvoiceHTML } from "../../utils/invoiceTemplate";
@@ -65,6 +66,8 @@ function determineGstType(storeGst, customerGst, storeState, customerState) {
 // -------------------------------
 export default function SalesFlow() {
   const { isMrpEnabled } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   // step: "list" | "form" | "items"
   const [step, setStep] = useState("list");
@@ -377,6 +380,24 @@ export default function SalesFlow() {
     setIsFormLoading(false);
     setStep("form");
   };
+
+  // ✅ NEW — dashboard theke "?new=true" query param diye asle,
+  // list page skip kore direct notun invoice form khule jabe.
+  // Ekbar-i trigger hoy (ref diye guard kora), tarpor URL theke
+  // query param clean kore dey jate refresh/back button e abar
+  // trigger na hoy.
+  const autoStartHandledRef = useRef(false);
+
+  useEffect(() => {
+    if (autoStartHandledRef.current) return;
+    const shouldAutoStart = searchParams.get("new") === "true";
+    if (!shouldAutoStart) return;
+
+    autoStartHandledRef.current = true;
+    handleStartNewInvoice();
+    router.replace("/dashboard/sales");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // ✅ targetStep: "form" (default, full invoice edit) | "items" (jump straight to item picker)
   const handleEditInvoice = async (invoiceId, targetStep = "form") => {

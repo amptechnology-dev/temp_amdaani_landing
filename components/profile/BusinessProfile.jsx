@@ -23,7 +23,6 @@ import {
   X,
   Save,
   Loader2,
-  ChevronDown,
 } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
@@ -51,7 +50,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import api from "../../utils/api";
 
 // =========================
-// Static data — registration page er sathe MILIYE deya holo (Bakery soho)
+// Static data
 // =========================
 const OWNERSHIP_TYPES = [
   "Sole Proprietorship",
@@ -116,16 +115,8 @@ const INDIAN_STATES = [
   "Puducherry",
 ];
 
-const bankFieldNames = [
-  "bankName",
-  "accountNo",
-  "holderName",
-  "ifsc",
-  "branch",
-];
-
 // =========================
-// Validation schema (mirrors mobile Yup schema)
+// Validation schema
 // =========================
 const validationSchema = Yup.object().shape(
   {
@@ -255,7 +246,7 @@ const validationSchema = Yup.object().shape(
 );
 
 // =========================
-// Field mappings (form field -> API field) — used for diffing on save
+// Field mappings
 // =========================
 const FIELD_MAPPINGS = {
   tagline: "businessTagline",
@@ -392,8 +383,6 @@ export default function BusinessProfile() {
 
         setOriginalData({ ...mapped, logo, signature });
 
-        // ✅ resetForm er bodole setValues — enableReinitialize soriye deya hoyeche,
-        // eta race-condition khoychilo jar karone businessName field khali dekhachilo
         formik.setValues({ ...mapped, logo, signature });
         formik.setTouched({});
       }
@@ -484,8 +473,6 @@ export default function BusinessProfile() {
     toast.info("Changes discarded");
   };
 
-  // ✅ Safe fallback — jodi kokhono emon business type ashe jeta list e nei,
-  // dropdown khali na dekhiye seta o ekta option hishebe dekhabe
   const businessTypeOptions = useMemo(() => {
     if (values.businessType && !BUSINESS_TYPES.includes(values.businessType)) {
       return [values.businessType, ...BUSINESS_TYPES];
@@ -502,177 +489,162 @@ export default function BusinessProfile() {
 
   if (loading) {
     return (
-      <div className="min-h-screen p-6 space-y-4">
-        <Skeleton className="h-9 w-64" />
-        <Skeleton className="h-10 w-80" />
-        <Card>
-          <CardContent className="p-6 space-y-4">
-            {[...Array(6)].map((_, i) => (
-              <Skeleton key={i} className="h-11 w-full rounded-lg" />
-            ))}
-          </CardContent>
-        </Card>
+      <div className="h-full p-6 space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-9 w-80" />
+        <div className="grid grid-cols-2 gap-4">
+          <Card>
+            <CardContent className="p-5 space-y-3">
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full rounded-lg" />
+              ))}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-5 space-y-3">
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full rounded-lg" />
+              ))}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-24">
+    <div className="h-full bg-slate-50 flex flex-col overflow-hidden">
       <form
         onSubmit={handleSubmit}
-        className="max-w-4xl mx-auto p-4 sm:p-6 space-y-5"
+        className="flex-1 max-w-7xl w-full mx-auto px-5 sm:px-6 pt-4 pb-3 flex flex-col overflow-hidden"
       >
-        {/* Header */}
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-900">
-            Business Profile
-          </h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Manage your company details, banking info and invoice preferences
-          </p>
+        {/* Header + Tabs on same row (saves vertical space) */}
+        <div className="flex items-center justify-between gap-4 mb-4 shrink-0 flex-wrap">
+          <div>
+            <h1 className="text-[21px] font-bold text-slate-900 leading-tight">
+              Business Profile
+            </h1>
+            <p className="text-[13px] text-slate-400 leading-tight mt-0.5">
+              Manage your company details, banking info and invoice preferences
+            </p>
+          </div>
+
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid grid-cols-2 w-80">
+              <TabsTrigger value="basic" className="gap-1.5 text-[13px]">
+                <Building2 className="w-4 h-4" />
+                Business Details
+              </TabsTrigger>
+              <TabsTrigger value="business" className="gap-1.5 text-[13px]">
+                <Landmark className="w-4 h-4" />
+                Bank &amp; Invoice
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
 
-        {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-2 w-full max-w-md">
-            <TabsTrigger value="basic" className="gap-1.5">
-              <Building2 className="w-4 h-4" />
-              Business Details
-            </TabsTrigger>
-            <TabsTrigger value="business" className="gap-1.5">
-              <Landmark className="w-4 h-4" />
-              Bank &amp; Invoice
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-
         {activeTab === "basic" ? (
-          <>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-0">
             {/* ===================== Basic Details ===================== */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Basic Details</CardTitle>
+            <Card className="overflow-y-auto">
+              <CardHeader className="py-3.5 px-5">
+                <CardTitle className="text-[15.5px]">Basic Details</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <Field
-                  label="Business Name *"
-                  icon={Store}
-                  error={touched.businessName && errors.businessName}
-                >
-                  <Input
-                    value={values.businessName}
-                    readOnly
-                    className="pl-10 bg-slate-50 text-slate-900 cursor-not-allowed"
-                  />
-                </Field>
-
-                <Field
-                  label="Business Type *"
-                  icon={Building2}
-                  error={touched.businessType && errors.businessType}
-                >
-                  <Select
-                    value={values.businessType}
-                    onValueChange={(v) => setFieldValue("businessType", v)}
+              <CardContent className="px-5 pb-5 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <Field
+                    label="Business Name *"
+                    icon={Store}
+                    error={touched.businessName && errors.businessName}
                   >
-                    <SelectTrigger className="pl-10">
-                      <SelectValue placeholder="Select business type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {businessTypeOptions.map((t) => (
-                        <SelectItem key={t} value={t}>
-                          {t}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
+                    <Input
+                      value={values.businessName}
+                      readOnly
+                      className="pl-10 h-10 text-[14px] bg-slate-50 text-slate-900 cursor-not-allowed"
+                    />
+                  </Field>
 
-                <Field
-                  label="Phone Number *"
-                  icon={Phone}
-                  error={touched.phoneNumber && errors.phoneNumber}
-                >
-                  <Input
-                    value={values.phoneNumber}
-                    onChange={handleChange("phoneNumber")}
-                    onBlur={handleBlur("phoneNumber")}
-                    maxLength={10}
-                    inputMode="numeric"
-                    className="pl-10"
-                  />
-                </Field>
+                  <Field
+                    label="Business Type *"
+                    icon={Building2}
+                    error={touched.businessType && errors.businessType}
+                  >
+                    <Select
+                      value={values.businessType}
+                      onValueChange={(v) => setFieldValue("businessType", v)}
+                    >
+                      <SelectTrigger className="pl-10 h-10 text-[14px]">
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {businessTypeOptions.map((t) => (
+                          <SelectItem key={t} value={t}>
+                            {t}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
 
-                <Field
-                  label="Email ID"
-                  icon={Mail}
-                  error={touched.emailId && errors.emailId}
-                >
-                  <Input
-                    type="email"
-                    value={values.emailId}
-                    onChange={handleChange("emailId")}
-                    onBlur={handleBlur("emailId")}
-                    className="pl-10"
-                  />
-                </Field>
+                  <Field
+                    label="Phone Number *"
+                    icon={Phone}
+                    error={touched.phoneNumber && errors.phoneNumber}
+                  >
+                    <Input
+                      value={values.phoneNumber}
+                      onChange={handleChange("phoneNumber")}
+                      onBlur={handleBlur("phoneNumber")}
+                      maxLength={10}
+                      inputMode="numeric"
+                      className="pl-10 h-10 text-[14px]"
+                    />
+                  </Field>
 
-                <Field
-                  label="GSTIN"
-                  icon={FileText}
-                  error={touched.gstin && errors.gstin}
-                >
-                  <Input
-                    value={values.gstin}
-                    onChange={(e) =>
-                      setFieldValue("gstin", e.target.value.toUpperCase())
-                    }
-                    onBlur={handleBlur("gstin")}
-                    disabled={!!originalData.gstin}
-                    className="pl-10 uppercase"
-                    placeholder="22AAAAA0000A1Z5"
-                  />
-                </Field>
+                  <Field
+                    label="Email ID"
+                    icon={Mail}
+                    error={touched.emailId && errors.emailId}
+                  >
+                    <Input
+                      type="email"
+                      value={values.emailId}
+                      onChange={handleChange("emailId")}
+                      onBlur={handleBlur("emailId")}
+                      className="pl-10 h-10 text-[14px]"
+                    />
+                  </Field>
 
-                <Field
-                  label="Registration Number"
-                  icon={BadgeCheck}
-                  error={touched.registrationNo && errors.registrationNo}
-                >
-                  <Input
-                    value={values.registrationNo}
-                    onChange={handleChange("registrationNo")}
-                    onBlur={handleBlur("registrationNo")}
-                    disabled={!!originalData.registrationNo}
-                    className="pl-10"
-                  />
-                </Field>
+                  <Field
+                    label="GSTIN"
+                    icon={FileText}
+                    error={touched.gstin && errors.gstin}
+                  >
+                    <Input
+                      value={values.gstin}
+                      onChange={(e) =>
+                        setFieldValue("gstin", e.target.value.toUpperCase())
+                      }
+                      onBlur={handleBlur("gstin")}
+                      disabled={!!originalData.gstin}
+                      className="pl-10 h-10 text-[14px] uppercase"
+                      placeholder="22AAAAA0000A1Z5"
+                    />
+                  </Field>
 
-                <div>
-                  <Label className="mb-2 block text-slate-700">
-                    Registration Type
-                  </Label>
-                  <div className="flex flex-wrap gap-2">
-                    {OWNERSHIP_TYPES.map((type) => (
-                      <button
-                        type="button"
-                        key={type}
-                        onClick={() => setFieldValue("ownershipType", type)}
-                        className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${
-                          values.ownershipType === type
-                            ? "bg-blue-50 text-blue-700 border-blue-300"
-                            : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
-                        }`}
-                      >
-                        {type}
-                      </button>
-                    ))}
-                  </div>
-                  {errors.ownershipType && (
-                    <p className="text-xs text-red-500 mt-1">
-                      {errors.ownershipType}
-                    </p>
-                  )}
+                  <Field
+                    label="Registration Number"
+                    icon={BadgeCheck}
+                    error={touched.registrationNo && errors.registrationNo}
+                  >
+                    <Input
+                      value={values.registrationNo}
+                      onChange={handleChange("registrationNo")}
+                      onBlur={handleBlur("registrationNo")}
+                      disabled={!!originalData.registrationNo}
+                      className="pl-10 h-10 text-[14px]"
+                    />
+                  </Field>
                 </div>
 
                 <Field
@@ -684,297 +656,327 @@ export default function BusinessProfile() {
                     value={values.businessTagline}
                     onChange={handleChange("businessTagline")}
                     onBlur={handleBlur("businessTagline")}
-                    className="pl-10"
-                  />
-                </Field>
-              </CardContent>
-            </Card>
-
-            {/* ===================== Address ===================== */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Business Address</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Field
-                  label="Street Address *"
-                  icon={Signpost}
-                  error={touched.street && errors.street}
-                >
-                  <Input
-                    value={values.street}
-                    onChange={handleChange("street")}
-                    onBlur={handleBlur("street")}
-                    className="pl-10"
-                  />
-                </Field>
-
-                <Field
-                  label="City *"
-                  icon={Building2}
-                  error={touched.city && errors.city}
-                >
-                  <Input
-                    value={values.city}
-                    onChange={handleChange("city")}
-                    onBlur={handleBlur("city")}
-                    maxLength={20}
-                    className="pl-10"
-                  />
-                </Field>
-
-                <Field
-                  label="State *"
-                  icon={MapPin}
-                  error={touched.state && errors.state}
-                >
-                  <Select
-                    value={values.state}
-                    onValueChange={(v) => setFieldValue("state", v)}
-                  >
-                    <SelectTrigger className="pl-10">
-                      <SelectValue placeholder="Select state" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-64">
-                      {stateOptions.map((s) => (
-                        <SelectItem key={s} value={s}>
-                          {s}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-
-                <Field
-                  label="Pincode *"
-                  icon={MapPin}
-                  error={touched.pincode && errors.pincode}
-                >
-                  <Input
-                    value={values.pincode}
-                    onChange={handleChange("pincode")}
-                    onBlur={handleBlur("pincode")}
-                    inputMode="numeric"
-                    maxLength={6}
-                    className="pl-10"
-                  />
-                </Field>
-              </CardContent>
-            </Card>
-          </>
-        ) : (
-          <>
-            {/* ===================== Bank Details ===================== */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Bank Details</CardTitle>
-                <CardDescription>
-                  Payment and banking information
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Field
-                  label="Bank Name"
-                  icon={Landmark}
-                  error={touched.bankName && errors.bankName}
-                >
-                  <Input
-                    value={values.bankName}
-                    onChange={handleChange("bankName")}
-                    onBlur={handleBlur("bankName")}
-                    className="pl-10"
-                  />
-                </Field>
-
-                <Field
-                  label="Account Number"
-                  icon={CreditCard}
-                  error={touched.accountNo && errors.accountNo}
-                >
-                  <Input
-                    value={values.accountNo}
-                    onChange={handleChange("accountNo")}
-                    onBlur={handleBlur("accountNo")}
-                    inputMode="numeric"
-                    maxLength={18}
-                    className="pl-10"
-                  />
-                </Field>
-
-                <Field
-                  label="Account Holder Name"
-                  icon={User}
-                  error={touched.holderName && errors.holderName}
-                >
-                  <Input
-                    value={values.holderName}
-                    onChange={handleChange("holderName")}
-                    onBlur={handleBlur("holderName")}
-                    maxLength={25}
-                    className="pl-10"
-                  />
-                </Field>
-
-                <Field
-                  label="IFSC Code"
-                  icon={Banknote}
-                  error={touched.ifsc && errors.ifsc}
-                >
-                  <Input
-                    value={values.ifsc}
-                    onChange={(e) =>
-                      setFieldValue("ifsc", e.target.value.toUpperCase())
-                    }
-                    onBlur={handleBlur("ifsc")}
-                    maxLength={20}
-                    className="pl-10 uppercase"
-                  />
-                </Field>
-
-                <Field
-                  label="Branch"
-                  icon={Landmark}
-                  error={touched.branch && errors.branch}
-                >
-                  <Input
-                    value={values.branch}
-                    onChange={handleChange("branch")}
-                    onBlur={handleBlur("branch")}
-                    maxLength={20}
-                    className="pl-10"
-                  />
-                </Field>
-
-                <Field
-                  label="UPI ID"
-                  icon={QrCode}
-                  error={touched.upiId && errors.upiId}
-                >
-                  <Input
-                    value={values.upiId}
-                    onChange={handleChange("upiId")}
-                    onBlur={handleBlur("upiId")}
-                    maxLength={70}
-                    placeholder="name@bank"
-                    className="pl-10"
-                  />
-                </Field>
-              </CardContent>
-            </Card>
-
-            {/* ===================== Invoice Settings ===================== */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Invoice Settings</CardTitle>
-                <CardDescription>Configure invoice preferences</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Field
-                  label="Invoice Prefix *"
-                  icon={FileText}
-                  error={touched.invoicePrefix && errors.invoicePrefix}
-                >
-                  <Input
-                    value={values.invoicePrefix}
-                    onChange={(e) =>
-                      setFieldValue(
-                        "invoicePrefix",
-                        e.target.value.toUpperCase(),
-                      )
-                    }
-                    onBlur={handleBlur("invoicePrefix")}
-                    maxLength={8}
-                    placeholder="e.g. INV, A2Z, CAFE24"
-                    className="pl-10 uppercase"
-                  />
-                </Field>
-
-                <Field
-                  label="Invoice Start Number"
-                  icon={FileText}
-                  error={
-                    touched.invoiceStartNumber && errors.invoiceStartNumber
-                  }
-                >
-                  <Input
-                    value={values.invoiceStartNumber}
-                    onChange={handleChange("invoiceStartNumber")}
-                    onBlur={handleBlur("invoiceStartNumber")}
-                    inputMode="numeric"
-                    className="pl-10"
+                    className="pl-10 h-10 text-[14px]"
                   />
                 </Field>
 
                 <div>
-                  <Label className="mb-2 block text-slate-700">
+                  <Label className="mb-1.5 block text-slate-700 text-[12.5px]">
+                    Registration Type
+                  </Label>
+                  <div className="flex flex-wrap gap-2">
+                    {OWNERSHIP_TYPES.map((type) => (
+                      <button
+                        type="button"
+                        key={type}
+                        onClick={() => setFieldValue("ownershipType", type)}
+                        className={`text-[12px] font-medium px-3 py-1.5 rounded-full border transition-colors cursor-pointer ${
+                          values.ownershipType === type
+                            ? "bg-blue-50 text-blue-700 border-blue-300"
+                            : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+                        }`}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+                  {errors.ownershipType && (
+                    <p className="text-[11px] text-red-500 mt-1">
+                      {errors.ownershipType}
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* ===================== Address ===================== */}
+            <Card className="overflow-y-auto">
+              <CardHeader className="py-3 px-4">
+                <CardTitle className="text-[14px]">Business Address</CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <Field
+                      label="Street Address *"
+                      icon={Signpost}
+                      error={touched.street && errors.street}
+                    >
+                      <Input
+                        value={values.street}
+                        onChange={handleChange("street")}
+                        onBlur={handleBlur("street")}
+                        className="pl-10 h-10 text-[14px]"
+                      />
+                    </Field>
+                  </div>
+
+                  <Field
+                    label="City *"
+                    icon={Building2}
+                    error={touched.city && errors.city}
+                  >
+                    <Input
+                      value={values.city}
+                      onChange={handleChange("city")}
+                      onBlur={handleBlur("city")}
+                      maxLength={20}
+                      className="pl-10 h-10 text-[14px]"
+                    />
+                  </Field>
+
+                  <Field
+                    label="Pincode *"
+                    icon={MapPin}
+                    error={touched.pincode && errors.pincode}
+                  >
+                    <Input
+                      value={values.pincode}
+                      onChange={handleChange("pincode")}
+                      onBlur={handleBlur("pincode")}
+                      inputMode="numeric"
+                      maxLength={6}
+                      className="pl-10 h-10 text-[14px]"
+                    />
+                  </Field>
+
+                  <div className="col-span-2">
+                    <Field
+                      label="State *"
+                      icon={MapPin}
+                      error={touched.state && errors.state}
+                    >
+                      <Select
+                        value={values.state}
+                        onValueChange={(v) => setFieldValue("state", v)}
+                      >
+                        <SelectTrigger className="pl-10 h-10 text-[14px]">
+                          <SelectValue placeholder="Select state" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-64">
+                          {stateOptions.map((s) => (
+                            <SelectItem key={s} value={s}>
+                              {s}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mt-5">
+                  <div>
+                    <Label className="mb-1.5 block text-slate-700 text-[13px]">
+                      Business Logo
+                    </Label>
+                    <ImageUploadBox
+                      compact
+                      value={values.logo}
+                      onSelect={(file) => handleFileSelect("logo", file)}
+                      onRemove={() => setFieldValue("logo", null)}
+                      inputRef={logoInputRef}
+                      icon={Upload}
+                      label="Upload logo"
+                    />
+                  </div>
+                  <div>
+                    <Label className="mb-1.5 block text-slate-700 text-[12px]">
+                      Digital Signature
+                    </Label>
+                    <ImageUploadBox
+                      compact
+                      value={values.signature}
+                      onSelect={(file) => handleFileSelect("signature", file)}
+                      onRemove={() => setFieldValue("signature", null)}
+                      inputRef={signatureInputRef}
+                      icon={Upload}
+                      label="Add signature"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-0">
+            {/* ===================== Bank Details ===================== */}
+            <Card className="overflow-y-auto">
+              <CardHeader className="py-3 px-4">
+                <CardTitle className="text-[14px]">Bank Details</CardTitle>
+                <CardDescription className="text-[11.5px]">
+                  Payment and banking information
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="px-4 pb-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <Field
+                    label="Bank Name"
+                    icon={Landmark}
+                    error={touched.bankName && errors.bankName}
+                  >
+                    <Input
+                      value={values.bankName}
+                      onChange={handleChange("bankName")}
+                      onBlur={handleBlur("bankName")}
+                      className="pl-10 h-10 text-[14px]"
+                    />
+                  </Field>
+
+                  <Field
+                    label="Account Number"
+                    icon={CreditCard}
+                    error={touched.accountNo && errors.accountNo}
+                  >
+                    <Input
+                      value={values.accountNo}
+                      onChange={handleChange("accountNo")}
+                      onBlur={handleBlur("accountNo")}
+                      inputMode="numeric"
+                      maxLength={18}
+                      className="pl-10 h-10 text-[14px]"
+                    />
+                  </Field>
+
+                  <Field
+                    label="Account Holder Name"
+                    icon={User}
+                    error={touched.holderName && errors.holderName}
+                  >
+                    <Input
+                      value={values.holderName}
+                      onChange={handleChange("holderName")}
+                      onBlur={handleBlur("holderName")}
+                      maxLength={25}
+                      className="pl-10 h-10 text-[14px]"
+                    />
+                  </Field>
+
+                  <Field
+                    label="IFSC Code"
+                    icon={Banknote}
+                    error={touched.ifsc && errors.ifsc}
+                  >
+                    <Input
+                      value={values.ifsc}
+                      onChange={(e) =>
+                        setFieldValue("ifsc", e.target.value.toUpperCase())
+                      }
+                      onBlur={handleBlur("ifsc")}
+                      maxLength={20}
+                      className="pl-10 h-10 text-[14px] uppercase"
+                    />
+                  </Field>
+
+                  <Field
+                    label="Branch"
+                    icon={Landmark}
+                    error={touched.branch && errors.branch}
+                  >
+                    <Input
+                      value={values.branch}
+                      onChange={handleChange("branch")}
+                      onBlur={handleBlur("branch")}
+                      maxLength={20}
+                      className="pl-10 h-10 text-[14px]"
+                    />
+                  </Field>
+
+                  <Field
+                    label="UPI ID"
+                    icon={QrCode}
+                    error={touched.upiId && errors.upiId}
+                  >
+                    <Input
+                      value={values.upiId}
+                      onChange={handleChange("upiId")}
+                      onBlur={handleBlur("upiId")}
+                      maxLength={70}
+                      placeholder="name@bank"
+                      className="pl-10 h-10 text-[14px]"
+                    />
+                  </Field>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* ===================== Invoice Settings ===================== */}
+            <Card className="overflow-y-auto">
+              <CardHeader className="py-3 px-4">
+                <CardTitle className="text-[14px]">Invoice Settings</CardTitle>
+                <CardDescription className="text-[11.5px]">
+                  Configure invoice preferences
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="px-4 pb-4 space-y-2.5">
+                <div className="grid grid-cols-2 gap-3">
+                  <Field
+                    label="Invoice Prefix *"
+                    icon={FileText}
+                    error={touched.invoicePrefix && errors.invoicePrefix}
+                  >
+                    <Input
+                      value={values.invoicePrefix}
+                      onChange={(e) =>
+                        setFieldValue(
+                          "invoicePrefix",
+                          e.target.value.toUpperCase(),
+                        )
+                      }
+                      onBlur={handleBlur("invoicePrefix")}
+                      maxLength={8}
+                      placeholder="e.g. INV"
+                      className="pl-10 h-10 text-[14px] uppercase"
+                    />
+                  </Field>
+
+                  <Field
+                    label="Invoice Start Number"
+                    icon={FileText}
+                    error={
+                      touched.invoiceStartNumber && errors.invoiceStartNumber
+                    }
+                  >
+                    <Input
+                      value={values.invoiceStartNumber}
+                      onChange={handleChange("invoiceStartNumber")}
+                      onBlur={handleBlur("invoiceStartNumber")}
+                      inputMode="numeric"
+                      className="pl-10 h-10 text-[14px]"
+                    />
+                  </Field>
+                </div>
+
+                <div>
+                  <Label className="mb-1.5 block text-slate-700 text-[12.5px]">
                     Invoice Terms &amp; Conditions
                   </Label>
                   <Textarea
                     value={values.invoiceTerms}
                     onChange={handleChange("invoiceTerms")}
                     onBlur={handleBlur("invoiceTerms")}
-                    rows={5}
+                    rows={4}
                     placeholder="Enter invoice terms and conditions"
-                    className="resize-none"
+                    className="resize-none text-[13px]"
                   />
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className="text-[11px] text-slate-400 mt-1">
                     Plain text supported for now — rich formatting can be added
                     later.
                   </p>
                 </div>
               </CardContent>
             </Card>
-
-            {/* ===================== Logo & Signature ===================== */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Business Logo</CardTitle>
-                <CardDescription>
-                  Upload your business logo for invoices
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ImageUploadBox
-                  value={values.logo}
-                  onSelect={(file) => handleFileSelect("logo", file)}
-                  onRemove={() => setFieldValue("logo", null)}
-                  inputRef={logoInputRef}
-                  icon={Upload}
-                  label="Tap to upload logo"
-                />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Digital Signature</CardTitle>
-                <CardDescription>
-                  Upload your signature for invoices
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ImageUploadBox
-                  value={values.signature}
-                  onSelect={(file) => handleFileSelect("signature", file)}
-                  onRemove={() => setFieldValue("signature", null)}
-                  inputRef={signatureInputRef}
-                  icon={Upload}
-                  label="Tap to add signature"
-                  sublabel="PNG with transparent background recommended"
-                />
-              </CardContent>
-            </Card>
-          </>
+          </div>
         )}
       </form>
 
-      {/* Sticky bottom action bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-4 sm:px-6 py-3 z-10">
-        <div className="max-w-4xl mx-auto flex gap-3">
+      {/* Bottom action bar — part of flex column, not fixed, so it never causes page scroll */}
+      <div className="bg-white border-t border-slate-200 px-5 sm:px-6 py-2.5 shrink-0">
+        <div className="max-w-7xl mx-auto flex justify-end gap-3">
           <Button
             type="button"
             variant="outline"
-            className="flex-1"
+            className="px-6"
             onClick={handleCancel}
             disabled={saving}
           >
@@ -982,7 +984,7 @@ export default function BusinessProfile() {
           </Button>
           <Button
             type="button"
-            className="flex-1"
+            className="px-6"
             onClick={handleSubmit}
             disabled={saving}
           >
@@ -1004,20 +1006,17 @@ export default function BusinessProfile() {
   );
 }
 
-// =========================
-// Small reusable pieces
-// =========================
 function Field({ label, icon: Icon, error, children }) {
   return (
     <div>
-      <Label className="mb-1.5 block text-slate-700">{label}</Label>
+      <Label className="mb-1.5 block text-slate-700 text-[13px]">{label}</Label>
       <div className="relative">
         {Icon && (
           <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 z-10 pointer-events-none" />
         )}
         {children}
       </div>
-      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+      {error && <p className="text-[11.5px] text-red-500 mt-1">{error}</p>}
     </div>
   );
 }
@@ -1030,6 +1029,7 @@ function ImageUploadBox({
   icon: Icon,
   label,
   sublabel,
+  compact,
 }) {
   return (
     <div>
@@ -1045,12 +1045,12 @@ function ImageUploadBox({
           <img
             src={value.uri}
             alt="preview"
-            className="w-40 h-24 object-contain rounded-lg border border-slate-200 bg-slate-50"
+            className={`${compact ? "w-full h-20" : "w-40 h-24"} object-contain rounded-lg border border-slate-200 bg-slate-50`}
           />
           {!value.isOriginal && (
             <Badge
               variant="secondary"
-              className="absolute -top-2 -left-2 text-[10px]"
+              className="absolute -top-2 -left-2 text-[9px] px-1.5 py-0"
             >
               New
             </Badge>
@@ -1058,21 +1058,31 @@ function ImageUploadBox({
           <button
             type="button"
             onClick={onRemove}
-            className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600"
+            className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 cursor-pointer"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-3 h-3" />
           </button>
         </div>
       ) : (
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className="w-full border-2 border-dashed border-slate-200 rounded-xl py-8 flex flex-col items-center justify-center gap-2 hover:border-blue-300 hover:bg-blue-50/40 transition-colors"
+          className={`w-full border-2 border-dashed border-slate-200 rounded-xl ${
+            compact ? "py-3" : "py-8"
+          } flex flex-col items-center justify-center gap-1.5 hover:border-blue-300 hover:bg-blue-50/40 transition-colors cursor-pointer`}
         >
-          <Icon className="w-8 h-8 text-blue-500" />
-          <span className="text-sm font-medium text-slate-700">{label}</span>
+          <Icon
+            className={
+              compact ? "w-5 h-5 text-blue-500" : "w-8 h-8 text-blue-500"
+            }
+          />
+          <span
+            className={`font-medium text-slate-700 ${compact ? "text-[11px]" : "text-sm"}`}
+          >
+            {label}
+          </span>
           {sublabel && (
-            <span className="text-xs text-slate-400">{sublabel}</span>
+            <span className="text-[10px] text-slate-400">{sublabel}</span>
           )}
         </button>
       )}

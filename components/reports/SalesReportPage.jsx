@@ -75,7 +75,7 @@ const CHUNK_SIZE = 25;
 
 export default function SalesReportPage() {
   // ── Core state ──────────────────────────────────────────────────────────
-  const [invoices, setInvoices] = useState([]); // visible/revealed slice
+  const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
@@ -92,8 +92,10 @@ export default function SalesReportPage() {
   const [suggestions, setSuggestions] = useState([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [hasFetched, setHasFetched] = useState(false);
   const debounceTimerRef = useRef(null);
   const searchBoxRef = useRef(null);
+  const dropdownBoxRef = useRef(null);
 
   const [storedata, setStoredata] = useState({});
 
@@ -124,7 +126,7 @@ export default function SalesReportPage() {
   const contactNo = storedata?.contactNo || storedata?.contactNumber || "N/A";
   const gstin = storedata?.gstNumber || storedata?.gstin || "N/A";
 
-  // ── Close suggestions on outside click ─────────────────────────────────
+  // ── Close suggestions / dropdowns on outside click ─────────────────────
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (searchBoxRef.current && !searchBoxRef.current.contains(e.target)) {
@@ -284,6 +286,10 @@ export default function SalesReportPage() {
       cursorRef.current = 0;
       setInvoices([]);
       loadNextChunk();
+      setHasFetched(true);
+      if (!rows.length) {
+        toast.error("No records found for the selected filters.");
+      }
     } catch (e) {
       console.error("Report fetch error:", e?.message);
       toast.error("Failed to fetch report data.");
@@ -353,6 +359,10 @@ export default function SalesReportPage() {
     setPaymentStatusFilter(null);
     setSaleStatus(null);
     clearSearch();
+    allInvoicesRef.current = [];
+    cursorRef.current = 0;
+    setInvoices([]);
+    setHasFetched(false);
   };
 
   const formattedRange = useMemo(
@@ -584,331 +594,298 @@ export default function SalesReportPage() {
     startDate || endDate || paymentMethod || paymentStatusFilter || saleStatus || invoiceSearch;
 
   const hasMore = cursorRef.current < allInvoicesRef.current.length;
+  const hasData = invoices.length > 0;
+
+  const emptyMessage = !canGenerate
+    ? "Select a date range or filter and tap Generate."
+    : hasFetched
+    ? "No records found for the selected filters."
+    : "Tap Generate to load the report.";
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto">
-      {/* ---------------- HEADER ---------------- */}
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => window.history.back()}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <h1 className="text-lg font-bold text-slate-900">Sales Report</h1>
+    <div className="h-full flex flex-col overflow-hidden bg-slate-50/40">
+      <div className="px-4 md:px-6 pt-4 pb-3 shrink-0">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <button onClick={() => window.history.back()} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <h1 className="text-lg font-bold text-slate-900">Sales Report</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={exportPDF} disabled={!hasData || loading} className="h-9 px-3 rounded-lg border border-slate-200 text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium">
+              <FileText className="w-4 h-4" />PDF
+            </button>
+            <button onClick={exportExcel} disabled={!hasData || loading} className="h-9 px-3 rounded-lg border border-slate-200 text-emerald-600 hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium">
+              <FileSpreadsheet className="w-4 h-4" />Excel
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={exportPDF}
-            disabled={!invoices.length || loading}
-            className="h-9 px-3 rounded-lg border border-slate-200 text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium"
-          >
-            <FileText className="w-4 h-4" />
-            PDF
-          </button>
-          <button
-            onClick={exportExcel}
-            disabled={!invoices.length || loading}
-            className="h-9 px-3 rounded-lg border border-slate-200 text-emerald-600 hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium"
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            Excel
-          </button>
-        </div>
-      </div>
 
-      {/* ---------------- FILTERS ---------------- */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-4 mb-5 space-y-3.5">
-        {/* Search */}
-        <div className="relative" ref={searchBoxRef}>
-          <form onSubmit={submitSearch}>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        {/* Single-row filter toolbar */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-3 flex items-center gap-2 flex-wrap" ref={dropdownBoxRef}>
+          {/* Search */}
+          <div className="relative shrink-0" ref={searchBoxRef}>
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+            <form onSubmit={submitSearch}>
               <input
                 type="text"
+                placeholder="Search invoice, customer, mobile"
                 value={searchText}
                 onChange={handleSearchChange}
                 onFocus={handleSearchFocus}
-                placeholder="Search invoice no, customer name or mobile"
-                className="w-full h-10 pl-9 pr-9 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                className="h-9 w-[210px] pl-8 pr-8 rounded-lg border border-slate-200 text-[13px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
               />
-              {searchText ? (
-                <button
-                  type="button"
-                  onClick={clearSearch}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              ) : suggestionsLoading ? (
-                <RefreshCw className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 animate-spin" />
-              ) : null}
-            </div>
-          </form>
+            </form>
+            {searchText ? (
+              <button onClick={clearSearch} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            ) : suggestionsLoading ? (
+              <RefreshCw className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 animate-spin" />
+            ) : null}
 
-          {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute z-20 mt-1.5 w-full bg-white border border-slate-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
-              {suggestions.map((item, idx) => (
-                <button
-                  key={`${item.type}-${item.value}-${idx}`}
-                  onClick={() => selectSuggestion(item.value)}
-                  className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 border-b border-slate-50 last:border-b-0"
-                >
-                  {item.type === "invoice" ? (
-                    <Receipt className="w-3.5 h-3.5 text-slate-400" />
-                  ) : item.type === "mobile" ? (
-                    <Phone className="w-3.5 h-3.5 text-slate-400" />
-                  ) : (
-                    <Search className="w-3.5 h-3.5 text-slate-400" />
-                  )}
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Date range */}
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-            <input
-              type="date"
-              value={toInputDate(startDate)}
-              max={toInputDate(new Date())}
-              onChange={(e) => {
-                setActiveRange(null);
-                setStartDate(e.target.value ? new Date(e.target.value) : null);
-              }}
-              className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-            />
-          </div>
-          <div className="relative flex-1">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-            <input
-              type="date"
-              value={toInputDate(endDate)}
-              max={toInputDate(new Date())}
-              onChange={(e) => {
-                setActiveRange(null);
-                setEndDate(e.target.value ? new Date(e.target.value) : null);
-              }}
-              className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-            />
-          </div>
-          <button
-            onClick={clearAllFilters}
-            disabled={loading || (!startDate && !endDate)}
-            title="Clear filters"
-            className="h-10 w-10 shrink-0 rounded-xl border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <CalendarX2 className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Quick day/week segmented */}
-        <div className="grid grid-cols-3 gap-1.5 bg-slate-50 rounded-xl p-1">
-          {[
-            { key: "today", label: "Today", fn: applyToday },
-            { key: "yesterday", label: "Yesterday", fn: applyYesterday },
-            { key: "thisWeek", label: "This Week", fn: applyThisWeek },
-          ].map((btn) => (
-            <button
-              key={btn.key}
-              onClick={btn.fn}
-              className={`h-8 rounded-lg text-xs font-semibold transition-colors ${
-                activeRange === btn.key
-                  ? "bg-white text-blue-600 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              {btn.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Quick range row */}
-        <div className="flex gap-2">
-          <button
-            onClick={applyThisYear}
-            className="flex-1 h-9 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50"
-          >
-            This Year
-          </button>
-          <button
-            onClick={applyThisMonth}
-            className="flex-1 h-9 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50"
-          >
-            This Month
-          </button>
-          <button
-            onClick={applyPreviousMonth}
-            className="flex-1 h-9 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50"
-          >
-            Prev Month
-          </button>
-        </div>
-
-        {/* Dropdown filters */}
-        <div className="flex gap-2">
-          {dropdownFilters.map((filter) => {
-            const selectedOption = filter.options.find((o) => o.value === filter.value);
-            return (
-              <DropdownMenu key={filter.key}>
-                <DropdownMenuTrigger asChild>
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute z-20 mt-1 w-[260px] bg-white border border-slate-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
+                {suggestions.map((item, idx) => (
                   <button
-                    className={`flex-1 h-9 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 ${
-                      filter.value != null
-                        ? "bg-blue-50 border-blue-200 text-blue-700"
-                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    key={`${item.type}-${item.value}-${idx}`}
+                    onClick={() => selectSuggestion(item.value)}
+                    className={`w-full text-left px-3.5 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 ${
+                      idx < suggestions.length - 1 ? "border-b border-slate-100" : ""
                     }`}
                   >
-                    {selectedOption?.label || filter.title}
-                    <ChevronDown className="w-3.5 h-3.5" />
+                    {item.type === "invoice" ? (
+                      <Receipt className="w-3.5 h-3.5 text-slate-400" />
+                    ) : item.type === "mobile" ? (
+                      <Phone className="w-3.5 h-3.5 text-slate-400" />
+                    ) : (
+                      <Search className="w-3.5 h-3.5 text-slate-400" />
+                    )}
+                    {item.label}
                   </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-44">
-                  {filter.options.map((opt) => (
-                    <DropdownMenuItem
-                      key={String(opt.value)}
-                      onClick={() => filter.setValue(opt.value)}
-                      className="flex items-center justify-between text-sm"
-                    >
-                      {opt.label}
-                      {filter.value === opt.value && <Check className="w-3.5 h-3.5 text-blue-600" />}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            );
-          })}
-        </div>
-
-        {/* Generate */}
-        <button
-          onClick={fetchInvoices}
-          disabled={!canGenerate || loading}
-          className="w-full h-10 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-sm font-semibold flex items-center justify-center gap-2 transition-colors"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          {loading ? "Loading..." : "Generate"}
-        </button>
-      </div>
-
-      {/* ---------------- CONTENT ---------------- */}
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-          <RefreshCw className="w-6 h-6 animate-spin mb-2" />
-          <span className="text-sm">Loading...</span>
-        </div>
-      ) : invoices.length === 0 ? (
-        <div className="flex items-center justify-center py-20 text-slate-400 text-sm text-center">
-          No records. Select a date range and Generate.
-        </div>
-      ) : (
-        <>
-          {/* Summary */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-            <SummaryCard label="Range" value={formattedRange} small />
-            <SummaryCard label="Invoices" value={totals.count} />
-            <SummaryCard label="Total GST" value={currency(totals.gstTotal)} />
-            <SummaryCard label="Grand Total" value={currency(totals.grandTotal)} highlight />
-          </div>
-
-          {/* Table */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
-                    <th className="text-left font-semibold px-4 py-3">Date</th>
-                    <th className="text-left font-semibold px-4 py-3">Invoice No</th>
-                    <th className="text-left font-semibold px-4 py-3">Customer</th>
-                    <th className="text-left font-semibold px-4 py-3">Mobile</th>
-                    <th className="text-right font-semibold px-4 py-3">GST</th>
-                    <th className="text-right font-semibold px-4 py-3">Total</th>
-                    <th className="text-left font-semibold px-4 py-3">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {invoices.map((inv, idx) => (
-                    <tr
-                      key={String(inv._id || inv.invoiceNumber || idx)}
-                      className="hover:bg-slate-50 cursor-pointer transition-colors"
-                      onClick={() => (window.location.href = `/dashboard/sales/${inv._id}`)}
-                    >
-                      <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
-                        {inv.invoiceDate
-                          ? new Date(inv.invoiceDate).toLocaleDateString("en-IN", {
-                              day: "2-digit",
-                              month: "short",
-                              year: "numeric",
-                            })
-                          : "-"}
-                      </td>
-                      <td className="px-4 py-3 font-semibold text-slate-800 whitespace-nowrap">
-                        #{inv.invoiceNumber || inv._id}
-                      </td>
-                      <td className="px-4 py-3 text-slate-700">{inv.customerName || "-"}</td>
-                      <td className="px-4 py-3 text-slate-500">{inv.customerMobile || "-"}</td>
-                      <td className="px-4 py-3 text-right text-slate-600">
-                        {currency(inv.gstTotal)}
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold text-slate-800">
-                        {currency(inv.grandTotal)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
-                            inv.paymentStatus === "paid"
-                              ? "bg-emerald-50 text-emerald-600"
-                              : inv.paymentStatus === "partial"
-                              ? "bg-amber-50 text-amber-600"
-                              : "bg-red-50 text-red-600"
-                          }`}
-                        >
-                          {inv.paymentStatus || "-"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {hasMore && (
-              <div className="p-4 border-t border-slate-100 flex justify-center">
-                <button
-                  onClick={handleLoadMore}
-                  disabled={loadingMore}
-                  className="h-9 px-5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-                >
-                  {loadingMore ? "Loading..." : "Load More"}
-                </button>
+                ))}
               </div>
             )}
           </div>
-        </>
-      )}
+
+          <div className="h-6 w-px bg-slate-200 shrink-0" />
+
+          {/* Date range */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <div className="relative">
+              <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+              <input type="date" value={toInputDate(startDate)} max={toInputDate(new Date())}
+                onChange={(e) => { setActiveRange(null); setStartDate(e.target.value ? new Date(e.target.value) : null); }}
+                className="h-9 w-[150px] pl-8 pr-2 rounded-lg border border-slate-200 text-[13px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
+            </div>
+            <span className="text-slate-300 text-xs">–</span>
+            <div className="relative">
+              <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+              <input type="date" value={toInputDate(endDate)} max={toInputDate(new Date())}
+                onChange={(e) => { setActiveRange(null); setEndDate(e.target.value ? new Date(e.target.value) : null); }}
+                className="h-9 w-[150px] pl-8 pr-2 rounded-lg border border-slate-200 text-[13px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
+            </div>
+          </div>
+
+          {/* Today / Yesterday / This Week */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {[
+              { value: "today", label: "Today", fn: applyToday },
+              { value: "yesterday", label: "Yesterday", fn: applyYesterday },
+              { value: "thisWeek", label: "This Week", fn: applyThisWeek },
+            ].map((opt) => (
+              <button key={opt.value} onClick={opt.fn} disabled={loading}
+                className={`h-9 px-3 rounded-lg text-[12.5px] font-semibold transition-colors ${activeRange === opt.value ? "bg-blue-50 text-blue-600 border border-blue-200" : "text-slate-500 border border-slate-200 hover:bg-slate-50"}`}>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {/* This Year / This Month / Prev Month */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {[
+              { label: "This Year", fn: applyThisYear },
+              { label: "This Month", fn: applyThisMonth },
+              { label: "Prev Month", fn: applyPreviousMonth },
+            ].map(({ label, fn }) => (
+              <button key={label} onClick={fn} disabled={loading}
+                className="h-9 px-3 rounded-lg border border-slate-200 text-[12.5px] font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Dropdown filters */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {dropdownFilters.map((filter) => {
+              const selectedOption = filter.options.find((o) => o.value === filter.value);
+              return (
+                <DropdownMenu key={filter.key}>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className={`h-9 px-3 rounded-lg border text-[12.5px] font-medium flex items-center gap-1 ${
+                        filter.value != null
+                          ? "bg-blue-50 border-blue-200 text-blue-700"
+                          : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      <span className="truncate max-w-[100px]">{selectedOption?.label || filter.title}</span>
+                      <ChevronDown className="w-3.5 h-3.5 shrink-0" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-44">
+                    {filter.options.map((opt) => (
+                      <DropdownMenuItem
+                        key={String(opt.value)}
+                        onClick={() => filter.setValue(opt.value)}
+                        className="flex items-center justify-between text-sm"
+                      >
+                        {opt.label}
+                        {filter.value === opt.value && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              );
+            })}
+          </div>
+
+          <button onClick={clearAllFilters} disabled={loading} title="Clear filters"
+            className="h-9 w-9 shrink-0 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-40">
+            <CalendarX2 className="w-4 h-4" />
+          </button>
+
+          <button onClick={fetchInvoices} disabled={!canGenerate || loading}
+            className="h-9 px-4 ml-auto shrink-0 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-[13px] font-semibold flex items-center gap-2 transition-colors">
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+            {loading ? "Loading..." : "Generate"}
+          </button>
+        </div>
+      </div>
+
+      {/* ---------------- CONTENT (scrolls internally) ---------------- */}
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-4">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+            <RefreshCw className="w-6 h-6 animate-spin mb-2" />
+            <span className="text-sm">Loading...</span>
+          </div>
+        ) : !hasData ? (
+          <div className="flex items-center justify-center py-20 text-slate-400 text-sm text-center">
+            {emptyMessage}
+          </div>
+        ) : (
+          <>
+            {/* Summary */}
+            <div className="bg-white border border-slate-200/80 rounded-2xl px-5 py-3.5 mb-4">
+              <div className="text-xs text-slate-400 mb-2">{formattedRange}</div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <SummaryStat label="Invoices" value={String(totals.count)} />
+                <SummaryStat label="Taxable Value" value={currency(totals.taxableValue)} />
+                <SummaryStat label="Total GST" value={currency(totals.gstTotal)} accent="text-red-600" />
+                <SummaryStat label="Grand Total" value={currency(totals.grandTotal)} accent="text-blue-600" bold />
+              </div>
+            </div>
+
+            {/* Table */}
+            <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden mb-4">
+              <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+                <h2 className="text-sm font-bold text-slate-800">Sales Register</h2>
+                <span className="text-xs text-slate-400">{totals.count} invoices</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+                      <th className="text-left font-semibold px-4 py-3">Date</th>
+                      <th className="text-left font-semibold px-4 py-3">Invoice No</th>
+                      <th className="text-left font-semibold px-4 py-3">Customer</th>
+                      <th className="text-left font-semibold px-4 py-3">Mobile</th>
+                      <th className="text-right font-semibold px-4 py-3">GST</th>
+                      <th className="text-right font-semibold px-4 py-3">Total</th>
+                      <th className="text-left font-semibold px-4 py-3">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {invoices.map((inv, idx) => (
+                      <tr
+                        key={String(inv._id || inv.invoiceNumber || idx)}
+                        className="hover:bg-slate-50 cursor-pointer transition-colors"
+                        onClick={() => (window.location.href = `/dashboard/sales/${inv._id}`)}
+                      >
+                        <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
+                          {inv.invoiceDate
+                            ? new Date(inv.invoiceDate).toLocaleDateString("en-IN", {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                              })
+                            : "-"}
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-slate-800 whitespace-nowrap">
+                          #{inv.invoiceNumber || inv._id}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">{inv.customerName || "-"}</td>
+                        <td className="px-4 py-3 text-slate-500">{inv.customerMobile || "-"}</td>
+                        <td className="px-4 py-3 text-right text-slate-600">{currency(inv.gstTotal)}</td>
+                        <td className="px-4 py-3 text-right font-semibold text-slate-800">{currency(inv.grandTotal)}</td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
+                              inv.paymentStatus === "paid"
+                                ? "bg-emerald-50 text-emerald-600"
+                                : inv.paymentStatus === "partial"
+                                ? "bg-amber-50 text-amber-600"
+                                : "bg-red-50 text-red-600"
+                            }`}
+                          >
+                            {inv.paymentStatus || "-"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-slate-50 font-semibold text-slate-800">
+                      <td colSpan={4} className="px-4 py-3 text-right">TOTAL</td>
+                      <td className="px-4 py-3 text-right">{currency(totals.gstTotal)}</td>
+                      <td className="px-4 py-3 text-right">{currency(totals.grandTotal)}</td>
+                      <td className="px-4 py-3"></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              {hasMore && (
+                <div className="p-4 border-t border-slate-100 flex justify-center">
+                  <button
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                    className="h-9 px-5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {loadingMore ? "Loading..." : "Load More"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
 
 // -----------------------------------------
-// Summary card
+// Summary stat
 // -----------------------------------------
-function SummaryCard({ label, value, small, highlight }) {
+function SummaryStat({ label, value, accent, bold }) {
   return (
-    <div className="bg-white border border-slate-200/80 rounded-xl px-4 py-3">
+    <div>
       <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1">
         {label}
       </div>
-      <div
-        className={`font-bold truncate ${
-          highlight ? "text-blue-600 text-lg" : "text-slate-800"
-        } ${small ? "text-sm" : "text-lg"}`}
-      >
+      <div className={`${bold ? "text-lg" : "text-base"} font-bold ${accent || "text-slate-800"} truncate`}>
         {value}
       </div>
     </div>

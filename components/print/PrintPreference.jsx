@@ -56,60 +56,58 @@ export default function PrintPreference() {
   };
 
   const handleSave = async () => {
-  if (!mode) {
-    toast.error("Please select a print format");
-    return;
-  }
-  if (mode === savedMode) {
-    toast.info("No changes to save");
-    return;
-  }
-
-  setSaving(true);
-  try {
-    const formData = new FormData();
-    formData.append("settings", JSON.stringify({ printMode: mode }));
-
-    const res = await api.put("/store/update-my-store", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-
-    // handles both cases: axios wrapper returns full response,
-    // OR an interceptor already unwraps to response.data
-    const body = res?.success !== undefined ? res : res?.data;
-
-    if (body?.success) {
-      const updatedMode = body?.data?.settings?.printMode;
-
-      if (updatedMode) {
-        toast.success(`Print format set to ${updatedMode.toUpperCase()}`);
-        setMode(updatedMode);
-        setSavedMode(updatedMode);
-      } else {
-        toast.warning(
-          "Saved, but server didn't confirm the print format. Please re-check settings."
-        );
-      }
-    } else {
-      toast.error(body?.message || "Failed to save print preference");
+    if (!mode) {
+      toast.error("Please select a print format");
+      return;
     }
-  } catch (err) {
-    const errBody = err?.response?.data;
-    toast.error(errBody?.message || "Failed to save print preference");
-  } finally {
-    setSaving(false);
-  }
-};
+    if (mode === savedMode) {
+      toast.info("No changes to save");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const formData = new FormData();
+      formData.append("settings", JSON.stringify({ printMode: mode }));
+
+      const res = await api.put("/store/update-my-store", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      const body = res?.success !== undefined ? res : res?.data;
+
+      if (body?.success) {
+        const updatedMode = body?.data?.settings?.printMode;
+
+        if (updatedMode) {
+          toast.success(`Print format set to ${updatedMode.toUpperCase()}`);
+          setMode(updatedMode);
+          setSavedMode(updatedMode);
+        } else {
+          toast.warning(
+            "Saved, but server didn't confirm the print format. Please re-check settings."
+          );
+        }
+      } else {
+        toast.error(body?.message || "Failed to save print preference");
+      }
+    } catch (err) {
+      const errBody = err?.response?.data;
+      toast.error(errBody?.message || "Failed to save print preference");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 p-4 sm:p-6">
-        <div className="max-w-2xl mx-auto space-y-5">
+      <div className="p-4 sm:p-6">
+        <div className="max-w-3xl mx-auto space-y-5">
           <Skeleton className="h-9 w-56" />
           <Skeleton className="h-4 w-72" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Skeleton className="h-40 rounded-2xl" />
-            <Skeleton className="h-40 rounded-2xl" />
+            <Skeleton className="h-36 rounded-2xl" />
+            <Skeleton className="h-36 rounded-2xl" />
           </div>
         </div>
       </div>
@@ -117,15 +115,15 @@ export default function PrintPreference() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 sm:p-6">
-      <div className="max-w-2xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6">
+      <div className="max-w-3xl mx-auto space-y-5">
         {/* Header */}
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shrink-0">
             <Printer className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
               Print Preference
             </h1>
             <p className="text-sm text-slate-400">
@@ -166,14 +164,10 @@ export default function PrintPreference() {
                     />
                   </div>
 
-                  <p
-                    className={`font-bold ${isActive ? "text-blue-700" : "text-slate-800"}`}
-                  >
+                  <p className={`font-bold ${isActive ? "text-blue-700" : "text-slate-800"}`}>
                     {item.label}
                   </p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    {item.dimensions}
-                  </p>
+                  <p className="text-xs text-slate-400 mt-1">{item.dimensions}</p>
                   <p className="text-sm text-slate-500 mt-2 leading-snug">
                     {item.description}
                   </p>
@@ -206,23 +200,25 @@ export default function PrintPreference() {
         </Card>
 
         {/* Save button */}
-        <Button
-          onClick={handleSave}
-          disabled={saving || !mode || mode === savedMode}
-          className="w-full rounded-xl h-11"
-        >
-          {saving ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            <>
-              <Check className="w-4 h-4 mr-2" />
-              Save Preference
-            </>
-          )}
-        </Button>
+        <div className="flex justify-end">
+          <Button
+            onClick={handleSave}
+            disabled={saving || !mode || mode === savedMode}
+            className="rounded-xl h-10 px-6"
+          >
+            {saving ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Check className="w-4 h-4 mr-2" />
+                Save Preference
+              </>
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "../../../context/ThemeContext";
 import { useAuth } from "../../../context/AuthContext";
@@ -12,7 +13,7 @@ import {
   endOfWeek,
   eachDayOfInterval,
 } from "date-fns";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Plus } from "lucide-react";
 
 import MetricCard from "../../../components/dashboard/MetricCard";
 import ChartCard from "../../../components/dashboard/ChartCard";
@@ -29,6 +30,7 @@ import api from "../../../utils/api";
 export default function DashboardPage() {
   const { theme } = useTheme();
   const { user } = useAuth();
+  const router = useRouter();
   const [dateRange, setDateRange] = useState("month");
   const currentTheme = themeConfig[theme];
 
@@ -286,6 +288,15 @@ export default function DashboardPage() {
                 className={`w-3.5 h-3.5 ${isRefetching ? "animate-spin" : ""}`}
               />
               Refresh
+            </button>
+
+            {/* ✅ Direct shortcut → opens NewInvoiceFormPage instantly (skips the list) */}
+            <button
+              onClick={() => router.push("/dashboard/sales?new=true")}
+              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2.5 text-sm font-semibold shadow-sm shadow-blue-200 ring-1 ring-blue-600/50 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              New Invoice
             </button>
           </div>
         </div>

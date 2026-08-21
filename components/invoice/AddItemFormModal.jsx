@@ -312,7 +312,7 @@ function CategorySection({ value, onChange }) {
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="mt-1 w-full h-10 px-3 rounded-md border border-slate-200 bg-white flex items-center justify-between text-sm hover:bg-slate-50"
+            className="mt-0.5 w-full h-10 px-3 rounded-md border border-slate-200 bg-white flex items-center justify-between text-sm hover:bg-slate-50"
           >
             <span
               className={selectedCategory ? "text-slate-800" : "text-slate-400"}
@@ -642,7 +642,7 @@ function HsnCodeSection({ value, gstRate, onHsnSelect }) {
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="mt-1 w-full h-10 px-3 rounded-md border border-slate-200 bg-white flex items-center justify-between text-sm hover:bg-slate-50"
+            className="mt-0.5 w-full h-10 px-3 rounded-md border border-slate-200 bg-white flex items-center justify-between text-sm hover:bg-slate-50"
           >
             <span className={value ? "text-slate-800" : "text-slate-400"}>
               {value
@@ -931,7 +931,7 @@ function TaxRateSection({ value, onChange, disabled }) {
           <button
             type="button"
             disabled={disabled}
-            className="mt-1 w-full h-10 px-3 rounded-md border border-slate-200 bg-white flex items-center justify-between text-sm hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="mt-0.5 w-full h-10 px-3 rounded-md border border-slate-200 bg-white flex items-center justify-between text-sm hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <span className={value ? "text-slate-800" : "text-slate-400"}>
               {value ? value.label : "Select tax rate"}
@@ -1358,8 +1358,8 @@ export default function AddItemFormModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[960px] max-h-[95vh] overflow-y-auto">
+        <DialogHeader className="space-y-0.5">
           <DialogTitle className="flex items-center gap-2">
             <Package className="w-5 h-5 text-blue-600" />
             {isEditMode ? "Edit Item" : "Add New Item"}
@@ -1417,13 +1417,13 @@ export default function AddItemFormModal({
               if (finalPurchasePrice < 0) finalPurchasePrice = 0;
 
               return (
-                <Form className="space-y-5">
+                <Form className="space-y-3">
                   {/* ---- Product Details ---- */}
                   <div className="flex items-center gap-2 text-slate-700 font-semibold">
                     <Package className="w-4 h-4 text-blue-600" />
                     Product Details
                   </div>
-                  <Separator />
+                  <Separator className="!my-1.5" />
 
                   <div>
                     <Label>Item Name *</Label>
@@ -1432,7 +1432,7 @@ export default function AddItemFormModal({
                       value={values.itemName}
                       onChange={handleChange}
                       placeholder="Enter item name"
-                      className="mt-1"
+                      className="mt-0.5"
                     />
                     {touched.itemName && errors.itemName && (
                       <p className="text-xs text-red-500 mt-1">
@@ -1441,14 +1441,15 @@ export default function AddItemFormModal({
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  {/* ✅ Wide modal → 4 fields in a single row instead of 2 rows */}
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                     <div>
                       <Label>Unit *</Label>
                       <Select
                         value={values.unit}
                         onValueChange={(v) => setFieldValue("unit", v)}
                       >
-                        <SelectTrigger className="mt-1">
+                        <SelectTrigger className="mt-0.5">
                           <SelectValue placeholder="Select unit" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1470,9 +1471,7 @@ export default function AddItemFormModal({
                       value={values.category}
                       onChange={(v) => setFieldValue("category", v)}
                     />
-                  </div>
 
-                  <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>SKU (optional)</Label>
                       <Input
@@ -1480,7 +1479,7 @@ export default function AddItemFormModal({
                         value={values.itemCode}
                         onChange={handleChange}
                         placeholder="Item code"
-                        className="mt-1"
+                        className="mt-0.5"
                       />
                     </div>
 
@@ -1518,17 +1517,17 @@ export default function AddItemFormModal({
                   </div>
 
                   {/* ---- Price ---- */}
-                  <div className="flex items-center gap-2 text-slate-700 font-semibold pt-2">
+                  <div className="flex items-center gap-2 text-slate-700 font-semibold pt-1">
                     <IndianRupee className="w-4 h-4 text-blue-600" />
                     Price
                   </div>
-                  <Separator />
+                  <Separator className="!my-1.5" />
 
                   {/* Purchase Price + Sales Price, each with their own Tax Option toggle */}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label>Purchase Price (optional)</Label>
-                      <div className="flex gap-2 mt-1">
+                      <div className="flex gap-2 mt-0.5">
                         <Input
                           name="purchasePrice"
                           value={values.purchasePrice}
@@ -1552,7 +1551,7 @@ export default function AddItemFormModal({
 
                     <div>
                       <Label>Sales Price *</Label>
-                      <div className="flex gap-2 mt-1">
+                      <div className="flex gap-2 mt-0.5">
                         <Input
                           name="salesPrice"
                           value={values.salesPrice}
@@ -1574,8 +1573,8 @@ export default function AddItemFormModal({
                     </div>
                   </div>
 
-                  {/* Tax rates, side-by-side — Purchase GST% and Sales GST% independent */}
-                  <div className="grid grid-cols-2 gap-4">
+                  {/* ✅ Wide modal → Tax rates + discounts, all 4 in a single row */}
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                     <TaxRateSection
                       value={selectedPurchaseTaxRate}
                       onChange={setSelectedPurchaseTaxRate}
@@ -1584,13 +1583,10 @@ export default function AddItemFormModal({
                       value={selectedTaxRate}
                       onChange={setSelectedTaxRate}
                     />
-                  </div>
 
-                  {/* Discounts, side-by-side */}
-                  <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>Discount on Purchase</Label>
-                      <div className="flex gap-2 mt-1">
+                      <div className="flex gap-2 mt-0.5">
                         <Input
                           name="purchaseDiscountPrice"
                           value={values.purchaseDiscountPrice}
@@ -1652,7 +1648,7 @@ export default function AddItemFormModal({
 
                     <div>
                       <Label>Discount on Sales</Label>
-                      <div className="flex gap-2 mt-1">
+                      <div className="flex gap-2 mt-0.5">
                         <Input
                           name="discountPrice"
                           value={values.discountPrice}
@@ -1708,45 +1704,52 @@ export default function AddItemFormModal({
                     </div>
                   </div>
 
-                  {values.purchasePrice && values.purchaseDiscountPrice ? (
-                    <p className="text-sm text-slate-600 font-medium">
-                      Purchase Price (After Discount): ₹
-                      {finalPurchasePrice.toFixed(2)}
-                    </p>
-                  ) : null}
+                  {/* ✅ Final-price hints + MRP, side-by-side to save vertical space */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-start">
+                    {values.purchasePrice && values.purchaseDiscountPrice ? (
+                      <p className="text-sm text-slate-600 font-medium">
+                        Purchase Price (After Discount): ₹
+                        {finalPurchasePrice.toFixed(2)}
+                      </p>
+                    ) : (
+                      <div />
+                    )}
 
-                  {values.salesPrice && values.discountPrice ? (
-                    <p className="text-sm text-slate-600 font-medium">
-                      Sales Price (After Discount): ₹{finalPrice.toFixed(2)}
-                    </p>
-                  ) : null}
+                    {values.salesPrice && values.discountPrice ? (
+                      <p className="text-sm text-slate-600 font-medium">
+                        Sales Price (After Discount): ₹{finalPrice.toFixed(2)}
+                      </p>
+                    ) : (
+                      <div />
+                    )}
 
-                  {isMrpEnabled && (
-                    <div>
-                      <Label>MRP (optional)</Label>
-                      <Input
-                        name="mrp"
-                        value={values.mrp}
-                        onChange={handleChange}
-                        placeholder="Enter MRP"
-                        type="number"
-                        className="mt-1"
-                      />
-                      {touched.mrp && errors.mrp && (
-                        <p className="text-xs text-red-500 mt-1">
-                          {errors.mrp}
-                        </p>
-                      )}
-                    </div>
-                  )}
+                    {isMrpEnabled && (
+                      <div>
+                        <Label>MRP (optional)</Label>
+                        <Input
+                          name="mrp"
+                          value={values.mrp}
+                          onChange={handleChange}
+                          placeholder="Enter MRP"
+                          type="number"
+                          className="mt-0.5"
+                        />
+                        {touched.mrp && errors.mrp && (
+                          <p className="text-xs text-red-500 mt-1">
+                            {errors.mrp}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
 
                   {/* ---- Opening Stock — collapsible, ItemsPage-style ---- */}
-                  <div className="pt-2">
-                    <div className="flex items-center gap-2 text-slate-700 font-semibold mb-2">
+                  <div className="pt-1">
+                    <div className="flex items-center gap-2 text-slate-700 font-semibold mb-1.5">
                       <Warehouse className="w-4 h-4 text-blue-600" />
                       Opening Stock
                     </div>
-                    <Separator className="mb-3" />
+                    <Separator className="!mb-2" />
 
                     {!showOpeningStock ? (
                       <div className="space-y-2">
@@ -1774,8 +1777,8 @@ export default function AddItemFormModal({
                         )}
                       </div>
                     ) : (
-                      <div className="space-y-3 bg-slate-50 rounded-xl p-4 border border-slate-200">
-                        <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2.5 bg-slate-50 rounded-xl p-3 border border-slate-200">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
                           <div>
                             <Label>Opening Stock Qty</Label>
                             <Input
@@ -1784,7 +1787,7 @@ export default function AddItemFormModal({
                               onChange={handleChange}
                               placeholder="Quantity"
                               type="number"
-                              className="mt-1"
+                              className="mt-0.5"
                             />
                           </div>
                           <div>
@@ -1795,17 +1798,15 @@ export default function AddItemFormModal({
                               onChange={handleChange}
                               placeholder="Total value (₹)"
                               type="number"
-                              className="mt-1"
+                              className="mt-0.5"
                             />
                           </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
-                          <Info className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                          <p className="text-xs text-blue-700 italic">
-                            Opening stock value = Opening stock qty × Purchase
-                            rate
-                          </p>
+                          <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 h-10">
+                            <Info className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                            <p className="text-xs text-blue-700 italic">
+                              Value = Qty × Purchase rate
+                            </p>
+                          </div>
                         </div>
 
                         <Button
@@ -1821,7 +1822,7 @@ export default function AddItemFormModal({
                     )}
                   </div>
 
-                  <DialogFooter className="pt-2">
+                  <DialogFooter className="pt-1">
                     <Button
                       type="button"
                       variant="outline"

@@ -6,9 +6,11 @@ import * as XLSX from "xlsx";
 import {
   Search,
   X,
+  CalendarX2,
   RefreshCw,
   ChevronLeft,
   ChevronDown,
+  Check,
   FileText,
   FileSpreadsheet,
 } from "lucide-react";
@@ -102,6 +104,7 @@ export default function StockReportPage() {
   const [activeType, setActiveType] = useState(null);
   const [hasFetched, setHasFetched] = useState(false);
   const [fyOpen, setFyOpen] = useState(false);
+  const [typeOpen, setTypeOpen] = useState(false);
 
   const [fyOptions, setFyOptions] = useState([]);
   const [fyLoading, setFyLoading] = useState(false);
@@ -113,6 +116,7 @@ export default function StockReportPage() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const searchDebounceRef = useRef(null);
   const searchBoxRef = useRef(null);
+  const toolbarRef = useRef(null);
 
   const [storedata, setStoredata] = useState({});
 
@@ -165,11 +169,15 @@ export default function StockReportPage() {
     })();
   }, []);
 
-  // close FY dropdown / suggestions on outside click
+  // close dropdowns / suggestions on outside click
   useEffect(() => {
     const handler = (e) => {
       if (searchBoxRef.current && !searchBoxRef.current.contains(e.target)) {
         setShowSuggestions(false);
+      }
+      if (toolbarRef.current && !toolbarRef.current.contains(e.target)) {
+        setFyOpen(false);
+        setTypeOpen(false);
       }
     };
     document.addEventListener("mousedown", handler);
@@ -255,6 +263,7 @@ export default function StockReportPage() {
 
   const handleTypeSelect = (type) => {
     setActiveType(type);
+    setTypeOpen(false);
     runFetch(financialYear, type, productSearch);
   };
 
@@ -466,63 +475,46 @@ export default function StockReportPage() {
     : "Tap Generate to load the report.";
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto">
-      {/* ---------------- HEADER ---------------- */}
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => window.history.back()}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <h1 className="text-lg font-bold text-slate-900">Stock Report</h1>
+    <div className="h-full flex flex-col overflow-hidden bg-slate-50/40">
+      <div className="px-4 md:px-6 pt-4 pb-3 shrink-0">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <button onClick={() => window.history.back()} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <h1 className="text-lg font-bold text-slate-900">Stock Report</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={exportPDF} disabled={!hasData || loading} className="h-9 px-3 rounded-lg border border-slate-200 text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium">
+              <FileText className="w-4 h-4" />PDF
+            </button>
+            <button onClick={exportExcel} disabled={!hasData || loading} className="h-9 px-3 rounded-lg border border-slate-200 text-emerald-600 hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium">
+              <FileSpreadsheet className="w-4 h-4" />Excel
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={exportPDF}
-            disabled={!hasData || loading}
-            className="h-9 px-3 rounded-lg border border-slate-200 text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium"
-          >
-            <FileText className="w-4 h-4" />
-            PDF
-          </button>
-          <button
-            onClick={exportExcel}
-            disabled={!hasData || loading}
-            className="h-9 px-3 rounded-lg border border-slate-200 text-emerald-600 hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium"
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            Excel
-          </button>
-        </div>
-      </div>
 
-      {/* ---------------- FILTERS ---------------- */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-4 mb-5 space-y-3.5">
-        {/* FY selector + clear */}
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
+        {/* Single-row filter toolbar */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-3 flex items-center gap-2 flex-wrap" ref={toolbarRef}>
+          {/* FY dropdown */}
+          <div className="relative shrink-0">
             <button
-              onClick={() => setFyOpen((v) => !v)}
+              onClick={() => { setFyOpen((v) => !v); setTypeOpen(false); }}
               disabled={fyLoading || loading}
-              className="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm text-slate-700 flex items-center justify-between disabled:opacity-50"
+              className="h-9 px-3 rounded-lg border border-slate-200 text-[12.5px] font-medium text-slate-700 flex items-center gap-1.5 disabled:opacity-50"
             >
               <span>{fyLoading ? "Loading…" : financialYear || "Select FY"}</span>
-              <ChevronDown className="w-4 h-4 text-slate-400" />
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
             </button>
             {fyOpen && !fyLoading && (
-              <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
+              <div className="absolute z-20 mt-1 left-0 w-[140px] bg-white border border-slate-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
                 {fyOptions.length === 0 ? (
                   <div className="px-3 py-2 text-sm text-slate-400">No financial years found</div>
                 ) : (
                   fyOptions.map((fy) => (
                     <button
                       key={fy}
-                      onClick={() => {
-                        setFinancialYear(fy);
-                        setFyOpen(false);
-                      }}
+                      onClick={() => { setFinancialYear(fy); setFyOpen(false); }}
                       className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 ${
                         fy === financialYear ? "text-emerald-600 font-semibold" : "text-slate-700"
                       }`}
@@ -534,217 +526,209 @@ export default function StockReportPage() {
               </div>
             )}
           </div>
-          <button
-            onClick={clearAll}
-            disabled={loading || !financialYear || fyLoading}
-            title="Reset filters"
-            className="h-10 w-10 shrink-0 rounded-xl border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <X className="w-4 h-4" />
+
+          <div className="h-6 w-px bg-slate-200 shrink-0" />
+
+          {/* Product search */}
+          <div className="relative shrink-0" ref={searchBoxRef}>
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search product (Pen, Medicine...)"
+              value={productSearch}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+              className={`h-9 w-[220px] pl-8 pr-8 rounded-lg border text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 ${
+                selectedProduct ? "border-emerald-400 text-emerald-700" : "border-slate-200 text-slate-700"
+              }`}
+            />
+            {productSearch && (
+              <button
+                onClick={() => { setProductSearch(""); setSelectedProduct(null); setSuggestions([]); setShowSuggestions(false); }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute z-20 mt-1 w-[280px] bg-white border border-slate-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
+                {suggestions.map((item, idx) => {
+                  const label = item.name || item.itemDescription || item.productName || "";
+                  return (
+                    <button
+                      key={item._id || item.id || idx}
+                      onClick={() => handleSelectSuggestion(item)}
+                      className={`w-full text-left px-3.5 py-2.5 hover:bg-slate-50 ${
+                        idx < suggestions.length - 1 ? "border-b border-slate-100" : ""
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-800 truncate">{label}</span>
+                        {item.currentStock !== undefined && (
+                          <span className="text-xs text-slate-400 ml-2 shrink-0">Stock: {fmt(item.currentStock)}</span>
+                        )}
+                      </div>
+                      {(item.hsn || item.category) && (
+                        <div className="text-xs text-slate-400 mt-0.5 truncate">
+                          {[item.hsn && `HSN: ${item.hsn}`, item.category].filter(Boolean).join(" · ")}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Transaction type dropdown */}
+          <div className="relative shrink-0">
+            <button
+              onClick={() => { setTypeOpen((v) => !v); setFyOpen(false); }}
+              disabled={loading}
+              className={`h-9 px-3 rounded-lg border text-[12.5px] font-medium flex items-center gap-1.5 disabled:opacity-50 ${
+                activeType != null ? "bg-blue-50 border-blue-200 text-blue-700" : "border-slate-200 text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <span>{activeTypeMeta?.icon} {activeTypeMeta?.label || "All Types"}</span>
+              <ChevronDown className="w-3.5 h-3.5" />
+            </button>
+            {typeOpen && (
+              <div className="absolute z-20 mt-1 left-0 w-[180px] bg-white border border-slate-200 rounded-xl shadow-lg p-1.5">
+                {TRANSACTION_TYPES.map(({ key, label, icon }) => (
+                  <button
+                    key={String(key)}
+                    onClick={() => handleTypeSelect(key)}
+                    className={`w-full text-left px-2.5 py-1.5 rounded-lg text-sm flex items-center justify-between ${
+                      activeType === key ? "bg-blue-50 text-blue-700 font-semibold" : "text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span>{icon} {label}</span>
+                    {activeType === key && <Check className="w-3.5 h-3.5" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button onClick={clearAll} disabled={loading || fyLoading} title="Reset filters"
+            className="h-9 w-9 shrink-0 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-40">
+            <CalendarX2 className="w-4 h-4" />
+          </button>
+
+          <button onClick={handleGenerate} disabled={!financialYear || loading || fyLoading}
+            className="h-9 px-4 ml-auto shrink-0 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-[13px] font-semibold flex items-center gap-2 transition-colors">
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+            {loading ? "Loading..." : "Generate"}
           </button>
         </div>
 
-        {/* Product search with suggestions */}
-        <div className="relative" ref={searchBoxRef}>
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-          <input
-            type="text"
-            placeholder="Search Product Name (e.g., Pen, Medicine...)"
-            value={productSearch}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-            className={`w-full h-10 pl-9 pr-9 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 ${
-              selectedProduct ? "border-emerald-400 text-emerald-700" : "border-slate-200 text-slate-700"
-            }`}
-          />
-          {productSearch && (
-            <button
-              onClick={() => {
-                setProductSearch("");
-                setSelectedProduct(null);
-                setSuggestions([]);
-                setShowSuggestions(false);
-              }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-
-          {selectedProduct && (
-            <div className="mt-1.5 inline-flex items-center px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 text-xs font-medium">
-              ✓ Filtering by: {productSearch}
-            </div>
-          )}
-
-          {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg max-h-52 overflow-y-auto">
-              {suggestions.map((item, idx) => {
-                const label = item.name || item.itemDescription || item.productName || "";
-                return (
-                  <button
-                    key={item._id || item.id || idx}
-                    onClick={() => handleSelectSuggestion(item)}
-                    className={`w-full text-left px-3.5 py-2.5 hover:bg-slate-50 ${
-                      idx < suggestions.length - 1 ? "border-b border-slate-100" : ""
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-800 truncate">{label}</span>
-                      {item.currentStock !== undefined && (
-                        <span className="text-xs text-slate-400 ml-2 shrink-0">
-                          Stock: {fmt(item.currentStock)}
-                        </span>
-                      )}
-                    </div>
-                    {(item.hsn || item.category) && (
-                      <div className="text-xs text-slate-400 mt-0.5 truncate">
-                        {[item.hsn && `HSN: ${item.hsn}`, item.category].filter(Boolean).join(" · ")}
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Transaction type chips */}
-        <div>
-          <div className="text-xs text-slate-400 mb-2">Filter by Type</div>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {TRANSACTION_TYPES.map(({ key, label, icon }) => {
-              const isActive = activeType === key;
-              return (
-                <button
-                  key={String(key)}
-                  onClick={() => handleTypeSelect(key)}
-                  disabled={loading}
-                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors disabled:opacity-50 ${
-                    isActive
-                      ? "bg-blue-600 border-blue-600 text-white"
-                      : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
-                  }`}
-                >
-                  {icon} {label}
-                </button>
-              );
-            })}
+        {isAsOnDate && (
+          <div className="text-[11px] text-slate-400 italic mt-1.5 px-1">
+            ℹ️ Using End Date as "As On Date" for this filter
           </div>
-          {isAsOnDate && (
-            <div className="text-[11px] text-slate-400 italic mt-1">
-              ℹ️ Using End Date as "As On Date" for this filter
-            </div>
-          )}
-        </div>
-
-        <button
-          onClick={handleGenerate}
-          disabled={!financialYear || loading || fyLoading}
-          className="w-full h-10 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-sm font-semibold flex items-center justify-center gap-2 transition-colors"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          {loading ? "Loading..." : "Generate"}
-        </button>
+        )}
       </div>
 
-      {/* ---------------- CONTENT ---------------- */}
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-          <RefreshCw className="w-6 h-6 animate-spin mb-2" />
-          <span className="text-sm">Loading...</span>
-        </div>
-      ) : !hasData ? (
-        <div className="flex items-center justify-center py-20 text-slate-400 text-sm text-center">
-          {emptyMessage}
-        </div>
-      ) : (
-        <>
-          {/* Summary */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl px-5 py-4 mb-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-xs text-slate-400">
-                {formattedRange}
-                {selectedProduct ? ` · ${productSearch}` : ""}
+      {/* ---------------- CONTENT (scrolls internally) ---------------- */}
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-4">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+            <RefreshCw className="w-6 h-6 animate-spin mb-2" />
+            <span className="text-sm">Loading...</span>
+          </div>
+        ) : !hasData ? (
+          <div className="flex items-center justify-center py-20 text-slate-400 text-sm text-center">
+            {emptyMessage}
+          </div>
+        ) : (
+          <>
+            {/* Summary */}
+            <div className="bg-white border border-slate-200/80 rounded-2xl px-5 py-3.5 mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs text-slate-400">
+                  {formattedRange}
+                  {selectedProduct ? ` · ${productSearch}` : ""}
+                </div>
+                {activeType && (
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">
+                    {activeTypeMeta?.icon} {activeTypeMeta?.label}
+                  </span>
+                )}
               </div>
-              {activeType && (
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">
-                  {activeTypeMeta?.icon} {activeTypeMeta?.label}
-                </span>
-              )}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <SummaryStat label="Items" value={String(totals.count)} />
+                <SummaryStat label="Stock Value" value={fmt(totals.stockValue)} bold />
+                <SummaryStat label="Closing Stock" value={fmt(totals.closingStock)} />
+                <SummaryStat label="Total In" value={fmt(totals.totalIn)} accent="text-emerald-600" />
+                <SummaryStat label="Total Out" value={fmt(totals.totalOut)} accent="text-red-600" />
+              </div>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <SummaryStat label="Items" value={String(totals.count)} />
-              <SummaryStat label="Stock Value" value={fmt(totals.stockValue)} bold />
-              <SummaryStat label="Closing Stock" value={fmt(totals.closingStock)} />
-              <SummaryStat label="Total In" value={fmt(totals.totalIn)} accent="text-emerald-600" />
-              <SummaryStat label="Total Out" value={fmt(totals.totalOut)} accent="text-red-600" />
-            </div>
-          </div>
 
-          {/* Table */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden mb-5">
-            <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-slate-800">Stock Movement</h2>
-              <span className="text-xs text-slate-400">{totals.count} items</span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
-                    <th className="text-left font-semibold px-4 py-3">Item</th>
-                    <th className="text-right font-semibold px-4 py-3">Opening(+)</th>
-                    <th className="text-right font-semibold px-4 py-3">Purchase(+)</th>
-                    <th className="text-right font-semibold px-4 py-3">Sale Ret.(+)</th>
-                    <th className="text-right font-semibold px-4 py-3">Sale(-)</th>
-                    <th className="text-right font-semibold px-4 py-3">Purch.Ret.(-)</th>
-                    <th className="text-right font-semibold px-4 py-3">Damage(-)</th>
-                    <th className="text-right font-semibold px-4 py-3">Expired(-)</th>
-                    <th className="text-right font-semibold px-4 py-3">Adj.(+-)</th>
-                    <th className="text-right font-semibold px-4 py-3">Closing</th>
-                    <th className="text-right font-semibold px-4 py-3">Stock Value</th>
-                    <th className="text-right font-semibold px-4 py-3">Avg Value</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {records?.map((r, i) => (
-                    <tr key={`${r._id || r.id || "row"}-${i}`} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3 font-medium text-slate-800">{safe(r.itemDescription)}</td>
-                      <td className="px-4 py-3 text-right text-slate-600">{num(r.openingQty)}</td>
-                      <td className="px-4 py-3 text-right text-emerald-600">{num(r.purchaseQty)}</td>
-                      <td className="px-4 py-3 text-right text-emerald-600">{num(r.returnInQty)}</td>
-                      <td className="px-4 py-3 text-right text-red-600">{num(r.saleQty)}</td>
-                      <td className="px-4 py-3 text-right text-red-600">{num(r.returnOutQty)}</td>
-                      <td className="px-4 py-3 text-right text-red-600">{num(r.damageQty)}</td>
-                      <td className="px-4 py-3 text-right text-red-600">{num(r.expiredQty)}</td>
-                      <td className="px-4 py-3 text-right text-slate-600">{num(r.adjustmentQty)}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-slate-800">{num(r.closingStock)}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-blue-600">{fmt(r.currentStockValue)}</td>
-                      <td className="px-4 py-3 text-right text-slate-600">{fmt(r.avgStockValue)}</td>
+            {/* Table */}
+            <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden mb-4">
+              <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+                <h2 className="text-sm font-bold text-slate-800">Stock Movement</h2>
+                <span className="text-xs text-slate-400">{totals.count} items</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+                      <th className="text-left font-semibold px-4 py-3">Item</th>
+                      <th className="text-right font-semibold px-4 py-3">Opening(+)</th>
+                      <th className="text-right font-semibold px-4 py-3">Purchase(+)</th>
+                      <th className="text-right font-semibold px-4 py-3">Sale Ret.(+)</th>
+                      <th className="text-right font-semibold px-4 py-3">Sale(-)</th>
+                      <th className="text-right font-semibold px-4 py-3">Purch.Ret.(-)</th>
+                      <th className="text-right font-semibold px-4 py-3">Damage(-)</th>
+                      <th className="text-right font-semibold px-4 py-3">Expired(-)</th>
+                      <th className="text-right font-semibold px-4 py-3">Adj.(+-)</th>
+                      <th className="text-right font-semibold px-4 py-3">Closing</th>
+                      <th className="text-right font-semibold px-4 py-3">Stock Value</th>
+                      <th className="text-right font-semibold px-4 py-3">Avg Value</th>
                     </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-slate-50 font-semibold text-slate-800">
-                    <td className="px-4 py-3 text-right">TOTAL</td>
-                    <td className="px-4 py-3 text-right">{fmt(totals.openingQty)}</td>
-                    <td className="px-4 py-3 text-right text-emerald-700">{fmt(totals.purchaseQty)}</td>
-                    <td className="px-4 py-3 text-right text-emerald-700">{fmt(totals.returnInQty)}</td>
-                    <td className="px-4 py-3 text-right text-red-700">{fmt(totals.saleQty)}</td>
-                    <td className="px-4 py-3 text-right text-red-700">{fmt(totals.returnOutQty)}</td>
-                    <td className="px-4 py-3 text-right text-red-700">{fmt(totals.damageQty)}</td>
-                    <td className="px-4 py-3 text-right text-red-700">{fmt(totals.expiredQty)}</td>
-                    <td className="px-4 py-3 text-right">{fmt(totals.adjustmentQty)}</td>
-                    <td className="px-4 py-3 text-right">{fmt(totals.closingStock)}</td>
-                    <td className="px-4 py-3 text-right text-blue-700">{fmt(totals.stockValue)}</td>
-                    <td className="px-4 py-3 text-right">{fmt(totals.averageStockValue)}</td>
-                  </tr>
-                </tfoot>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {records?.map((r, i) => (
+                      <tr key={`${r._id || r.id || "row"}-${i}`} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-3 font-medium text-slate-800">{safe(r.itemDescription)}</td>
+                        <td className="px-4 py-3 text-right text-slate-600">{num(r.openingQty)}</td>
+                        <td className="px-4 py-3 text-right text-emerald-600">{num(r.purchaseQty)}</td>
+                        <td className="px-4 py-3 text-right text-emerald-600">{num(r.returnInQty)}</td>
+                        <td className="px-4 py-3 text-right text-red-600">{num(r.saleQty)}</td>
+                        <td className="px-4 py-3 text-right text-red-600">{num(r.returnOutQty)}</td>
+                        <td className="px-4 py-3 text-right text-red-600">{num(r.damageQty)}</td>
+                        <td className="px-4 py-3 text-right text-red-600">{num(r.expiredQty)}</td>
+                        <td className="px-4 py-3 text-right text-slate-600">{num(r.adjustmentQty)}</td>
+                        <td className="px-4 py-3 text-right font-semibold text-slate-800">{num(r.closingStock)}</td>
+                        <td className="px-4 py-3 text-right font-semibold text-blue-600">{fmt(r.currentStockValue)}</td>
+                        <td className="px-4 py-3 text-right text-slate-600">{fmt(r.avgStockValue)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-slate-50 font-semibold text-slate-800">
+                      <td className="px-4 py-3 text-right">TOTAL</td>
+                      <td className="px-4 py-3 text-right">{fmt(totals.openingQty)}</td>
+                      <td className="px-4 py-3 text-right text-emerald-700">{fmt(totals.purchaseQty)}</td>
+                      <td className="px-4 py-3 text-right text-emerald-700">{fmt(totals.returnInQty)}</td>
+                      <td className="px-4 py-3 text-right text-red-700">{fmt(totals.saleQty)}</td>
+                      <td className="px-4 py-3 text-right text-red-700">{fmt(totals.returnOutQty)}</td>
+                      <td className="px-4 py-3 text-right text-red-700">{fmt(totals.damageQty)}</td>
+                      <td className="px-4 py-3 text-right text-red-700">{fmt(totals.expiredQty)}</td>
+                      <td className="px-4 py-3 text-right">{fmt(totals.adjustmentQty)}</td>
+                      <td className="px-4 py-3 text-right">{fmt(totals.closingStock)}</td>
+                      <td className="px-4 py-3 text-right text-blue-700">{fmt(totals.stockValue)}</td>
+                      <td className="px-4 py-3 text-right">{fmt(totals.averageStockValue)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
             </div>
-          </div>
-        </>
-      )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

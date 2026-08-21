@@ -558,301 +558,258 @@ export default function PurchaseReportPage() {
       : "Tap Generate to load the report.";
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto">
-      {/* ---------------- HEADER ---------------- */}
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => window.history.back()}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <h1 className="text-lg font-bold text-slate-900">Purchase Report</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={exportPDF}
-            disabled={!hasData || loading}
-            className="h-9 px-3 rounded-lg border border-slate-200 text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium"
-          >
-            <FileText className="w-4 h-4" />
-            PDF
-          </button>
-          <button
-            onClick={exportExcel}
-            disabled={!hasData || loading}
-            className="h-9 px-3 rounded-lg border border-slate-200 text-emerald-600 hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium"
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            Excel
-          </button>
-        </div>
-      </div>
-
-      {/* ---------------- FILTERS ---------------- */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-4 mb-5 space-y-3.5">
-        {/* Search */}
-        <div className="relative" ref={searchBoxRef}>
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-          <form onSubmit={submitSearch}>
-            <input
-              type="text"
-              placeholder="Search invoice no, vendor name or mobile"
-              value={searchText}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              onFocus={handleSearchFocus}
-              className="w-full h-10 pl-9 pr-9 rounded-xl border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-            />
-          </form>
-          {searchText ? (
-            <button
-              onClick={clearSearch}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-            >
-              <X className="w-4 h-4" />
+    <div className="h-full flex flex-col overflow-hidden bg-slate-50/40">
+      <div className="px-4 md:px-6 pt-4 pb-3 shrink-0">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <button onClick={() => window.history.back()} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100">
+              <ChevronLeft className="w-4 h-4" />
             </button>
-          ) : suggestionsLoading ? (
-            <RefreshCw className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 animate-spin" />
-          ) : null}
+            <h1 className="text-lg font-bold text-slate-900">Purchase Report</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={exportPDF} disabled={!hasData || loading} className="h-9 px-3 rounded-lg border border-slate-200 text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium">
+              <FileText className="w-4 h-4" />PDF
+            </button>
+            <button onClick={exportExcel} disabled={!hasData || loading} className="h-9 px-3 rounded-lg border border-slate-200 text-emerald-600 hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium">
+              <FileSpreadsheet className="w-4 h-4" />Excel
+            </button>
+          </div>
+        </div>
 
-          {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
-              {suggestions.map((item, idx) => (
+        {/* Single-row filter toolbar */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-3 flex items-center gap-2 flex-wrap" ref={dropdownBoxRef}>
+          <div className="relative shrink-0" ref={searchBoxRef}>
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+            <form onSubmit={submitSearch}>
+              <input
+                type="text"
+                placeholder="Search invoice, vendor, mobile"
+                value={searchText}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                onFocus={handleSearchFocus}
+                className="h-9 w-[210px] pl-8 pr-8 rounded-lg border border-slate-200 text-[13px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+              />
+            </form>
+            {searchText ? (
+              <button onClick={clearSearch} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            ) : suggestionsLoading ? (
+              <RefreshCw className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 animate-spin" />
+            ) : null}
+
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute z-20 mt-1 w-[260px] bg-white border border-slate-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
+                {suggestions.map((item, idx) => (
+                  <button
+                    key={`${item.type}-${item.value}-${idx}`}
+                    onClick={() => selectSuggestion(item.value)}
+                    className={`w-full text-left px-3.5 py-2.5 text-sm text-slate-700 hover:bg-slate-50 ${
+                      idx < suggestions.length - 1 ? "border-b border-slate-100" : ""
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="h-6 w-px bg-slate-200 shrink-0" />
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            <div className="relative">
+              <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+              <input type="date" value={toInputDate(startDate)} max={toInputDate(new Date())}
+                onChange={(e) => { setActiveRange(null); setStartDate(e.target.value ? new Date(e.target.value) : null); }}
+                className="h-9 w-[150px] pl-8 pr-2 rounded-lg border border-slate-200 text-[13px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
+            </div>
+            <span className="text-slate-300 text-xs">–</span>
+            <div className="relative">
+              <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+              <input type="date" value={toInputDate(endDate)} max={toInputDate(new Date())}
+                onChange={(e) => { setActiveRange(null); setEndDate(e.target.value ? new Date(e.target.value) : null); }}
+                className="h-9 w-[150px] pl-8 pr-2 rounded-lg border border-slate-200 text-[13px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            {[
+              { value: "today", label: "Today", fn: applyToday },
+              { value: "yesterday", label: "Yesterday", fn: applyYesterday },
+              { value: "thisWeek", label: "This Week", fn: applyThisWeek },
+            ].map((opt) => (
+              <button key={opt.value} onClick={opt.fn} disabled={loading}
+                className={`h-9 px-3 rounded-lg text-[12.5px] font-semibold transition-colors ${activeRange === opt.value ? "bg-blue-50 text-blue-600 border border-blue-200" : "text-slate-500 border border-slate-200 hover:bg-slate-50"}`}>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            {[
+              { label: "This Year", fn: applyThisYear },
+              { label: "This Month", fn: applyThisMonth },
+              { label: "Prev Month", fn: applyPreviousMonth },
+            ].map(({ label, fn }) => (
+              <button key={label} onClick={fn} disabled={loading}
+                className="h-9 px-3 rounded-lg border border-slate-200 text-[12.5px] font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            {dropdownFilters.map((filter) => (
+              <div key={filter.key} className="relative">
                 <button
-                  key={`${item.type}-${item.value}-${idx}`}
-                  onClick={() => selectSuggestion(item.value)}
-                  className={`w-full text-left px-3.5 py-2.5 text-sm text-slate-700 hover:bg-slate-50 ${
-                    idx < suggestions.length - 1 ? "border-b border-slate-100" : ""
+                  onClick={() => setActiveDropdown(activeDropdown === filter.key ? null : filter.key)}
+                  className={`h-9 px-3 rounded-lg border text-[12.5px] font-medium flex items-center gap-1 ${
+                    filter.value != null
+                      ? "bg-blue-50 border-blue-200 text-blue-700"
+                      : "border-slate-200 text-slate-600 hover:bg-slate-50"
                   }`}
                 >
-                  {item.label}
+                  <span className="truncate max-w-[100px]">{filter.label}</span>
+                  <ChevronDown className="w-3.5 h-3.5 shrink-0" />
                 </button>
-              ))}
-            </div>
-          )}
-        </div>
+                {activeDropdown === filter.key && (
+                  <div className="absolute z-20 mt-1 left-0 bg-white border border-slate-200 rounded-xl shadow-lg p-2 min-w-[160px]">
+                    {filter.options.map((opt) => (
+                      <button
+                        key={String(opt.value)}
+                        onClick={() => {
+                          filter.onSelect(opt.value);
+                          setActiveDropdown(null);
+                        }}
+                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs ${
+                          filter.value === opt.value
+                            ? "bg-blue-50 text-blue-700 font-semibold"
+                            : "text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
 
-        {/* Date range */}
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-            <input
-              type="date"
-              value={toInputDate(startDate)}
-              max={toInputDate(new Date())}
-              onChange={(e) => {
-                setActiveRange(null);
-                setStartDate(e.target.value ? new Date(e.target.value) : null);
-              }}
-              className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-            />
-          </div>
-          <div className="relative flex-1">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-            <input
-              type="date"
-              value={toInputDate(endDate)}
-              max={toInputDate(new Date())}
-              onChange={(e) => {
-                setActiveRange(null);
-                setEndDate(e.target.value ? new Date(e.target.value) : null);
-              }}
-              className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-            />
-          </div>
-          <button
-            onClick={clearAll}
-            disabled={loading}
-            title="Clear filters"
-            className="h-10 w-10 shrink-0 rounded-xl border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
+          <button onClick={clearAll} disabled={loading} title="Clear filters"
+            className="h-9 w-9 shrink-0 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-40">
             <CalendarX2 className="w-4 h-4" />
           </button>
-        </div>
 
-        {/* Today / Yesterday / This Week toggle */}
-        <div className="flex p-1 bg-slate-100 rounded-xl">
-          {[
-            { value: "today", label: "Today", fn: applyToday },
-            { value: "yesterday", label: "Yesterday", fn: applyYesterday },
-            { value: "thisWeek", label: "This Week", fn: applyThisWeek },
-          ].map((opt) => (
-            <button
-              key={opt.value}
-              onClick={opt.fn}
-              disabled={loading}
-              className={`flex-1 h-9 rounded-lg text-xs font-semibold transition-colors ${
-                activeRange === opt.value ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+          <button
+            onClick={fetchPurchases}
+            disabled={
+              loading ||
+              (!startDate && !endDate && !paymentMethod && !paymentStatusFilter && !purchaseStatus && !invoiceSearch)
+            }
+            className="h-9 px-4 ml-auto shrink-0 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-[13px] font-semibold flex items-center gap-2 transition-colors">
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+            {loading ? "Loading..." : "Generate"}
+          </button>
         </div>
-
-        {/* This Year / This Month / Prev Month */}
-        <div className="flex gap-2">
-          {[
-            { label: "This Year", fn: applyThisYear },
-            { label: "This Month", fn: applyThisMonth },
-            { label: "Prev Month", fn: applyPreviousMonth },
-          ].map(({ label, fn }) => (
-            <button
-              key={label}
-              onClick={fn}
-              disabled={loading}
-              className="flex-1 h-9 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* Dropdown filters */}
-        <div className="flex gap-2 relative" ref={dropdownBoxRef}>
-          {dropdownFilters.map((filter) => (
-            <div key={filter.key} className="relative flex-1">
-              <button
-                onClick={() => setActiveDropdown(activeDropdown === filter.key ? null : filter.key)}
-                className={`w-full h-9 px-3 rounded-lg border text-xs font-medium flex items-center justify-between ${
-                  filter.value != null
-                    ? "bg-blue-50 border-blue-200 text-blue-700"
-                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                <span className="truncate">{filter.label}</span>
-                <ChevronDown className="w-3.5 h-3.5 shrink-0 ml-1" />
-              </button>
-              {activeDropdown === filter.key && (
-                <div className="absolute z-20 mt-1 left-0 bg-white border border-slate-200 rounded-xl shadow-lg p-2 min-w-[160px]">
-                  {filter.options.map((opt) => (
-                    <button
-                      key={String(opt.value)}
-                      onClick={() => {
-                        filter.onSelect(opt.value);
-                        setActiveDropdown(null);
-                      }}
-                      className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs ${
-                        filter.value === opt.value
-                          ? "bg-blue-50 text-blue-700 font-semibold"
-                          : "text-slate-600 hover:bg-slate-50"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        <button
-          onClick={fetchPurchases}
-          disabled={
-            loading ||
-            (!startDate && !endDate && !paymentMethod && !paymentStatusFilter && !purchaseStatus && !invoiceSearch)
-          }
-          className="w-full h-10 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-sm font-semibold flex items-center justify-center gap-2 transition-colors"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          {loading ? "Loading..." : "Generate"}
-        </button>
       </div>
 
-      {/* ---------------- CONTENT ---------------- */}
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-          <RefreshCw className="w-6 h-6 animate-spin mb-2" />
-          <span className="text-sm">Loading...</span>
-        </div>
-      ) : !hasData ? (
-        <div className="flex items-center justify-center py-20 text-slate-400 text-sm text-center">
-          {emptyMessage}
-        </div>
-      ) : (
-        <>
-          {/* Summary */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl px-5 py-4 mb-5">
-            <div className="text-xs text-slate-400 mb-3">{formattedRange}</div>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <SummaryStat label="Purchases" value={String(totals.count)} />
-              <SummaryStat label="Total Qty" value={String(totals.totalQty)} />
-              <SummaryStat label="Taxable" value={currency(totals.subTotal)} />
-              <SummaryStat label="GST" value={currency(totals.gstTotal)} accent="text-red-600" />
-              <SummaryStat label="Grand Total" value={currency(totals.grandTotal)} accent="text-blue-600" bold />
-            </div>
+      {/* ---------------- CONTENT (scrolls internally) ---------------- */}
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-4">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+            <RefreshCw className="w-6 h-6 animate-spin mb-2" />
+            <span className="text-sm">Loading...</span>
           </div>
+        ) : !hasData ? (
+          <div className="flex items-center justify-center py-20 text-slate-400 text-sm text-center">
+            {emptyMessage}
+          </div>
+        ) : (
+          <>
+            {/* Summary */}
+            <div className="bg-white border border-slate-200/80 rounded-2xl px-5 py-3.5 mb-4">
+              <div className="text-xs text-slate-400 mb-2">{formattedRange}</div>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <SummaryStat label="Purchases" value={String(totals.count)} />
+                <SummaryStat label="Total Qty" value={String(totals.totalQty)} />
+                <SummaryStat label="Taxable" value={currency(totals.subTotal)} />
+                <SummaryStat label="GST" value={currency(totals.gstTotal)} accent="text-red-600" />
+                <SummaryStat label="Grand Total" value={currency(totals.grandTotal)} accent="text-blue-600" bold />
+              </div>
+            </div>
 
-          {/* Table */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden mb-5">
-            <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-slate-800">Purchase Register</h2>
-              <span className="text-xs text-slate-400">{totals.count} entries</span>
+            {/* Table */}
+            <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden mb-4">
+              <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+                <h2 className="text-sm font-bold text-slate-800">Purchase Register</h2>
+                <span className="text-xs text-slate-400">{totals.count} entries</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+                      <th className="text-center font-semibold px-4 py-3">Bill No</th>
+                      <th className="text-left font-semibold px-4 py-3">Date</th>
+                      <th className="text-left font-semibold px-4 py-3">Supplier</th>
+                      <th className="text-left font-semibold px-4 py-3">Mobile</th>
+                      <th className="text-center font-semibold px-4 py-3">Qty</th>
+                      <th className="text-right font-semibold px-4 py-3">Taxable</th>
+                      <th className="text-right font-semibold px-4 py-3">CGST</th>
+                      <th className="text-right font-semibold px-4 py-3">SGST</th>
+                      <th className="text-right font-semibold px-4 py-3">GST</th>
+                      <th className="text-right font-semibold px-4 py-3">Net Amount</th>
+                      <th className="text-center font-semibold px-4 py-3">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {purchases.map((p, i) => {
+                      const d = getRowData(p, i + 1);
+                      const statusColor =
+                        d.paymentStatus === "paid"
+                          ? "text-emerald-600"
+                          : d.paymentStatus === "partial"
+                          ? "text-amber-600"
+                          : "text-red-600";
+                      return (
+                        <tr key={`${d.id || "row"}-${i}`} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-3 text-center font-medium text-slate-800">{safe(d.invoiceNumber)}</td>
+                          <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{d.billDate}</td>
+                          <td className="px-4 py-3 text-slate-700">{safe(d.supplierName)}</td>
+                          <td className="px-4 py-3 text-slate-500">{safe(d.supplierMobile)}</td>
+                          <td className="px-4 py-3 text-center text-slate-600">{d.totalItemsQty}</td>
+                          <td className="px-4 py-3 text-right text-slate-600">{currency(d.taxableValue)}</td>
+                          <td className="px-4 py-3 text-right text-orange-600">{currency(d.cgst)}</td>
+                          <td className="px-4 py-3 text-right text-orange-600">{currency(d.sgst)}</td>
+                          <td className="px-4 py-3 text-right text-orange-600">{currency(d.gstTotal)}</td>
+                          <td className="px-4 py-3 text-right font-semibold text-slate-800">{currency(d.grandTotal)}</td>
+                          <td className={`px-4 py-3 text-center font-medium capitalize ${statusColor}`}>
+                            {d.paymentStatus}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-slate-50 font-semibold text-slate-800">
+                      <td colSpan={4} className="px-4 py-3 text-right">TOTAL</td>
+                      <td className="px-4 py-3 text-center">{totals.totalQty}</td>
+                      <td className="px-4 py-3 text-right">{currency(totals.subTotal)}</td>
+                      <td className="px-4 py-3 text-right">{currency(totals.gstTotal / 2)}</td>
+                      <td className="px-4 py-3 text-right">{currency(totals.gstTotal / 2)}</td>
+                      <td className="px-4 py-3 text-right">{currency(totals.gstTotal)}</td>
+                      <td className="px-4 py-3 text-right">{currency(totals.grandTotal)}</td>
+                      <td className="px-4 py-3"></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
-                    <th className="text-center font-semibold px-4 py-3">Bill No</th>
-                    <th className="text-left font-semibold px-4 py-3">Date</th>
-                    <th className="text-left font-semibold px-4 py-3">Supplier</th>
-                    <th className="text-left font-semibold px-4 py-3">Mobile</th>
-                    <th className="text-center font-semibold px-4 py-3">Qty</th>
-                    <th className="text-right font-semibold px-4 py-3">Taxable</th>
-                    <th className="text-right font-semibold px-4 py-3">CGST</th>
-                    <th className="text-right font-semibold px-4 py-3">SGST</th>
-                    <th className="text-right font-semibold px-4 py-3">GST</th>
-                    <th className="text-right font-semibold px-4 py-3">Net Amount</th>
-                    <th className="text-center font-semibold px-4 py-3">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {purchases.map((p, i) => {
-                    const d = getRowData(p, i + 1);
-                    const statusColor =
-                      d.paymentStatus === "paid"
-                        ? "text-emerald-600"
-                        : d.paymentStatus === "partial"
-                        ? "text-amber-600"
-                        : "text-red-600";
-                    return (
-                      <tr key={`${d.id || "row"}-${i}`} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3 text-center font-medium text-slate-800">{safe(d.invoiceNumber)}</td>
-                        <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{d.billDate}</td>
-                        <td className="px-4 py-3 text-slate-700">{safe(d.supplierName)}</td>
-                        <td className="px-4 py-3 text-slate-500">{safe(d.supplierMobile)}</td>
-                        <td className="px-4 py-3 text-center text-slate-600">{d.totalItemsQty}</td>
-                        <td className="px-4 py-3 text-right text-slate-600">{currency(d.taxableValue)}</td>
-                        <td className="px-4 py-3 text-right text-orange-600">{currency(d.cgst)}</td>
-                        <td className="px-4 py-3 text-right text-orange-600">{currency(d.sgst)}</td>
-                        <td className="px-4 py-3 text-right text-orange-600">{currency(d.gstTotal)}</td>
-                        <td className="px-4 py-3 text-right font-semibold text-slate-800">{currency(d.grandTotal)}</td>
-                        <td className={`px-4 py-3 text-center font-medium capitalize ${statusColor}`}>
-                          {d.paymentStatus}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-slate-50 font-semibold text-slate-800">
-                    <td colSpan={4} className="px-4 py-3 text-right">TOTAL</td>
-                    <td className="px-4 py-3 text-center">{totals.totalQty}</td>
-                    <td className="px-4 py-3 text-right">{currency(totals.subTotal)}</td>
-                    <td className="px-4 py-3 text-right">{currency(totals.gstTotal / 2)}</td>
-                    <td className="px-4 py-3 text-right">{currency(totals.gstTotal / 2)}</td>
-                    <td className="px-4 py-3 text-right">{currency(totals.gstTotal)}</td>
-                    <td className="px-4 py-3 text-right">{currency(totals.grandTotal)}</td>
-                    <td className="px-4 py-3"></td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-        </>
-      )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

@@ -60,67 +60,156 @@ import { useAuth } from "../../context/AuthContext";
 // Reports sub-items
 // -----------------------------------------
 const reportSubItems = [
-  { title: "Sales Report", url: "/dashboard/reports/sales", icon: TrendingUp, key: "sales" },
-  { title: "Product Report", url: "/dashboard/reports/products", icon: Package, key: "products" },
-  { title: "Product Wise Sales", url: "/dashboard/reports/product-wise-sales", icon: BarChart3, key: "productWiseSales" },
-  { title: "Expense Report", url: "/dashboard/reports/expenses", icon: Wallet, key: "expenses" },
-  { title: "GST Report", url: "/dashboard/reports/gst", icon: FileBarChart, key: "gst" },
-  { title: "Stock Report", url: "/dashboard/reports/stock", icon: PackageSearch, key: "stock", requiresStock: true },
-  { title: "Profit & Loss Report", url: "/dashboard/reports/profit-loss", icon: PieChart, key: "profitLoss" },
-  { title: "Purchase Report", url: "/dashboard/reports/purchase", icon: ShoppingCart, key: "purchase", requiresPurchaseOrder: true },
-  { title: "Creditors Report", url: "/dashboard/reports/creditors", icon: Landmark, key: "creditors" },
-  { title: "Debtors Report", url: "/dashboard/reports/debtors", icon: UserCheck, key: "debtors" },
+  {
+    title: "Sales Report",
+    url: "/dashboard/reports/sales",
+    icon: TrendingUp,
+    key: "sales",
+  },
+  {
+    title: "Product Report",
+    url: "/dashboard/reports/products",
+    icon: Package,
+    key: "products",
+  },
+  {
+    title: "Product Wise Sales",
+    url: "/dashboard/reports/product-wise-sales",
+    icon: BarChart3,
+    key: "productWiseSales",
+  },
+  {
+    title: "Expense Report",
+    url: "/dashboard/reports/expenses",
+    icon: Wallet,
+    key: "expenses",
+  },
+  {
+    title: "GST Report",
+    url: "/dashboard/reports/gst",
+    icon: FileBarChart,
+    key: "gst",
+  },
+  {
+    title: "Stock Report",
+    url: "/dashboard/reports/stock",
+    icon: PackageSearch,
+    key: "stock",
+    requiresStock: true,
+  },
+  {
+    title: "Profit & Loss Report",
+    url: "/dashboard/reports/profit-loss",
+    icon: PieChart,
+    key: "profitLoss",
+  },
+  {
+    title: "Purchase Report",
+    url: "/dashboard/reports/purchase",
+    icon: ShoppingCart,
+    key: "purchase",
+    requiresPurchaseOrder: true,
+  },
+  {
+    title: "Creditors Report",
+    url: "/dashboard/reports/creditors",
+    icon: Landmark,
+    key: "creditors",
+  },
+  {
+    title: "Debtors Report",
+    url: "/dashboard/reports/debtors",
+    icon: UserCheck,
+    key: "debtors",
+  },
 ];
 
 // -----------------------------------------
 // Grouped sections
 // -----------------------------------------
 const sections = [
-  { label: "Menu", items: [{ title: "Dashboard", url: "/dashboard", icon: LayoutDashboard }] },
+  {
+    label: "Menu",
+    items: [{ title: "Dashboard", url: "/dashboard", icon: LayoutDashboard }],
+  },
   {
     label: "Master",
     items: [
       { title: "Items", url: "/dashboard/items", icon: Package },
-      { title: "Vendors", url: "/dashboard/vendors", icon: Users, requiresPurchaseOrder: true },
+      {
+        title: "Vendors",
+        url: "/dashboard/vendors",
+        icon: Users,
+        requiresPurchaseOrder: true,
+      },
       { title: "Customers", url: "/dashboard/customers", icon: Users },
     ],
   },
   {
     label: "Billing & Other Expenses",
     items: [
-      { title: "Purchase", url: "/dashboard/purchase", icon: ShoppingCart, requiresPurchaseOrder: true },
+      {
+        title: "Purchase",
+        url: "/dashboard/purchase",
+        icon: ShoppingCart,
+        requiresPurchaseOrder: true,
+      },
       { title: "Invoices", url: "/dashboard/sales", icon: Receipt },
       { title: "Other Expenses", url: "/dashboard/expenses", icon: Wallet },
     ],
   },
   {
     label: "Reports & Insights",
-    items: [{ title: "All Transactions", url: "/dashboard/transactions", icon: FileText }],
+    items: [
+      {
+        title: "All Transactions",
+        url: "/dashboard/transactions",
+        icon: FileText,
+      },
+    ],
   },
   {
     label: "Business Setup",
     items: [
       { title: "Business Profile", url: "/dashboard/profile", icon: Building2 },
-      { title: "Print Preference", url: "/dashboard/print-preference", icon: FileText },
+      {
+        title: "Print Preference",
+        url: "/dashboard/print-preference",
+        icon: FileText,
+      },
     ],
   },
   {
     label: "Subscriptions",
-    items: [{ title: "Plans & Pricing", url: "/dashboard/pricing", icon: CreditCard }],
+    items: [
+      { title: "Plans & Pricing", url: "/dashboard/pricing", icon: CreditCard },
+    ],
   },
   {
     label: "Resources",
     items: [
-      { title: "Our Products", url: "/dashboard/products", icon: PackageSearch },
+      {
+        title: "Our Products",
+        url: "/dashboard/products",
+        icon: PackageSearch,
+      },
       { title: "How to Use", url: "/dashboard/how-to-use", icon: BookOpen },
-      { title: "Give Feedback", url: "/dashboard/feedback", icon: MessageSquareHeart },
+      {
+        title: "Give Feedback",
+        url: "/dashboard/feedback",
+        icon: MessageSquareHeart,
+      },
     ],
   },
   {
     label: "Support",
     items: [
       { title: "Help & Support", url: "/dashboard/support", icon: LifeBuoy },
-      { title: "Privacy Policy", url: "/dashboard/privacy-policy", icon: ShieldCheck },
+      {
+        title: "Privacy Policy",
+        url: "/dashboard/privacy-policy",
+        icon: ShieldCheck,
+      },
     ],
   },
 ];
@@ -162,15 +251,15 @@ export function AppSidebar({ ...props }) {
       className="border-r border-slate-200/70 bg-white"
     >
       {/* ---------------- HEADER ---------------- */}
-      <SidebarHeader className="border-b border-slate-100 px-3 py-5">
+      <SidebarHeader className="border-b border-slate-100 px-3 py-4">
         <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
-          <div className="relative flex items-center justify-center w-12 h-12 rounded-2xl bg-white shrink-0 shadow-sm ring-1 ring-slate-200/80 overflow-hidden">
+          <div className="relative flex items-center justify-center w-11 h-11 rounded-2xl bg-white shrink-0 shadow-sm ring-1 ring-slate-200/80 overflow-hidden">
             <Image
               src="/images/Tapplogo.png"
               alt="AMDAANI logo"
               fill
               className="object-contain p-1.5"
-              sizes="48px"
+              sizes="44px"
               priority
             />
           </div>
@@ -178,7 +267,7 @@ export function AppSidebar({ ...props }) {
             <span className="font-black text-[19px] text-slate-900 tracking-tight leading-none truncate">
               AMDAANI
             </span>
-            <span className="text-[11px] font-medium text-slate-400 mt-1.5 tracking-wide">
+            <span className="text-[11px] font-medium text-slate-400 mt-1 tracking-wide">
               Free plan
             </span>
           </div>
@@ -186,9 +275,11 @@ export function AppSidebar({ ...props }) {
       </SidebarHeader>
 
       {/* ---------------- NAV ---------------- */}
-      <SidebarContent className="px-2.5 py-4">
+      <SidebarContent className="px-2.5 py-2 gap-0.5">
         {sections.map((section, sIdx) => {
-          const visibleItems = section.items.filter((item) => isItemVisible(item, flags));
+          const visibleItems = section.items.filter((item) =>
+            isItemVisible(item, flags),
+          );
           const showReportsRow = section.label === "Reports & Insights";
           const hasReportsContent = showReportsRow;
 
@@ -196,15 +287,16 @@ export function AppSidebar({ ...props }) {
 
           return (
             <React.Fragment key={section.label}>
-              <SidebarGroup>
-                <SidebarGroupLabel className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider px-2 mb-2">
+              <SidebarGroup className="py-1">
+                <SidebarGroupLabel className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider px-2 mb-1">
                   {section.label}
                 </SidebarGroupLabel>
-                <SidebarMenu className="gap-1">
+                <SidebarMenu className="gap-0.5">
                   {visibleItems.map((item) => {
                     const isActive =
                       pathname === item.url ||
-                      (item.url !== "/dashboard" && pathname?.startsWith(item.url));
+                      (item.url !== "/dashboard" &&
+                        pathname?.startsWith(item.url));
 
                     return (
                       <SidebarMenuItem key={item.title}>
@@ -212,7 +304,7 @@ export function AppSidebar({ ...props }) {
                           onClick={() => router.push(item.url)}
                           isActive={isActive}
                           tooltip={item.title}
-                          className={`relative h-11 rounded-xl px-3 transition-all duration-150 cursor-pointer ${
+                          className={`relative h-10 rounded-xl px-3 transition-all duration-150 cursor-pointer ${
                             isActive
                               ? "bg-gradient-to-r from-blue-600 to-blue-600/95 hover:from-blue-600 hover:to-blue-600/95 shadow-sm shadow-blue-200"
                               : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
@@ -227,7 +319,9 @@ export function AppSidebar({ ...props }) {
                             }`}
                             strokeWidth={2}
                           />
-                          <span className={`font-semibold text-[13.5px] ${isActive ? "!text-white" : ""}`}>
+                          <span
+                            className={`font-semibold text-[13.5px] ${isActive ? "!text-white" : ""}`}
+                          >
                             {item.title}
                           </span>
                         </SidebarMenuButton>
@@ -241,7 +335,7 @@ export function AppSidebar({ ...props }) {
                         onClick={() => setReportsOpen((prev) => !prev)}
                         isActive={isReportsActive}
                         tooltip="Reports"
-                        className={`relative h-11 rounded-xl px-3 transition-all duration-150 cursor-pointer ${
+                        className={`relative h-10 rounded-xl px-3 transition-all duration-150 cursor-pointer ${
                           isReportsActive
                             ? "bg-gradient-to-r from-blue-600 to-blue-600/95 hover:from-blue-600 hover:to-blue-600/95 shadow-sm shadow-blue-200"
                             : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
@@ -254,7 +348,9 @@ export function AppSidebar({ ...props }) {
                           className={`w-[18px] h-[18px] shrink-0 ${isReportsActive ? "!text-white" : "text-slate-400"}`}
                           strokeWidth={2}
                         />
-                        <span className={`font-semibold text-[13.5px] ${isReportsActive ? "!text-white" : ""}`}>
+                        <span
+                          className={`font-semibold text-[13.5px] ${isReportsActive ? "!text-white" : ""}`}
+                        >
                           Reports
                         </span>
                         <ChevronRight
@@ -266,7 +362,7 @@ export function AppSidebar({ ...props }) {
                       </SidebarMenuButton>
 
                       {reportsOpen && (
-                        <SidebarMenuSub className="mt-1 ml-3.5 pl-3 border-l border-slate-100 gap-0.5 group-data-[collapsible=icon]:hidden">
+                        <SidebarMenuSub className="mt-0.5 ml-3.5 pl-3 border-l border-slate-100 gap-0.5 group-data-[collapsible=icon]:hidden">
                           {visibleReportItems.map((item) => {
                             const isSubActive = pathname === item.url;
                             return (
@@ -274,7 +370,7 @@ export function AppSidebar({ ...props }) {
                                 <SidebarMenuSubButton
                                   onClick={() => router.push(item.url)}
                                   isActive={isSubActive}
-                                  className={`h-9 rounded-lg px-2.5 text-[13px] font-medium transition-all duration-150 cursor-pointer ${
+                                  className={`h-8 rounded-lg px-2.5 text-[13px] font-medium transition-all duration-150 cursor-pointer ${
                                     isSubActive
                                       ? "bg-blue-50 text-blue-700"
                                       : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
@@ -296,32 +392,23 @@ export function AppSidebar({ ...props }) {
                 </SidebarMenu>
               </SidebarGroup>
 
-              {sIdx < sections.length - 1 && <SidebarSeparator className="my-2.5" />}
+              {sIdx < sections.length - 1 && (
+                <SidebarSeparator className="my-1" />
+              )}
             </React.Fragment>
           );
         })}
       </SidebarContent>
 
       {/* ---------------- FOOTER ---------------- */}
-      <SidebarFooter className="border-t border-slate-100 px-2.5 py-3">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              onClick={() => router.push("/dashboard/settings")}
-              className="h-10 rounded-xl px-3 text-slate-600 hover:bg-slate-50 hover:text-slate-900 cursor-pointer"
-              tooltip="Settings"
-            >
-              <Settings className="w-[18px] h-[18px] text-slate-400" strokeWidth={2} />
-              <span className="font-semibold text-[13.5px]">Settings</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-
+      <SidebarFooter className="border-t border-slate-100 px-2.5 py-2.5">
+        <SidebarMenu className="gap-0.5">
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton
                   size="lg"
-                  className="h-14 rounded-xl px-2.5 mt-1.5 hover:bg-slate-50 data-[state=open]:bg-slate-50 border border-transparent hover:border-slate-100 cursor-pointer"
+                  className="h-13 rounded-xl px-2.5 mt-1 hover:bg-slate-50 data-[state=open]:bg-slate-50 border border-transparent hover:border-slate-100 cursor-pointer"
                 >
                   <Avatar className="h-8 w-8 rounded-lg border border-slate-200 shrink-0 bg-white">
                     <AvatarImage
@@ -334,13 +421,21 @@ export function AppSidebar({ ...props }) {
                     </AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden min-w-0">
-                    <span className="truncate font-bold text-[13.5px] text-slate-800">{user.name}</span>
-                    <span className="truncate text-[11.5px] text-slate-400">{user.email}</span>
+                    <span className="truncate font-bold text-[13.5px] text-slate-800">
+                      {user.name}
+                    </span>
+                    <span className="truncate text-[11.5px] text-slate-400">
+                      {user.email}
+                    </span>
                   </div>
                   <ChevronsUpDown className="ml-auto w-4 h-4 text-slate-300 group-data-[collapsible=icon]:hidden" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56 rounded-xl" side="top" align="start">
+              <DropdownMenuContent
+                className="w-56 rounded-xl"
+                side="top"
+                align="start"
+              >
                 <DropdownMenuItem
                   onClick={() => router.push("/dashboard/settings")}
                   className="gap-2 cursor-pointer"

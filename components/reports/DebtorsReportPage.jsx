@@ -418,272 +418,185 @@ export default function DebtorsReportPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto">
-      {/* ---------------- HEADER ---------------- */}
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => window.history.back()}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <h1 className="text-lg font-bold text-slate-900">Sundry Debtors Report</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={exportPDF}
-            disabled={!hasData || loading}
-            className="h-9 px-3 rounded-lg border border-slate-200 text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium"
-          >
-            <FileText className="w-4 h-4" />
-            PDF
-          </button>
-          <button
-            onClick={exportExcel}
-            disabled={!hasData || loading}
-            className="h-9 px-3 rounded-lg border border-slate-200 text-emerald-600 hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium"
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            Excel
-          </button>
-        </div>
-      </div>
-
-      {/* ---------------- FILTERS ---------------- */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-4 mb-5 space-y-3.5">
-        {/* Date range */}
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-            <input
-              type="date"
-              value={toInputDate(startDate)}
-              max={toInputDate(new Date())}
-              onChange={(e) => {
-                setActiveRange(null);
-                setStartDate(e.target.value ? new Date(e.target.value) : null);
-              }}
-              className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-            />
-          </div>
-          <div className="relative flex-1">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-            <input
-              type="date"
-              value={toInputDate(endDate)}
-              max={toInputDate(new Date())}
-              onChange={(e) => {
-                setActiveRange(null);
-                setEndDate(e.target.value ? new Date(e.target.value) : null);
-              }}
-              className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-            />
-          </div>
-          <button
-            onClick={clearAll}
-            disabled={loading}
-            title="Clear filters"
-            className="h-10 w-10 shrink-0 rounded-xl border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <CalendarX2 className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Today / Yesterday / This Week toggle */}
-        <div className="flex p-1 bg-slate-100 rounded-xl">
-          {[
-            { value: "today", label: "Today", fn: applyToday },
-            { value: "yesterday", label: "Yesterday", fn: applyYesterday },
-            { value: "thisWeek", label: "This Week", fn: applyThisWeek },
-          ].map((opt) => (
-            <button
-              key={opt.value}
-              onClick={opt.fn}
-              disabled={loading}
-              className={`flex-1 h-9 rounded-lg text-xs font-semibold transition-colors ${
-                activeRange === opt.value ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              {opt.label}
+    <div className="h-full flex flex-col overflow-hidden bg-slate-50/40">
+      <div className="px-4 md:px-6 pt-4 pb-3 shrink-0">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <button onClick={() => window.history.back()} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100">
+              <ChevronLeft className="w-4 h-4" />
             </button>
-          ))}
-        </div>
-
-        {/* This Year / This Month / Prev Month */}
-        <div className="flex gap-2">
-          {[
-            { label: "This Year", fn: applyThisYear },
-            { label: "This Month", fn: applyThisMonth },
-            { label: "Prev Month", fn: applyPreviousMonth },
-          ].map(({ label, fn }) => (
-            <button
-              key={label}
-              onClick={fn}
-              disabled={loading}
-              className="flex-1 h-9 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-            >
-              {label}
+            <h1 className="text-lg font-bold text-slate-900">Sundry Debtors Report</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={exportPDF} disabled={!hasData || loading} className="h-9 px-3 rounded-lg border border-slate-200 text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium">
+              <FileText className="w-4 h-4" />PDF
             </button>
-          ))}
+            <button onClick={exportExcel} disabled={!hasData || loading} className="h-9 px-3 rounded-lg border border-slate-200 text-emerald-600 hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium">
+              <FileSpreadsheet className="w-4 h-4" />Excel
+            </button>
+          </div>
         </div>
 
-        <button
-          onClick={fetchReport}
-          disabled={loading || (!startDate && !endDate)}
-          className="w-full h-10 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-sm font-semibold flex items-center justify-center gap-2 transition-colors"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          {loading ? "Loading..." : "Generate"}
-        </button>
-      </div>
-
-      {/* ---------------- CONTENT ---------------- */}
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-          <RefreshCw className="w-6 h-6 animate-spin mb-2" />
-          <span className="text-sm">Loading...</span>
-        </div>
-      ) : !hasData ? (
-        <div className="flex items-center justify-center py-20 text-slate-400 text-sm text-center">
-          {emptyMessage}
-        </div>
-      ) : (
-        <>
-          {/* Summary */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl px-5 py-4 mb-5">
-            <div className="text-xs text-slate-400 mb-3">{formattedRange}</div>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <SummaryStat label="Customers" value={String(totals.customerCount)} />
-              <SummaryStat label="Invoices" value={String(totals.invoiceCount)} />
-              <SummaryStat label="Sale" value={currency(totals.totalSale)} />
-              <SummaryStat label="Paid" value={currency(totals.totalPaid)} accent="text-emerald-600" />
-              <SummaryStat
-                label="Due"
-                value={currency(totals.totalDue)}
-                accent={totals.totalDue > 0 ? "text-red-600" : "text-emerald-600"}
-                bold
-              />
+        {/* Single-row filter toolbar */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-3 flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <div className="relative">
+              <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+              <input type="date" value={toInputDate(startDate)} max={toInputDate(new Date())}
+                onChange={(e) => { setActiveRange(null); setStartDate(e.target.value ? new Date(e.target.value) : null); }}
+                className="h-9 w-[150px] pl-8 pr-2 rounded-lg border border-slate-200 text-[13px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
+            </div>
+            <span className="text-slate-300 text-xs">–</span>
+            <div className="relative">
+              <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+              <input type="date" value={toInputDate(endDate)} max={toInputDate(new Date())}
+                onChange={(e) => { setActiveRange(null); setEndDate(e.target.value ? new Date(e.target.value) : null); }}
+                className="h-9 w-[150px] pl-8 pr-2 rounded-lg border border-slate-200 text-[13px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
             </div>
           </div>
 
-          {/* Customer list */}
-          <div className="space-y-3">
-            {customers.map((customer, idx) => {
-              const id = getCustomerId(customer, idx);
-              const isExpanded = !!expandedCustomers[id];
-              const ct = getCustomerTotals(customer);
-              const sortedInvoices = [...(customer.invoices || [])].sort(
-                (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-              );
+          <div className="h-6 w-px bg-slate-200 shrink-0" />
 
-              return (
-                <div
-                  key={id}
-                  className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden"
-                >
-                  {/* Customer header row */}
-                  <button
-                    onClick={() => toggleCustomer(id)}
-                    className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 transition-colors"
-                  >
-                    <div className="flex-1 text-left min-w-0">
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-blue-500 shrink-0" />
-                        <span className="text-sm font-bold text-slate-800 truncate">
-                          {customer.customerName || "Walk-in Customer"}
-                        </span>
-                      </div>
-                      {customer.customerMobile && (
-                        <div className="flex items-center gap-1 mt-1 pl-6">
-                          <Phone className="w-3 h-3 text-slate-400" />
-                          <span className="text-xs text-slate-400">{customer.customerMobile}</span>
-                        </div>
-                      )}
-                    </div>
-                    <span className="text-xs text-slate-400 mr-3 shrink-0">
-                      {ct.totalInvoices} invoices
-                    </span>
-                    {isExpanded ? (
-                      <ChevronUp className="w-4 h-4 text-slate-400 shrink-0" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-                    )}
-                  </button>
-
-                  {/* Customer summary chips */}
-                  <div className="grid grid-cols-3 gap-4 px-5 py-3 border-t border-slate-100 bg-slate-50/50">
-                    <SummaryStat label="Sale" value={currency(ct.totalSale)} />
-                    <SummaryStat label="Paid" value={currency(ct.totalPaid)} accent="text-emerald-600" />
-                    <SummaryStat
-                      label="Due"
-                      value={currency(ct.totalDue)}
-                      accent={ct.totalDue > 0 ? "text-red-600" : "text-emerald-600"}
-                    />
-                  </div>
-
-                  {/* Invoice table */}
-                  {isExpanded && (
-                    <div className="overflow-x-auto border-t border-slate-100">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
-                            <th className="text-left font-semibold px-4 py-2.5">Date</th>
-                            <th className="text-left font-semibold px-4 py-2.5">Invoice No</th>
-                            <th className="text-right font-semibold px-4 py-2.5">Grand Total</th>
-                            <th className="text-right font-semibold px-4 py-2.5">Paid</th>
-                            <th className="text-right font-semibold px-4 py-2.5">Due</th>
-                            <th className="text-center font-semibold px-4 py-2.5">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {sortedInvoices.length === 0 ? (
-                            <tr>
-                              <td colSpan={6} className="px-4 py-6 text-center text-slate-400 text-sm">
-                                No invoices
-                              </td>
-                            </tr>
-                          ) : (
-                            sortedInvoices.map((inv, i) => {
-                              const ps = getPaymentStatus(inv);
-                              return (
-                                <tr key={inv._id || i} className="hover:bg-slate-50 transition-colors">
-                                  <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">
-                                    {inv.createdAt ? new Date(inv.createdAt).toLocaleDateString("en-IN") : "-"}
-                                  </td>
-                                  <td className="px-4 py-2.5 text-slate-700">{safe(inv.invoiceNumber)}</td>
-                                  <td className="px-4 py-2.5 text-right text-slate-600">{currency(inv.grandTotal)}</td>
-                                  <td className="px-4 py-2.5 text-right text-emerald-600">{currency(inv.amountPaid)}</td>
-                                  <td
-                                    className={`px-4 py-2.5 text-right font-medium ${
-                                      num(inv.amountDue) > 0 ? "text-red-600" : "text-emerald-600"
-                                    }`}
-                                  >
-                                    {currency(inv.amountDue)}
-                                  </td>
-                                  <td className="px-4 py-2.5 text-center">
-                                    <span
-                                      className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium capitalize ${statusBg(
-                                        ps
-                                      )} ${statusColor(ps)}`}
-                                    >
-                                      {ps}
-                                    </span>
-                                  </td>
-                                </tr>
-                              );
-                            })
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {[
+              { value: "today", label: "Today", fn: applyToday },
+              { value: "yesterday", label: "Yesterday", fn: applyYesterday },
+              { value: "thisWeek", label: "This Week", fn: applyThisWeek },
+            ].map((opt) => (
+              <button key={opt.value} onClick={opt.fn} disabled={loading}
+                className={`h-9 px-3 rounded-lg text-[12.5px] font-semibold transition-colors ${activeRange === opt.value ? "bg-blue-50 text-blue-600 border border-blue-200" : "text-slate-500 border border-slate-200 hover:bg-slate-50"}`}>
+                {opt.label}
+              </button>
+            ))}
           </div>
-        </>
-      )}
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            {[
+              { label: "This Year", fn: applyThisYear },
+              { label: "This Month", fn: applyThisMonth },
+              { label: "Prev Month", fn: applyPreviousMonth },
+            ].map(({ label, fn }) => (
+              <button key={label} onClick={fn} disabled={loading}
+                className="h-9 px-3 rounded-lg border border-slate-200 text-[12.5px] font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <button onClick={clearAll} disabled={loading} title="Clear filters"
+            className="h-9 w-9 shrink-0 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-40">
+            <CalendarX2 className="w-4 h-4" />
+          </button>
+
+          <button onClick={fetchReport} disabled={loading || (!startDate && !endDate)}
+            className="h-9 px-4 ml-auto shrink-0 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-[13px] font-semibold flex items-center gap-2 transition-colors">
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+            {loading ? "Loading..." : "Generate"}
+          </button>
+        </div>
+      </div>
+
+      {/* ---------------- CONTENT (scrolls internally) ---------------- */}
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-4">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+            <RefreshCw className="w-6 h-6 animate-spin mb-2" />
+            <span className="text-sm">Loading...</span>
+          </div>
+        ) : !hasData ? (
+          <div className="flex items-center justify-center py-20 text-slate-400 text-sm text-center">
+            {emptyMessage}
+          </div>
+        ) : (
+          <>
+            <div className="bg-white border border-slate-200/80 rounded-2xl px-5 py-3.5 mb-4">
+              <div className="text-xs text-slate-400 mb-2">{formattedRange}</div>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <SummaryStat label="Customers" value={String(totals.customerCount)} />
+                <SummaryStat label="Invoices" value={String(totals.invoiceCount)} />
+                <SummaryStat label="Sale" value={currency(totals.totalSale)} />
+                <SummaryStat label="Paid" value={currency(totals.totalPaid)} accent="text-emerald-600" />
+                <SummaryStat label="Due" value={currency(totals.totalDue)} accent={totals.totalDue > 0 ? "text-red-600" : "text-emerald-600"} bold />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {customers.map((customer, idx) => {
+                const id = getCustomerId(customer, idx);
+                const isExpanded = !!expandedCustomers[id];
+                const ct = getCustomerTotals(customer);
+                const sortedInvoices = [...(customer.invoices || [])].sort(
+                  (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+                );
+                return (
+                  <div key={id} className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden">
+                    <button onClick={() => toggleCustomer(id)} className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 transition-colors">
+                      <div className="flex-1 text-left min-w-0">
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4 text-blue-500 shrink-0" />
+                          <span className="text-sm font-bold text-slate-800 truncate">{customer.customerName || "Walk-in Customer"}</span>
+                        </div>
+                        {customer.customerMobile && (
+                          <div className="flex items-center gap-1 mt-1 pl-6">
+                            <Phone className="w-3 h-3 text-slate-400" />
+                            <span className="text-xs text-slate-400">{customer.customerMobile}</span>
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-xs text-slate-400 mr-3 shrink-0">{ct.totalInvoices} invoices</span>
+                      {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400 shrink-0" /> : <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />}
+                    </button>
+
+                    <div className="grid grid-cols-3 gap-4 px-5 py-3 border-t border-slate-100 bg-slate-50/50">
+                      <SummaryStat label="Sale" value={currency(ct.totalSale)} />
+                      <SummaryStat label="Paid" value={currency(ct.totalPaid)} accent="text-emerald-600" />
+                      <SummaryStat label="Due" value={currency(ct.totalDue)} accent={ct.totalDue > 0 ? "text-red-600" : "text-emerald-600"} />
+                    </div>
+
+                    {isExpanded && (
+                      <div className="overflow-x-auto border-t border-slate-100">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+                              <th className="text-left font-semibold px-4 py-2.5">Date</th>
+                              <th className="text-left font-semibold px-4 py-2.5">Invoice No</th>
+                              <th className="text-right font-semibold px-4 py-2.5">Grand Total</th>
+                              <th className="text-right font-semibold px-4 py-2.5">Paid</th>
+                              <th className="text-right font-semibold px-4 py-2.5">Due</th>
+                              <th className="text-center font-semibold px-4 py-2.5">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {sortedInvoices.length === 0 ? (
+                              <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-400 text-sm">No invoices</td></tr>
+                            ) : (
+                              sortedInvoices.map((inv, i) => {
+                                const ps = getPaymentStatus(inv);
+                                return (
+                                  <tr key={inv._id || i} className="hover:bg-slate-50 transition-colors">
+                                    <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{inv.createdAt ? new Date(inv.createdAt).toLocaleDateString("en-IN") : "-"}</td>
+                                    <td className="px-4 py-2.5 text-slate-700">{safe(inv.invoiceNumber)}</td>
+                                    <td className="px-4 py-2.5 text-right text-slate-600">{currency(inv.grandTotal)}</td>
+                                    <td className="px-4 py-2.5 text-right text-emerald-600">{currency(inv.amountPaid)}</td>
+                                    <td className={`px-4 py-2.5 text-right font-medium ${num(inv.amountDue) > 0 ? "text-red-600" : "text-emerald-600"}`}>{currency(inv.amountDue)}</td>
+                                    <td className="px-4 py-2.5 text-center">
+                                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium capitalize ${statusBg(ps)} ${statusColor(ps)}`}>{ps}</span>
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
