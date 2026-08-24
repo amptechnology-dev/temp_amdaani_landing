@@ -225,7 +225,7 @@ export default function CTASection() {
                     className="w-full h-full flex items-center justify-center bg-white"
                   >
                     <img
-                      src="/images/amdaaniplaystore.jpeg"
+                      src="/images/amdaaniplaystore.png"
                       alt="Amdaani on Google Play"
                       className="w-full h-full object-cover"
                     />

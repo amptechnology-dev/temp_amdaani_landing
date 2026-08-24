@@ -219,7 +219,7 @@ export default function Navigation({
 
   const navigationItems = [
     { name: "Home", ref: heroRef, Icon: IconHome },
-    { name: "About Us", ref: aboutRef, Icon: IconAbout },
+    // { name: "About Us", ref: aboutRef, Icon: IconAbout },
     { name: "Testimonial", ref: testimonialsRef, Icon: IconTestimonial },
     { name: "Pricing", ref: pricingRef, Icon: IconPricing },
     { name: "FAQ", ref: faqRef, Icon: IconFaq },
