@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { format } from "date-fns";
-import { FileText, Check, Loader2 } from "lucide-react";
+import { FileText, Check, Loader2, Printer, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -34,16 +34,14 @@ export default function InvoiceSummary({
 }) {
   const [previewHtml, setPreviewHtml] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
+  const iframeRef = useRef(null);
 
-  // ✅ NEW — store-e save kora print preference (a4 / a5), default a4
+  // Store-e save kora print preference (a4 / a5), default a4
   const pageFormat = storedata?.settings?.printMode === "a5" ? "a5" : "a4";
 
-  const handlePreview = () => {
-    if (!cartItems?.length) return;
-
+  const buildHtml = () => {
     const now = new Date();
-
-    const html = generateInvoiceHTML({
+    return generateInvoiceHTML({
       preview: false,
       createdInvoice: false,
       invoiceData: {
@@ -64,16 +62,39 @@ export default function InvoiceSummary({
       isMrpEnabled,
       isFreePlan,
       appBrand,
-      pageFormat, // ✅ NEW
+      pageFormat,
       payment: {
         paid: payment?.paid ?? 0,
         due: payment?.due ?? 0,
         status: payment?.status ?? "unpaid",
       },
     });
+  };
 
-    setPreviewHtml(html);
+  const handlePreview = () => {
+    if (!cartItems?.length) return;
+    setPreviewHtml(buildHtml());
     setPreviewOpen(true);
+  };
+
+  const handlePrint = () => {
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return;
+    win.focus();
+    win.print();
+  };
+
+  const handleDownload = () => {
+    if (!previewHtml) return;
+    const blob = new Blob([previewHtml], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Invoice-${invoiceNumber}.html`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -111,10 +132,21 @@ export default function InvoiceSummary({
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-3xl w-full h-[85vh] p-0 flex flex-col overflow-hidden">
-          <DialogHeader className="px-4 py-2 border-b shrink-0">
+          <DialogHeader className="px-4 py-2 border-b shrink-0 flex flex-row items-center justify-between pr-10 space-y-0">
             <DialogTitle>Invoice Preview</DialogTitle>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={handlePrint}>
+                <Printer className="w-3.5 h-3.5 mr-1.5" />
+                Print
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleDownload}>
+                <Download className="w-3.5 h-3.5 mr-1.5" />
+                Download
+              </Button>
+            </div>
           </DialogHeader>
           <iframe
+            ref={iframeRef}
             title="invoice-preview"
             srcDoc={previewHtml}
             className="flex-1 w-full border-0 bg-white"

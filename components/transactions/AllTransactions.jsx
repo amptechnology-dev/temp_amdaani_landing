@@ -6,8 +6,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "../../context/ThemeContext";
 import { themeConfig } from "../../utils/ThemeConfig";
 import api from "../../utils/api";
-import { motion, AnimatePresence } from "framer-motion";
-import { formatDistanceToNow } from "date-fns";
+import { motion } from "framer-motion";
+import { formatDistanceToNow, format } from "date-fns";
 import {
   Search,
   Loader2,
@@ -21,17 +21,12 @@ import {
   Wallet,
   FileText,
   Printer,
+  Eye,
+  RefreshCw,
+  Receipt,
 } from "lucide-react";
 
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -40,6 +35,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 import { generateInvoiceHTML } from "../../utils/invoiceTemplate";
 import { generatePurchaseHTML } from "../../utils/purchaseTemplate";
@@ -52,6 +54,11 @@ const DATE_FILTERS = [
   { key: "week", label: "This Week" },
   { key: "month", label: "This Month" },
   { key: "all", label: "All Time" },
+];
+
+const TAB_FILTERS = [
+  { key: "customers", label: "Customers" },
+  { key: "vendors", label: "Vendors" },
 ];
 
 const getStartDate = (filter) => {
@@ -383,6 +390,11 @@ export default function AllTransactionsPage() {
   const [vendorSearch, setVendorSearch] = useState("");
   const [vendorFilter, setVendorFilter] = useState("month");
 
+  const [limit, setLimit] = useState(10);
+  const [page, setPage] = useState(1);
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   // ---- preview dialog state ----
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -392,16 +404,24 @@ export default function AllTransactionsPage() {
   const { data: storedata } = useQuery({
     queryKey: ["store"],
     queryFn: fetchStoreData,
-    staleTime: 5 * 60 * 1000, // store info rarely changes
+    staleTime: 5 * 60 * 1000,
   });
 
-  const { data: customerData, isLoading: customerLoading } = useQuery({
+  const {
+    data: customerData,
+    isLoading: customerLoading,
+    refetch: refetchCustomers,
+  } = useQuery({
     queryKey: ["customer-payments", { filter: customerFilter }],
     queryFn: fetchCustomerPayments,
     staleTime: 20000,
   });
 
-  const { data: vendorData, isLoading: vendorLoading } = useQuery({
+  const {
+    data: vendorData,
+    isLoading: vendorLoading,
+    refetch: refetchVendors,
+  } = useQuery({
     queryKey: ["vendor-payments", { filter: vendorFilter }],
     queryFn: fetchVendorPayments,
     staleTime: 20000,
@@ -462,6 +482,39 @@ export default function AllTransactionsPage() {
   const list = isVendorTab ? processedVendorPayments : processedCustomerPayments;
   const total = isVendorTab ? vendorTotal : customerTotal;
   const count = isVendorTab ? vendorCount : customerCount;
+
+  // reset to page 1 whenever the underlying list changes shape
+  const totalPages = Math.max(1, Math.ceil(list.length / limit));
+  const pagedList = list.slice((page - 1) * limit, page * limit);
+
+  const handleTabChange = (key) => {
+    setActiveTab(key);
+    setPage(1);
+  };
+
+  const handleFilterChange = (key) => {
+    setFilter(key);
+    setPage(1);
+  };
+
+  const handleSearchChange = (e) => {
+    setSearch(e.target.value);
+    setPage(1);
+  };
+
+  const handleClearSearch = () => {
+    setSearch("");
+    setPage(1);
+  };
+
+  const refreshData = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([refetchCustomers(), refetchVendors()]);
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
+  };
 
   // -------------------------------
   // Preview: fetch full record + rebuild printable HTML — no route change
@@ -585,7 +638,7 @@ export default function AllTransactionsPage() {
     }
   };
 
-  const handleCardClick = (item) => {
+  const handleRowClick = (item) => {
     if (isVendorTab && item.purchase?._id) {
       openPurchasePreview(item.purchase._id, item.purchase?.invoiceNumber);
     } else if (!isVendorTab && item.invoice?._id) {
@@ -593,255 +646,318 @@ export default function AllTransactionsPage() {
     }
   };
 
+  // Combined chip list: tab chips + date chips (Expenses-page pattern)
+  const chips = [...TAB_FILTERS, ...DATE_FILTERS];
+
+  const isChipActive = (chip) => {
+    const isTabChip = TAB_FILTERS.some((f) => f.key === chip.key);
+    if (isTabChip) return activeTab === chip.key;
+    return filter === chip.key;
+  };
+
+  const handleChipClick = (chip) => {
+    const isTabChip = TAB_FILTERS.some((f) => f.key === chip.key);
+    if (isTabChip) {
+      handleTabChange(chip.key);
+    } else {
+      handleFilterChange(chip.key);
+    }
+  };
+
   return (
-    <div className={`min-h-screen p-6 ${currentTheme.background}`}>
-      <div className="flex items-center justify-between mb-6">
+    <div className={`min-h-screen p-3 md:p-4 ${currentTheme.background}`}>
+      {/* Header — compact, Expenses-page style */}
+      <div className="flex items-center justify-between mb-3">
         <div>
-          <h1 className={`text-2xl font-bold ${currentTheme.text}`}>
+          <h1 className={`text-lg md:text-xl font-bold ${currentTheme.text}`}>
             All Transactions
           </h1>
-          <p className={currentTheme.textSecondary}>
+          <p className={`text-xs ${currentTheme.textSecondary}`}>
             Payments received from customers & paid to vendors
           </p>
         </div>
-      </div>
-
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
-        <TabsList className="grid grid-cols-2 w-full max-w-sm">
-          <TabsTrigger value="customers" className="gap-1.5">
-            <ArrowDownCircle className="w-4 h-4" />
-            Customers
-            {customerCount > 0 && (
-              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">
-                {customerCount > 99 ? "99+" : customerCount}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="vendors" className="gap-1.5">
-            <ArrowUpCircle className="w-4 h-4" />
-            Vendors
-            {vendorCount > 0 && (
-              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">
-                {vendorCount > 99 ? "99+" : vendorCount}
-              </Badge>
-            )}
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      {/* Search */}
-      <Card className={`mb-4 ${currentTheme.card}`}>
-        <CardContent className="p-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <Input
-              placeholder={
-                isVendorTab
-                  ? "Search vendor / invoice..."
-                  : "Search invoices..."
-              }
-              className="pl-10 rounded-full"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={refreshData}
+            disabled={isRefreshing}
+          >
+            <RefreshCw
+              className={`w-3.5 h-3.5 mr-1.5 ${isRefreshing ? "animate-spin" : ""}`}
             />
-            {search && (
-              <X
-                onClick={() => setSearch("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 cursor-pointer text-gray-400"
-              />
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Date filter chips */}
-      <div className="flex gap-2 overflow-x-auto pb-1 mb-4 no-scrollbar">
-        {DATE_FILTERS.map((f) => (
-          <button
-            key={f.key}
-            disabled={loading}
-            onClick={() => setFilter(f.key)}
-            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap border transition-colors disabled:opacity-60 ${
-              filter === f.key
-                ? "bg-blue-50 text-blue-600 border-blue-200"
-                : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+            Refresh
+          </Button>
+        </div>
       </div>
 
-      {/* Overview card */}
-      <Card className={`mb-4 ${currentTheme.card}`}>
-        <CardContent className="p-5 flex items-center gap-4">
-          <div
-            className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
-            style={{ backgroundColor: isVendorTab ? "#DC2626" : "#2563EB" }}
-          >
-            {isVendorTab ? (
-              <ArrowUpCircle className="w-5 h-5 text-white" />
-            ) : (
-              <ArrowDownCircle className="w-5 h-5 text-white" />
-            )}
+      {/* Summary strip — compact single row */}
+      <div className="grid grid-cols-2 gap-2 mb-2.5">
+        <div className="bg-white rounded-lg border border-slate-200 px-3 py-2 flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+            <ArrowDownCircle className="w-3.5 h-3.5 text-blue-600" />
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-bold text-slate-800">
-              {isVendorTab ? "Amount Paid" : "Amount Received"}
+          <div className="min-w-0">
+            <p className="text-[10px] text-slate-400 leading-tight">
+              Received ({customerCount})
             </p>
-            <p className="text-xs text-slate-400">
-              {isVendorTab ? "Total paid to vendors" : "Total received from customers"}
+            <p className="text-sm font-bold text-blue-600 leading-tight">
+              {customerLoading ? "…" : formatAmount(customerTotal)}
             </p>
           </div>
-          <div className="text-right shrink-0">
-            {loading ? (
-              <Loader2 className="w-5 h-5 animate-spin text-slate-300 ml-auto" />
-            ) : (
-              <>
-                <p
-                  className="text-xl font-bold"
-                  style={{ color: isVendorTab ? "#DC2626" : "#2563EB" }}
-                >
-                  {formatAmount(total)}
-                </p>
-                <p className="text-xs text-slate-400">
-                  {count} transaction{count !== 1 ? "s" : ""}
-                </p>
-              </>
-            )}
+        </div>
+        <div className="bg-white rounded-lg border border-slate-200 px-3 py-2 flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
+            <ArrowUpCircle className="w-3.5 h-3.5 text-red-600" />
           </div>
-        </CardContent>
-      </Card>
+          <div className="min-w-0">
+            <p className="text-[10px] text-slate-400 leading-tight">
+              Paid ({vendorCount})
+            </p>
+            <p className="text-sm font-bold text-red-600 leading-tight">
+              {vendorLoading ? "…" : formatAmount(vendorTotal)}
+            </p>
+          </div>
+        </div>
+      </div>
 
-      {/* Transactions list */}
-      <Card className={`${currentTheme.card} overflow-hidden`}>
-        <CardHeader className={currentTheme.surfaceVariant}>
-          <CardTitle>{isVendorTab ? "Vendor Payments" : "Customer Payments"}</CardTitle>
-          <CardDescription>
-            Showing {list.length} {isVendorTab ? "payment(s) made" : "payment(s) received"}
-          </CardDescription>
-        </CardHeader>
+      {/* Search + limit — compact single row */}
+      <div className="flex gap-2 mb-2.5">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+          <Input
+            placeholder={
+              isVendorTab ? "Search vendor / invoice…" : "Search invoices…"
+            }
+            className="pl-9 h-8 text-sm rounded-lg"
+            value={search}
+            onChange={handleSearchChange}
+          />
+          {search && (
+            <X
+              onClick={handleClearSearch}
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 cursor-pointer text-gray-400"
+            />
+          )}
+        </div>
 
-        <CardContent className="p-4">
-          {loading ? (
-            <div className="flex items-center justify-center py-16 text-slate-400">
-              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-              Loading transactions...
-            </div>
-          ) : list.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              {isVendorTab ? (
-                <ArrowUpCircle className="w-10 h-10 text-slate-300 mb-3" />
-              ) : (
-                <ArrowDownCircle className="w-10 h-10 text-slate-300 mb-3" />
-              )}
-              <p className="font-semibold text-slate-600">
-                No {isVendorTab ? "payments" : "receipts"} found
-              </p>
-              <p className="text-sm text-slate-400 mt-1 max-w-xs">
-                {search
-                  ? "Try adjusting your search terms"
-                  : `No ${isVendorTab ? "payments made" : "payments received"} in the selected period`}
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <AnimatePresence>
-                {list.map((item, index) => {
+        <Select
+          value={limit}
+          onValueChange={(v) => {
+            setLimit(Number(v));
+            setPage(1);
+          }}
+        >
+          <SelectTrigger className="w-[100px] h-8 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {[10, 25, 50, 100].map((x) => (
+              <SelectItem key={x} value={x}>
+                {x} / page
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Filter chips — tab + date combined, Expenses-page style */}
+      <div className="flex gap-1.5 overflow-x-auto pb-1 mb-2.5 no-scrollbar">
+        {chips.map((chip) => {
+          const active = isChipActive(chip);
+          const isTabChip = TAB_FILTERS.some((f) => f.key === chip.key);
+          return (
+            <button
+              key={chip.key}
+              disabled={loading && !isTabChip}
+              onClick={() => handleChipClick(chip)}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap border transition-colors disabled:opacity-60 ${
+                active
+                  ? isTabChip
+                    ? "bg-slate-800 text-white border-slate-800"
+                    : "bg-blue-600 text-white border-blue-600"
+                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              {chip.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ===== Excel-style dense table ===== */}
+      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+        <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-slate-50">
+          <span className="text-sm font-semibold text-slate-700">
+            {isVendorTab ? "Vendor Payments" : "Customer Payments"}
+          </span>
+          <span className="text-xs text-slate-400">
+            Showing {pagedList.length} of {list.length}
+          </span>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-14 text-slate-400 text-sm">
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Loading transactions...
+          </div>
+        ) : list.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-14 text-center">
+            <Receipt className="w-10 h-10 text-slate-300 mb-2" />
+            <p className="text-sm font-semibold text-slate-700">
+              No {isVendorTab ? "payments" : "receipts"} found
+            </p>
+            <p className="text-xs text-slate-400 max-w-xs mt-0.5">
+              {search
+                ? `No results match "${search}".`
+                : `No ${isVendorTab ? "payments made" : "payments received"} in the selected period.`}
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wide border-b border-slate-200">
+                  <th className="text-left font-semibold px-3 py-1.5 w-8">#</th>
+                  <th className="text-left font-semibold px-3 py-1.5">
+                    {isVendorTab ? "Vendor" : "Invoice #"}
+                  </th>
+                  {isVendorTab && (
+                    <th className="text-left font-semibold px-3 py-1.5">Invoice Ref</th>
+                  )}
+                  <th className="text-left font-semibold px-3 py-1.5">Method</th>
+                  <th className="text-left font-semibold px-3 py-1.5">Status</th>
+                  <th className="text-left font-semibold px-3 py-1.5">When</th>
+                  <th className="text-right font-semibold px-3 py-1.5">Amount</th>
+                  <th className="text-center font-semibold px-3 py-1.5 w-14">View</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pagedList.map((item, index) => {
                   const status = getStatusColor(item.status);
                   const PayIcon = getPaymentIcon(item.paymentMethod);
-
                   const primaryLabel = isVendorTab
                     ? item.purchase?.vendorName || "N/A"
                     : item.invoice?.invoiceNumber || "N/A";
                   const secondaryLabel = isVendorTab
-                    ? item.purchase?.invoiceNumber || "N/A"
+                    ? item.purchase?.invoiceNumber || "—"
                     : null;
 
                   return (
-                    <motion.div
+                    <motion.tr
                       key={item._id}
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -12 }}
-                      transition={{ duration: 0.2, delay: index * 0.02 }}
-                      onClick={() => handleCardClick(item)}
-                      className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 cursor-pointer hover:shadow-md hover:border-blue-200 transition-all"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.15 }}
+                      onClick={() => handleRowClick(item)}
+                      className={`cursor-pointer border-b border-slate-100 last:border-0 hover:bg-blue-50/60 transition-colors ${
+                        index % 2 === 1 ? "bg-slate-50/40" : "bg-white"
+                      }`}
                     >
-                      <div className="flex items-start gap-3">
-                        <div
-                          className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+                      <td className="px-3 py-1.5 text-slate-400 text-xs align-middle">
+                        {(page - 1) * limit + index + 1}
+                      </td>
+
+                      <td className="px-3 py-1.5 align-middle">
+                        <span className="font-medium text-slate-800 truncate">
+                          {primaryLabel}
+                        </span>
+                      </td>
+
+                      {isVendorTab && (
+                        <td className="px-3 py-1.5 text-slate-500 text-xs align-middle whitespace-nowrap">
+                          {secondaryLabel}
+                        </td>
+                      )}
+
+                      <td className="px-3 py-1.5 align-middle whitespace-nowrap">
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] flex items-center gap-1 w-fit capitalize"
+                        >
+                          <PayIcon className="w-3 h-3" />
+                          {item.paymentMethod || "—"}
+                        </Badge>
+                      </td>
+
+                      <td className="px-3 py-1.5 align-middle whitespace-nowrap">
+                        <span
+                          className="text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase"
                           style={{
-                            backgroundColor: isVendorTab ? "#FEF2F2" : "#EFF6FF",
+                            backgroundColor: status.bg,
+                            color: status.text,
+                            borderColor: status.border,
                           }}
                         >
-                          <PayIcon
-                            className="w-4 h-4"
-                            style={{ color: isVendorTab ? "#DC2626" : "#2563EB" }}
-                          />
+                          {item.status || "—"}
+                        </span>
+                      </td>
+
+                      <td className="px-3 py-1.5 text-slate-400 text-xs align-middle whitespace-nowrap">
+                        {item.createdAt
+                          ? formatDistanceToNow(new Date(item.createdAt), {
+                              addSuffix: true,
+                            })
+                          : "—"}
+                      </td>
+
+                      <td className="px-3 py-1.5 text-right align-middle whitespace-nowrap">
+                        <span
+                          className="font-semibold text-xs"
+                          style={{ color: isVendorTab ? "#DC2626" : "#2563EB" }}
+                        >
+                          {formatAmount(item.amount)}
+                        </span>
+                      </td>
+
+                      <td
+                        className="px-3 py-1.5 align-middle"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex items-center justify-center">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            onClick={() => handleRowClick(item)}
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </Button>
                         </div>
-
-                        <div className="flex-1 min-w-0">
-                          <div className="flex justify-between items-start gap-2">
-                            <p className="font-semibold text-slate-800 text-sm truncate">
-                              {primaryLabel}
-                            </p>
-                            <div className="flex items-center gap-1 shrink-0">
-                              {isVendorTab ? (
-                                <ArrowUpCircle className="w-3.5 h-3.5 text-red-500" />
-                              ) : (
-                                <ArrowDownCircle className="w-3.5 h-3.5 text-blue-500" />
-                              )}
-                              <span
-                                className="font-bold text-sm"
-                                style={{ color: isVendorTab ? "#DC2626" : "#2563EB" }}
-                              >
-                                {formatAmount(item.amount)}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="flex justify-between items-center mt-1.5">
-                            <div className="flex items-center gap-2 min-w-0">
-                              {secondaryLabel && (
-                                <span className="text-xs text-blue-500 truncate">
-                                  {secondaryLabel}
-                                </span>
-                              )}
-                              <span className="text-xs text-slate-400 capitalize truncate">
-                                {item.paymentMethod}
-                              </span>
-                              <span className="text-xs text-slate-300 shrink-0">
-                                {formatDistanceToNow(new Date(item.createdAt), {
-                                  addSuffix: true,
-                                })}
-                              </span>
-                            </div>
-
-                            {item.status !== "completed" && (
-                              <span
-                                className="text-[9px] font-bold px-2 py-0.5 rounded-full border shrink-0 ml-2"
-                                style={{
-                                  backgroundColor: status.bg,
-                                  color: status.text,
-                                  borderColor: status.border,
-                                }}
-                              >
-                                {String(item.status || "").toUpperCase()}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
+                      </td>
+                    </motion.tr>
                   );
                 })}
-              </AnimatePresence>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Pagination — compact, Expenses-page style */}
+      {!loading && list.length > 0 && (
+        <div className="flex justify-between items-center mt-3">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page === 1}
+            onClick={() => setPage((p) => p - 1)}
+          >
+            Previous
+          </Button>
+          <p className="text-xs text-slate-500">
+            Page {page} of {totalPages}
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page === totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Next
+          </Button>
+        </div>
+      )}
 
       {/* Preview Dialog — no route change, print straight from here */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>

@@ -15,7 +15,6 @@ const fallbackAds = [
       "https://cdn.amptechnology.in/0199dcb9-7d78-7000-8be8-56c84c67ba61.webp",
     ctaLabel: "Shop Now",
     ctaUrl: "/dashboard/products",
-    bgColor: "#0F766E",
   },
   {
     id: "product-2",
@@ -25,7 +24,6 @@ const fallbackAds = [
       "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSDxCrG8KPWXoAf9bFDEVjYJsDUg_iRxQJt4pCd_636p5rHG8nzJvaR-eUumDox0cxnqpc&usqp=CAU",
     ctaLabel: "Shop Now",
     ctaUrl: "/dashboard/products",
-    bgColor: "#1D4ED8",
   },
 ];
 
@@ -57,7 +55,6 @@ export default function CarouselSlider() {
               image: b.imageUrl,
               ctaLabel: b.ctaLabel || "Learn More",
               ctaUrl: b.ctaUrl || "#",
-              bgColor: b.bgColor || "#1D4ED8",
             })),
           );
         }
@@ -92,7 +89,7 @@ export default function CarouselSlider() {
 
   return (
     <div
-      className="relative w-full rounded-2xl overflow-hidden shadow-sm border border-slate-200/80 h-56 md:h-72 group"
+      className="relative w-full rounded-2xl overflow-hidden shadow-sm border border-slate-200/80 h-40 md:h-48 bg-slate-100 group"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
@@ -105,44 +102,39 @@ export default function CarouselSlider() {
           <a
             key={slide.id}
             href={slide.ctaUrl}
-            className="relative min-w-full h-full flex items-center px-6 md:px-10"
-            style={{ backgroundColor: slide.bgColor }}
+            className="relative min-w-full h-full flex items-center justify-center bg-slate-100"
           >
-            {/* Background image (optional, sits behind gradient) */}
+            {/* Full image, no crop — fills the slot as much as possible without cutting */}
             {slide.image && (
-              <Image
-                src={slide.image}
-                alt={slide.title}
-                fill
-                className="object-contain opacity-40"
-                sizes="100vw"
-                unoptimized
-                priority
-              />
+              <div className="relative w-full h-full">
+                <Image
+                  src={slide.image}
+                  alt={slide.title}
+                  fill
+                  className="object-contain"
+                  style={{ objectPosition: "center" }}
+                  sizes="100vw"
+                  unoptimized
+                  priority
+                />
+              </div>
             )}
 
-            {/* Gradient overlay for text legibility */}
-            <div
-              className="absolute inset-0"
-              style={{
-                background: `linear-gradient(90deg, ${slide.bgColor} 35%, transparent 100%)`,
-              }}
-            />
+            {/* Bottom-only dark scrim for caption readability */}
+            {(slide.title || slide.subtitle || slide.ctaLabel) && (
+              <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
+            )}
 
-            {/* Content */}
-            <div className="relative z-10 max-w-md">
-              <h3 className="text-white font-bold text-[18px] md:text-[22px] leading-tight">
-                {slide.title}
-              </h3>
+            <div className="absolute left-4 bottom-2.5 right-4 z-10">
+              {slide.title && (
+                <h3 className="text-white font-bold text-[14px] md:text-[16px] leading-tight drop-shadow">
+                  {slide.title}
+                </h3>
+              )}
               {slide.subtitle && (
-                <p className="text-white/85 text-[12.5px] md:text-[13.5px] mt-1.5 line-clamp-2">
+                <p className="text-white/90 text-[11px] md:text-[12px] mt-0.5 line-clamp-1 drop-shadow">
                   {slide.subtitle}
                 </p>
-              )}
-              {slide.ctaLabel && (
-                <span className="inline-block mt-3.5 px-4 py-1.5 rounded-lg bg-white text-slate-900 text-[12.5px] font-semibold hover:bg-slate-100 transition-colors">
-                  {slide.ctaLabel}
-                </span>
               )}
             </div>
           </a>
@@ -155,23 +147,23 @@ export default function CarouselSlider() {
           <button
             onClick={goPrev}
             aria-label="Previous slide"
-            className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/25 hover:bg-black/40 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20"
+            className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/25 hover:bg-black/40 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20"
           >
-            <ChevronLeft size={18} />
+            <ChevronLeft size={16} />
           </button>
           <button
             onClick={goNext}
             aria-label="Next slide"
-            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/25 hover:bg-black/40 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20"
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/25 hover:bg-black/40 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20"
           >
-            <ChevronRight size={18} />
+            <ChevronRight size={16} />
           </button>
         </>
       )}
 
       {/* Dots */}
       {slides.length > 1 && (
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-20">
+        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-20">
           {slides.map((_, i) => (
             <button
               key={i}

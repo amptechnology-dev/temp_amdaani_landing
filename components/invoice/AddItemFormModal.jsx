@@ -74,7 +74,6 @@ const UNITS = [
 
 const COMMON_GST_RATES = [0, 5, 12, 18, 28];
 
-// ✅ Mirrors RN TaxSelectorBottomSheet's TAX_OPTIONS exactly
 const TAX_OPTIONS = [
   {
     id: "with_tax",
@@ -90,9 +89,8 @@ const TAX_OPTIONS = [
   },
 ];
 
-const defaultTaxOption = TAX_OPTIONS[1]; // without_tax — same default as RN
+const defaultTaxOption = TAX_OPTIONS[1];
 
-// ✅ Mirrors RN TaxRateSelectorBottomSheet's preset GST rate list
 const GST_RATE_OPTIONS = COMMON_GST_RATES.map((r) => ({
   id: String(r),
   rate: r,
@@ -118,7 +116,6 @@ const unwrapList = (res) => {
   return [];
 };
 
-// ✅ ItemsPage er moto opening stock validation
 function validateOpeningStockValues(stockStr, valueStr, isEdit = false) {
   const errors = {};
   const hasStock =
@@ -312,10 +309,10 @@ function CategorySection({ value, onChange }) {
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="mt-0.5 w-full h-10 px-3 rounded-md border border-slate-200 bg-white flex items-center justify-between text-sm hover:bg-slate-50"
+            className="mt-0.5 w-full h-9 px-3 rounded-md border border-slate-200 bg-white flex items-center justify-between text-sm hover:bg-slate-50"
           >
             <span
-              className={selectedCategory ? "text-slate-800" : "text-slate-400"}
+              className={`text-xs ${selectedCategory ? "text-slate-800" : "text-slate-400"}`}
             >
               {selectedCategory?.name || "Select category"}
             </span>
@@ -642,9 +639,9 @@ function HsnCodeSection({ value, gstRate, onHsnSelect }) {
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="mt-0.5 w-full h-10 px-3 rounded-md border border-slate-200 bg-white flex items-center justify-between text-sm hover:bg-slate-50"
+            className="mt-0.5 w-full h-9 px-3 rounded-md border border-slate-200 bg-white flex items-center justify-between text-sm hover:bg-slate-50"
           >
-            <span className={value ? "text-slate-800" : "text-slate-400"}>
+            <span className={`text-xs ${value ? "text-slate-800" : "text-slate-400"}`}>
               {value
                 ? `${value}${gstRate ? ` (${gstRate}% GST)` : ""}`
                 : "Select HSN code"}
@@ -824,84 +821,36 @@ function HsnCodeSection({ value, gstRate, onHsnSelect }) {
 }
 
 // =========================================================
-// ✅ Tax Option selector — mirrors RN TaxSelectorBottomSheet
-// (Include Tax / Exclude Tax)
+// Tax Option toggle — simple click-to-switch, no popover
 // =========================================================
 function TaxOptionSection({ value, onChange }) {
-  const [open, setOpen] = useState(false);
   const selected =
     TAX_OPTIONS.find((o) => o.id === value?.id) || defaultTaxOption;
+  const isInclude = selected.id === "with_tax";
+
+  const handleToggle = () => {
+    const next = isInclude ? TAX_OPTIONS[1] : TAX_OPTIONS[0];
+    onChange(next);
+  };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className={`flex items-center gap-1.5 px-3 h-9 rounded-full text-xs font-semibold border shrink-0 transition-colors ${
-            selected.id === "with_tax"
-              ? "bg-blue-600 text-white border-blue-600"
-              : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
-          }`}
-        >
-          <selected.Icon className="w-3.5 h-3.5" />
-          {selected.label}
-          <ChevronDown className="w-3 h-3" />
-        </button>
-      </PopoverTrigger>
-
-      <PopoverContent className="w-72 p-2" align="end">
-        <p className="text-xs font-semibold text-slate-500 px-1 pb-1.5">
-          Tax Option
-        </p>
-        <div className="space-y-1.5">
-          {TAX_OPTIONS.map((opt) => {
-            const isSelected = selected.id === opt.id;
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => {
-                  onChange(opt);
-                  setOpen(false);
-                }}
-                className={`w-full flex items-start gap-2.5 rounded-lg px-3 py-2.5 border text-left transition-colors ${
-                  isSelected
-                    ? "bg-blue-50 border-blue-300"
-                    : "bg-white border-slate-200 hover:bg-slate-50"
-                }`}
-              >
-                <opt.Icon
-                  className={`w-4 h-4 mt-0.5 shrink-0 ${
-                    isSelected ? "text-blue-600" : "text-slate-400"
-                  }`}
-                />
-                <div className="min-w-0">
-                  <p
-                    className={`text-sm font-medium ${
-                      isSelected ? "text-blue-700" : "text-slate-800"
-                    }`}
-                  >
-                    {opt.label}
-                  </p>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    {opt.description}
-                  </p>
-                </div>
-                {isSelected && (
-                  <Check className="w-4 h-4 text-blue-600 shrink-0 ml-auto" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </PopoverContent>
-    </Popover>
+    <button
+      type="button"
+      onClick={handleToggle}
+      className={`flex items-center gap-1.5 px-2.5 h-9 rounded-full text-[11px] font-semibold border shrink-0 transition-colors ${
+        isInclude
+          ? "bg-blue-600 text-white border-blue-600"
+          : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
+      }`}
+    >
+      <selected.Icon className="w-3.5 h-3.5" />
+      {selected.label}
+    </button>
   );
 }
 
 // =========================================================
-// ✅ Tax Rate selector — mirrors RN TaxRateSelectorBottomSheet
-// preset GST slabs + custom rate entry
+// Tax Rate selector
 // =========================================================
 function TaxRateSection({ value, onChange, disabled }) {
   const [open, setOpen] = useState(false);
@@ -931,9 +880,9 @@ function TaxRateSection({ value, onChange, disabled }) {
           <button
             type="button"
             disabled={disabled}
-            className="mt-0.5 w-full h-10 px-3 rounded-md border border-slate-200 bg-white flex items-center justify-between text-sm hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="mt-0.5 w-full h-9 px-3 rounded-md border border-slate-200 bg-white flex items-center justify-between text-sm hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <span className={value ? "text-slate-800" : "text-slate-400"}>
+            <span className={`text-xs ${value ? "text-slate-800" : "text-slate-400"}`}>
               {value ? value.label : "Select tax rate"}
             </span>
             <ChevronDown className="w-4 h-4 text-slate-400" />
@@ -1023,7 +972,7 @@ function TaxRateSection({ value, onChange, disabled }) {
 }
 
 // =========================================================
-// MAIN — Add / Edit Item Form Modal (shared, ItemsPage-style design)
+// MAIN — Add / Edit Item Form Modal
 // =========================================================
 export default function AddItemFormModal({
   open,
@@ -1035,8 +984,6 @@ export default function AddItemFormModal({
   const isEditMode = Boolean(editItem);
   const { isMrpEnabled } = useAuth();
 
-  // ✅ Modal jekhan theke-i khola hok na keno, fresh full product data
-  // nijei fetch kore neyoya hoy — caller-er upor nirbhor kore na
   const [resolvedItem, setResolvedItem] = useState(null);
   const [isFetchingEditItem, setIsFetchingEditItem] = useState(false);
   const [showOpeningStock, setShowOpeningStock] = useState(false);
@@ -1058,7 +1005,6 @@ export default function AddItemFormModal({
     const targetId = editItem._id;
 
     if (!isValidObjectId(targetId)) {
-      // temp/locally-added item — cart-er existing data e use koro
       setResolvedItem(editItem);
       return;
     }
@@ -1098,10 +1044,6 @@ export default function AddItemFormModal({
   const activeItem = resolvedItem || editItem;
   const canUpdateExisting = isValidObjectId(activeItem?._id);
 
-  // ✅ Tax option / tax rate — independent selector state, mirrors RN's
-  // `selectedTaxOption` / `selectedTaxRate` Formik fields. Kept outside
-  // Formik values (like the category/hsn popovers) and synced into the
-  // submit payload directly, same pattern already used for `mrp`.
   const [selectedTaxOption, setSelectedTaxOption] = useState(defaultTaxOption);
   const [selectedTaxRate, setSelectedTaxRate] = useState(null);
 
@@ -1115,8 +1057,8 @@ export default function AddItemFormModal({
     if (!activeItem) {
       setSelectedTaxOption(defaultTaxOption);
       setSelectedTaxRate(null);
-      setSelectedPurchaseTaxOption(defaultTaxOption); // NEW
-      setSelectedPurchaseTaxRate(null); // NEW
+      setSelectedPurchaseTaxOption(defaultTaxOption);
+      setSelectedPurchaseTaxRate(null);
       return;
     }
 
@@ -1173,14 +1115,12 @@ export default function AddItemFormModal({
       };
     }
 
-    // ✅ Unit match
     const rawUnit = String(activeItem.unit || "").toLowerCase();
     const matchedUnit = UNITS.find(
       (u) =>
         u.symbol.toLowerCase() === rawUnit || u.name.toLowerCase() === rawUnit,
     );
 
-    // ✅ Category resolve
     let categoryId = "";
     if (activeItem.category && typeof activeItem.category === "object") {
       categoryId = isValidObjectId(activeItem.category._id)
@@ -1190,7 +1130,6 @@ export default function AddItemFormModal({
       categoryId = activeItem.category;
     }
 
-    // ✅ Sales discount derive
     const savedDiscountType = activeItem.discountType ?? "amount";
     const savedDiscountPercentage = Number(activeItem.discountPercentage ?? 0);
     const savedDiscountPrice = Number(activeItem.discountPrice ?? 0);
@@ -1203,7 +1142,6 @@ export default function AddItemFormModal({
           ? String(savedDiscountPrice)
           : "";
 
-    // ✅ Purchase discount derive
     const savedPurchaseDiscountType =
       activeItem.purchaseDiscountType ?? "amount";
     const savedPurchaseDiscountPercentage = Number(
@@ -1260,7 +1198,6 @@ export default function AddItemFormModal({
             ? parseFloat(((inputDiscount / salesPrice) * 100).toFixed(4))
             : 0;
 
-      // ✅ NEW — purchase discount, exact same pattern হিসেবে sales discount এর মতো
       const purchasePrice = Number(values.purchasePrice) || 0;
       const inputPurchaseDiscount = Number(values.purchaseDiscountPrice) || 0;
 
@@ -1302,14 +1239,12 @@ export default function AddItemFormModal({
         costPrice: purchasePrice,
         ...(isMrpEnabled ? { mrp: Number(values.mrp) || 0 } : {}),
 
-        // Sales-side tax
         gstRate: selectedTaxRate?.rate ? Number(selectedTaxRate.rate) : 0,
         isTaxInclusive: selectedTaxOption?.id === "with_tax",
         discountPrice: discountValue,
         discountType: values.discountType,
         discountPercentage,
 
-        // ✅ NEW — Purchase-side tax, product schema এর সাথে exact match
         purchaseGstRate: selectedPurchaseTaxRate?.rate
           ? Number(selectedPurchaseTaxRate.rate)
           : 0,
@@ -1358,17 +1293,19 @@ export default function AddItemFormModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[960px] max-h-[95vh] overflow-y-auto">
-        <DialogHeader className="space-y-0.5">
-          <DialogTitle className="flex items-center gap-2">
-            <Package className="w-5 h-5 text-blue-600" />
+      <DialogContent className="sm:max-w-[900px] max-h-[92vh] overflow-y-auto">
+        <DialogHeader className="space-y-0">
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <Package className="w-4 h-4 text-blue-600" />
             {isEditMode ? "Edit Item" : "Add New Item"}
           </DialogTitle>
-          <DialogDescription>Enter the item details below.</DialogDescription>
+          <DialogDescription className="text-xs">
+            Enter the item details below.
+          </DialogDescription>
         </DialogHeader>
 
         {isFetchingEditItem ? (
-          <div className="flex items-center justify-center py-16 text-slate-400">
+          <div className="flex items-center justify-center py-12 text-slate-400">
             <Loader2 className="w-5 h-5 mr-2 animate-spin" />
             Loading item details...
           </div>
@@ -1417,39 +1354,32 @@ export default function AddItemFormModal({
               if (finalPurchasePrice < 0) finalPurchasePrice = 0;
 
               return (
-                <Form className="space-y-3">
-                  {/* ---- Product Details ---- */}
-                  <div className="flex items-center gap-2 text-slate-700 font-semibold">
-                    <Package className="w-4 h-4 text-blue-600" />
-                    Product Details
-                  </div>
-                  <Separator className="!my-1.5" />
+                <Form className="space-y-2">
+                  {/* ---- Item basic fields (single clean row) ---- */}
+                  <div className="grid grid-cols-1 sm:grid-cols-6 gap-2">
+                    <div className="sm:col-span-2">
+                      <Label>Item Name *</Label>
+                      <Input
+                        name="itemName"
+                        value={values.itemName}
+                        onChange={handleChange}
+                        placeholder="Enter item name"
+                        className="mt-0.5 h-9"
+                      />
+                      {touched.itemName && errors.itemName && (
+                        <p className="text-xs text-red-500 mt-1">
+                          {errors.itemName}
+                        </p>
+                      )}
+                    </div>
 
-                  <div>
-                    <Label>Item Name *</Label>
-                    <Input
-                      name="itemName"
-                      value={values.itemName}
-                      onChange={handleChange}
-                      placeholder="Enter item name"
-                      className="mt-0.5"
-                    />
-                    {touched.itemName && errors.itemName && (
-                      <p className="text-xs text-red-500 mt-1">
-                        {errors.itemName}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* ✅ Wide modal → 4 fields in a single row instead of 2 rows */}
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                     <div>
                       <Label>Unit *</Label>
                       <Select
                         value={values.unit}
                         onValueChange={(v) => setFieldValue("unit", v)}
                       >
-                        <SelectTrigger className="mt-0.5">
+                        <SelectTrigger className="mt-0.5 h-9">
                           <SelectValue placeholder="Select unit" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1479,7 +1409,7 @@ export default function AddItemFormModal({
                         value={values.itemCode}
                         onChange={handleChange}
                         placeholder="Item code"
-                        className="mt-0.5"
+                        className="mt-0.5 h-9 placeholder:text-xs"
                       />
                     </div>
 
@@ -1491,8 +1421,8 @@ export default function AddItemFormModal({
                           setFieldValue("hsnCode", "");
                           setSelectedTaxRate(null);
                           setSelectedTaxOption(defaultTaxOption);
-                          setSelectedPurchaseTaxRate(null); // NEW
-                          setSelectedPurchaseTaxOption(defaultTaxOption); // NEW
+                          setSelectedPurchaseTaxRate(null);
+                          setSelectedPurchaseTaxOption(defaultTaxOption);
                           return;
                         }
                         setFieldValue("hsnCode", hsn.code);
@@ -1504,259 +1434,265 @@ export default function AddItemFormModal({
                           };
                           setSelectedTaxRate(rateObj);
                           setSelectedTaxOption(defaultTaxOption);
-                          setSelectedPurchaseTaxRate(rateObj); // NEW — same HSN, same GST rate
-                          setSelectedPurchaseTaxOption(defaultTaxOption); // NEW
+                          setSelectedPurchaseTaxRate(rateObj);
+                          setSelectedPurchaseTaxOption(defaultTaxOption);
                         } else {
                           setSelectedTaxRate(null);
                           setSelectedTaxOption(defaultTaxOption);
-                          setSelectedPurchaseTaxRate(null); // NEW
-                          setSelectedPurchaseTaxOption(defaultTaxOption); // NEW
+                          setSelectedPurchaseTaxRate(null);
+                          setSelectedPurchaseTaxOption(defaultTaxOption);
                         }
                       }}
                     />
                   </div>
 
-                  {/* ---- Price ---- */}
-                  <div className="flex items-center gap-2 text-slate-700 font-semibold pt-1">
-                    <IndianRupee className="w-4 h-4 text-blue-600" />
+                  {/* ---- Price — Purchase row, then Sales row (stacked) ---- */}
+                  <div className="flex items-center gap-2 text-slate-700 font-semibold text-sm pt-0.5">
+                    <IndianRupee className="w-3.5 h-3.5 text-blue-600" />
                     Price
                   </div>
-                  <Separator className="!my-1.5" />
+                  <Separator className="!my-0.5" />
 
-                  {/* Purchase Price + Sales Price, each with their own Tax Option toggle */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label>Purchase Price (optional)</Label>
-                      <div className="flex gap-2 mt-0.5">
-                        <Input
-                          name="purchasePrice"
-                          value={values.purchasePrice}
-                          onChange={handleChange}
-                          placeholder="Enter purchase price"
-                          type="number"
-                          className="flex-1"
-                        />
-                        {/* ✅ Purchase Tax Option — independent from Sales */}
-                        <TaxOptionSection
-                          value={selectedPurchaseTaxOption}
-                          onChange={setSelectedPurchaseTaxOption}
-                        />
-                      </div>
-                      {touched.purchasePrice && errors.purchasePrice && (
-                        <p className="text-xs text-red-500 mt-1">
-                          {errors.purchasePrice}
-                        </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <Label>Sales Price *</Label>
-                      <div className="flex gap-2 mt-0.5">
-                        <Input
-                          name="salesPrice"
-                          value={values.salesPrice}
-                          onChange={handleChange}
-                          placeholder="Enter sales price"
-                          type="number"
-                          className="flex-1"
-                        />
-                        <TaxOptionSection
-                          value={selectedTaxOption}
-                          onChange={setSelectedTaxOption}
-                        />
-                      </div>
-                      {touched.salesPrice && errors.salesPrice && (
-                        <p className="text-xs text-red-500 mt-1">
-                          {errors.salesPrice}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* ✅ Wide modal → Tax rates + discounts, all 4 in a single row */}
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                    <TaxRateSection
-                      value={selectedPurchaseTaxRate}
-                      onChange={setSelectedPurchaseTaxRate}
-                    />
-                    <TaxRateSection
-                      value={selectedTaxRate}
-                      onChange={setSelectedTaxRate}
-                    />
-
-                    <div>
-                      <Label>Discount on Purchase</Label>
-                      <div className="flex gap-2 mt-0.5">
-                        <Input
-                          name="purchaseDiscountPrice"
-                          value={values.purchaseDiscountPrice}
-                          onChange={handleChange}
-                          placeholder="0"
-                          type="number"
-                          className="flex-1"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newType =
-                              values.purchaseDiscountType === "amount"
-                                ? "percentage"
-                                : "amount";
-                            const currentInput =
-                              Number(values.purchaseDiscountPrice) || 0;
-                            const priceForConversion =
-                              Number(values.purchasePrice) || 0;
-                            let converted = currentInput;
-                            if (
-                              newType === "percentage" &&
-                              values.purchaseDiscountType === "amount"
-                            ) {
-                              converted =
-                                priceForConversion > 0
-                                  ? parseFloat(
-                                      (
-                                        (currentInput / priceForConversion) *
-                                        100
-                                      ).toFixed(2),
-                                    )
-                                  : 0;
-                            } else if (
-                              newType === "amount" &&
-                              values.purchaseDiscountType === "percentage"
-                            ) {
-                              converted = parseFloat(
-                                (
-                                  (priceForConversion * currentInput) /
-                                  100
-                                ).toFixed(2),
-                              );
-                            }
-                            setFieldValue("purchaseDiscountType", newType);
-                            setFieldValue(
-                              "purchaseDiscountPrice",
-                              converted > 0 ? String(converted) : "",
-                            );
-                          }}
-                          className="flex items-center gap-1 px-2.5 rounded-full text-[11px] font-semibold border shrink-0 bg-slate-100 text-slate-600 border-slate-200"
-                        >
-                          {values.purchaseDiscountType === "percentage"
-                            ? "%"
-                            : "₹"}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label>Discount on Sales</Label>
-                      <div className="flex gap-2 mt-0.5">
-                        <Input
-                          name="discountPrice"
-                          value={values.discountPrice}
-                          onChange={handleChange}
-                          placeholder="0"
-                          type="number"
-                          className="flex-1"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newType =
-                              values.discountType === "amount"
-                                ? "percentage"
-                                : "amount";
-                            const currentInput =
-                              Number(values.discountPrice) || 0;
-                            let converted = currentInput;
-                            if (
-                              newType === "percentage" &&
-                              values.discountType === "amount"
-                            ) {
-                              converted =
-                                salesPriceNum > 0
-                                  ? parseFloat(
-                                      (
-                                        (currentInput / salesPriceNum) *
-                                        100
-                                      ).toFixed(2),
-                                    )
-                                  : 0;
-                            } else if (
-                              newType === "amount" &&
-                              values.discountType === "percentage"
-                            ) {
-                              converted = parseFloat(
-                                ((salesPriceNum * currentInput) / 100).toFixed(
-                                  2,
-                                ),
-                              );
-                            }
-                            setFieldValue("discountType", newType);
-                            setFieldValue(
-                              "discountPrice",
-                              converted > 0 ? String(converted) : "",
-                            );
-                          }}
-                          className="flex items-center gap-1 px-2.5 rounded-full text-[11px] font-semibold border shrink-0 bg-slate-100 text-slate-600 border-slate-200"
-                        >
-                          {values.discountType === "percentage" ? "%" : "₹"}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* ✅ Final-price hints + MRP, side-by-side to save vertical space */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-start">
-                    {values.purchasePrice && values.purchaseDiscountPrice ? (
-                      <p className="text-sm text-slate-600 font-medium">
-                        Purchase Price (After Discount): ₹
-                        {finalPurchasePrice.toFixed(2)}
-                      </p>
-                    ) : (
-                      <div />
-                    )}
-
-                    {values.salesPrice && values.discountPrice ? (
-                      <p className="text-sm text-slate-600 font-medium">
-                        Sales Price (After Discount): ₹{finalPrice.toFixed(2)}
-                      </p>
-                    ) : (
-                      <div />
-                    )}
-
-                    {isMrpEnabled && (
+                  {/* ===== PURCHASE row ===== */}
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] font-bold tracking-wide text-slate-400 uppercase">
+                      Purchase
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                       <div>
-                        <Label>MRP (optional)</Label>
-                        <Input
-                          name="mrp"
-                          value={values.mrp}
-                          onChange={handleChange}
-                          placeholder="Enter MRP"
-                          type="number"
-                          className="mt-0.5"
-                        />
-                        {touched.mrp && errors.mrp && (
+                        <Label>Purchase Price (optional)</Label>
+                        <div className="flex gap-2 mt-0.5">
+                          <Input
+                            name="purchasePrice"
+                            value={values.purchasePrice}
+                            onChange={handleChange}
+                            placeholder="Enter purchase price"
+                            type="number"
+                            className="flex-1 h-9"
+                          />
+                          <TaxOptionSection
+                            value={selectedPurchaseTaxOption}
+                            onChange={setSelectedPurchaseTaxOption}
+                          />
+                        </div>
+                        {touched.purchasePrice && errors.purchasePrice && (
                           <p className="text-xs text-red-500 mt-1">
-                            {errors.mrp}
+                            {errors.purchasePrice}
                           </p>
                         )}
                       </div>
-                    )}
+
+                      <TaxRateSection
+                        value={selectedPurchaseTaxRate}
+                        onChange={setSelectedPurchaseTaxRate}
+                      />
+
+                      <div>
+                        <Label>Discount</Label>
+                        <div className="flex gap-2 mt-0.5">
+                          <Input
+                            name="purchaseDiscountPrice"
+                            value={values.purchaseDiscountPrice}
+                            onChange={handleChange}
+                            placeholder="0"
+                            type="number"
+                            className="flex-1 h-9"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newType =
+                                values.purchaseDiscountType === "amount"
+                                  ? "percentage"
+                                  : "amount";
+                              const currentInput =
+                                Number(values.purchaseDiscountPrice) || 0;
+                              const priceForConversion =
+                                Number(values.purchasePrice) || 0;
+                              let converted = currentInput;
+                              if (
+                                newType === "percentage" &&
+                                values.purchaseDiscountType === "amount"
+                              ) {
+                                converted =
+                                  priceForConversion > 0
+                                    ? parseFloat(
+                                        (
+                                          (currentInput /
+                                            priceForConversion) *
+                                          100
+                                        ).toFixed(2),
+                                      )
+                                    : 0;
+                              } else if (
+                                newType === "amount" &&
+                                values.purchaseDiscountType === "percentage"
+                              ) {
+                                converted = parseFloat(
+                                  (
+                                    (priceForConversion * currentInput) /
+                                    100
+                                  ).toFixed(2),
+                                );
+                              }
+                              setFieldValue("purchaseDiscountType", newType);
+                              setFieldValue(
+                                "purchaseDiscountPrice",
+                                converted > 0 ? String(converted) : "",
+                              );
+                            }}
+                            className="flex items-center justify-center w-9 h-9 rounded-full text-[11px] font-semibold border shrink-0 bg-slate-100 text-slate-600 border-slate-200"
+                          >
+                            {values.purchaseDiscountType === "percentage"
+                              ? "%"
+                              : "₹"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {values.purchasePrice && values.purchaseDiscountPrice ? (
+                      <p className="text-xs text-slate-500 font-medium">
+                        After Discount: ₹{finalPurchasePrice.toFixed(2)}
+                      </p>
+                    ) : null}
                   </div>
 
-                  {/* ---- Opening Stock — collapsible, ItemsPage-style ---- */}
-                  <div className="pt-1">
-                    <div className="flex items-center gap-2 text-slate-700 font-semibold mb-1.5">
-                      <Warehouse className="w-4 h-4 text-blue-600" />
+                  <Separator className="!my-1" />
+
+                  {/* ===== SALES row ===== */}
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] font-bold tracking-wide text-slate-400 uppercase">
+                      Sales
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <div>
+                        <Label>Sales Price *</Label>
+                        <div className="flex gap-2 mt-0.5">
+                          <Input
+                            name="salesPrice"
+                            value={values.salesPrice}
+                            onChange={handleChange}
+                            placeholder="Enter sales price"
+                            type="number"
+                            className="flex-1 h-9"
+                          />
+                          <TaxOptionSection
+                            value={selectedTaxOption}
+                            onChange={setSelectedTaxOption}
+                          />
+                        </div>
+                        {touched.salesPrice && errors.salesPrice && (
+                          <p className="text-xs text-red-500 mt-1">
+                            {errors.salesPrice}
+                          </p>
+                        )}
+                      </div>
+
+                      <TaxRateSection
+                        value={selectedTaxRate}
+                        onChange={setSelectedTaxRate}
+                      />
+
+                      <div>
+                        <Label>Discount</Label>
+                        <div className="flex gap-2 mt-0.5">
+                          <Input
+                            name="discountPrice"
+                            value={values.discountPrice}
+                            onChange={handleChange}
+                            placeholder="0"
+                            type="number"
+                            className="flex-1 h-9"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newType =
+                                values.discountType === "amount"
+                                  ? "percentage"
+                                  : "amount";
+                              const currentInput =
+                                Number(values.discountPrice) || 0;
+                              let converted = currentInput;
+                              if (
+                                newType === "percentage" &&
+                                values.discountType === "amount"
+                              ) {
+                                converted =
+                                  salesPriceNum > 0
+                                    ? parseFloat(
+                                        (
+                                          (currentInput / salesPriceNum) *
+                                          100
+                                        ).toFixed(2),
+                                      )
+                                    : 0;
+                              } else if (
+                                newType === "amount" &&
+                                values.discountType === "percentage"
+                              ) {
+                                converted = parseFloat(
+                                  (
+                                    (salesPriceNum * currentInput) /
+                                    100
+                                  ).toFixed(2),
+                                );
+                              }
+                              setFieldValue("discountType", newType);
+                              setFieldValue(
+                                "discountPrice",
+                                converted > 0 ? String(converted) : "",
+                              );
+                            }}
+                            className="flex items-center justify-center w-9 h-9 rounded-full text-[11px] font-semibold border shrink-0 bg-slate-100 text-slate-600 border-slate-200"
+                          >
+                            {values.discountType === "percentage" ? "%" : "₹"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {values.salesPrice && values.discountPrice ? (
+                      <p className="text-xs text-slate-500 font-medium">
+                        After Discount: ₹{finalPrice.toFixed(2)}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  {isMrpEnabled && (
+                    <div className="sm:w-1/3">
+                      <Label>MRP (optional)</Label>
+                      <Input
+                        name="mrp"
+                        value={values.mrp}
+                        onChange={handleChange}
+                        placeholder="Enter MRP"
+                        type="number"
+                        className="mt-0.5 h-9"
+                      />
+                      {touched.mrp && errors.mrp && (
+                        <p className="text-xs text-red-500 mt-1">
+                          {errors.mrp}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ---- Opening Stock — collapsible ---- */}
+                  <div className="pt-0">
+                    <div className="flex items-center gap-2 text-slate-700 font-semibold text-sm mb-0.5">
+                      <Warehouse className="w-3.5 h-3.5 text-blue-600" />
                       Opening Stock
                     </div>
-                    <Separator className="!mb-2" />
+                    <Separator className="!mb-1" />
 
                     {!showOpeningStock ? (
-                      <div className="space-y-2">
+                      <div className="space-y-1.5">
                         <button
                           type="button"
                           onClick={() => setShowOpeningStock(true)}
-                          className="text-xs font-medium text-blue-600 border border-blue-100 rounded-full px-3 py-1.5"
+                          className="text-xs font-medium text-blue-600 border border-blue-100 rounded-full px-3 py-1"
                         >
                           {values.openingStock
                             ? "Edit Opening Stock"
@@ -1764,7 +1700,7 @@ export default function AddItemFormModal({
                         </button>
 
                         {values.openingStock && values.openingStockValue && (
-                          <p className="text-sm text-slate-500">
+                          <p className="text-xs text-slate-500">
                             Opening Stock:{" "}
                             <span className="font-medium text-slate-700">
                               {values.openingStock}
@@ -1777,8 +1713,8 @@ export default function AddItemFormModal({
                         )}
                       </div>
                     ) : (
-                      <div className="space-y-2.5 bg-slate-50 rounded-xl p-3 border border-slate-200">
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                      <div className="space-y-2 bg-slate-50 rounded-xl p-2.5 border border-slate-200">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
                           <div>
                             <Label>Opening Stock Qty</Label>
                             <Input
@@ -1787,7 +1723,7 @@ export default function AddItemFormModal({
                               onChange={handleChange}
                               placeholder="Quantity"
                               type="number"
-                              className="mt-0.5"
+                              className="mt-0.5 h-9"
                             />
                           </div>
                           <div>
@@ -1798,10 +1734,10 @@ export default function AddItemFormModal({
                               onChange={handleChange}
                               placeholder="Total value (₹)"
                               type="number"
-                              className="mt-0.5"
+                              className="mt-0.5 h-9"
                             />
                           </div>
-                          <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 h-10">
+                          <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 h-9">
                             <Info className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                             <p className="text-xs text-blue-700 italic">
                               Value = Qty × Purchase rate
@@ -1822,7 +1758,7 @@ export default function AddItemFormModal({
                     )}
                   </div>
 
-                  <DialogFooter className="pt-1">
+                  <DialogFooter className="pt-0">
                     <Button
                       type="button"
                       variant="outline"

@@ -6,7 +6,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { themeConfig } from "../../utils/ThemeConfig";
 import { useAuth } from "../../context/AuthContext";
 import api from "../../utils/api";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Formik, Form, ErrorMessage } from "formik";
 import * as Yup from "yup";
 import { toast } from "sonner";
@@ -30,7 +30,6 @@ import {
   MoreVertical,
   RefreshCw,
   X,
-  FileText,
   Calendar,
   User,
   CreditCard,
@@ -38,9 +37,6 @@ import {
   Smartphone,
   Hash,
   Landmark,
-  IndianRupee,
-  TrendingUp,
-  ChevronDown,
 } from "lucide-react";
 
 // shadcn components
@@ -54,7 +50,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -73,7 +68,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -103,7 +97,6 @@ const DATE_FILTERS = [
 ];
 
 const PAYMENT_METHOD_FILTERS = [
-  { label: "All", value: "all" },
   { label: "Cash", value: "cash" },
   { label: "UPI", value: "UPI" },
   { label: "Card", value: "card" },
@@ -205,6 +198,9 @@ export default function ExpensesPage() {
   const [allExpenses, setAllExpenses] = useState([]);
   const [expenseHeads, setExpenseHeads] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const [limit, setLimit] = useState(10);
+  const [page, setPage] = useState(1);
 
   const debouncedSearch = useDebounce(searchTerm, 300);
 
@@ -367,25 +363,15 @@ export default function ExpensesPage() {
     return [...searched].sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [allExpenses, activeDateFilter, activePaymentFilter, debouncedSearch]);
 
-  // Overview stats (based on currently filtered set)
-  const totalExpenses = filteredExpenses.length;
-  const totalAmount = filteredExpenses.reduce(
-    (sum, e) => sum + (e.amount || 0),
-    0,
-  );
-  const averageExpense = totalExpenses > 0 ? totalAmount / totalExpenses : 0;
+  useEffect(() => {
+    setPage(1);
+  }, [activeDateFilter, activePaymentFilter, debouncedSearch]);
 
-  const paymentMethodBreakdown = filteredExpenses.reduce((acc, e) => {
-    const method = e.paymentMethod?.toLowerCase() || "other";
-    acc[method] = (acc[method] || 0) + 1;
-    return acc;
-  }, {});
-  const mostUsedPaymentMethod =
-    Object.keys(paymentMethodBreakdown).length > 0
-      ? Object.keys(paymentMethodBreakdown).reduce((a, b) =>
-          paymentMethodBreakdown[a] > paymentMethodBreakdown[b] ? a : b,
-        )
-      : "N/A";
+  const totalPages = Math.max(1, Math.ceil(filteredExpenses.length / limit));
+  const pagedExpenses = filteredExpenses.slice(
+    (page - 1) * limit,
+    page * limit,
+  );
 
   const formatCurrency = (amount) =>
     new Intl.NumberFormat("en-IN", {
@@ -395,218 +381,240 @@ export default function ExpensesPage() {
       maximumFractionDigits: 0,
     }).format(amount || 0);
 
+  // Combined chip list: date chips + payment-method chips (Items-page pattern)
+  const chips = [
+    ...DATE_FILTERS,
+    ...PAYMENT_METHOD_FILTERS,
+  ];
+
+  const isChipActive = (chip) => {
+    const isDateChip = DATE_FILTERS.some((f) => f.value === chip.value);
+    if (isDateChip) return activeDateFilter === chip.value;
+    return activePaymentFilter === chip.value;
+  };
+
+  const handleChipClick = (chip) => {
+    const isDateChip = DATE_FILTERS.some((f) => f.value === chip.value);
+    if (isDateChip) {
+      setActiveDateFilter(chip.value);
+    } else {
+      setActivePaymentFilter((prev) => (prev === chip.value ? "all" : chip.value));
+    }
+  };
+
   return (
-    <div className={`min-h-screen w-full ${currentTheme.background}`}>
-      <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
-        {/* ---------------- HEADER ---------------- */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="space-y-4"
-        >
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div>
-              <h1
-                className={`text-2xl md:text-3xl font-bold ${currentTheme.text}`}
-              >
-                Expenses
-              </h1>
-              <p className={`mt-1 text-sm ${currentTheme.textSecondary}`}>
-                Track and manage your business expenses
-              </p>
-            </div>
+    <div className={`min-h-screen p-3 md:p-4 ${currentTheme.background}`}>
+      {/* Header — compact, Items-page style */}
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h1 className={`text-lg md:text-xl font-bold ${currentTheme.text}`}>
+            Expenses
+          </h1>
+          <p className={`text-xs ${currentTheme.textSecondary}`}>
+            Track and manage your business expenses
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={refreshData}
+            disabled={isRefreshing}
+          >
+            <RefreshCw
+              className={`w-3.5 h-3.5 mr-1.5 ${isRefreshing ? "animate-spin" : ""}`}
+            />
+            Refresh
+          </Button>
+          <Button onClick={handleAddExpense} size="sm" className={currentTheme.buttonPrimary}>
+            <Plus className="w-3.5 h-3.5 mr-1.5" />
+            Add Expense
+          </Button>
+        </div>
+      </div>
 
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={refreshData}
-                disabled={isRefreshing}
-              >
-                <RefreshCw
-                  className={`w-4 h-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`}
-                />
-                Refresh
-              </Button>
-              <Button onClick={handleAddExpense}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Expense
-              </Button>
-            </div>
-          </div>
-
-          {/* Stats strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              {
-                label: "Total Expenses",
-                value: totalExpenses,
-                icon: Receipt,
-                color: "text-blue-600 bg-blue-50",
-              },
-              {
-                label: "Total Amount",
-                value: formatCurrency(totalAmount),
-                icon: IndianRupee,
-                color: "text-rose-600 bg-rose-50",
-              },
-              {
-                label: "Average",
-                value: formatCurrency(averageExpense),
-                icon: TrendingUp,
-                color: "text-emerald-600 bg-emerald-50",
-              },
-              {
-                label: "Top Method",
-                value:
-                  mostUsedPaymentMethod !== "N/A"
-                    ? mostUsedPaymentMethod.charAt(0).toUpperCase() +
-                      mostUsedPaymentMethod.slice(1)
-                    : "N/A",
-                icon: Wallet,
-                color: "text-orange-600 bg-orange-50",
-              },
-            ].map((stat, i) => (
-              <div
-                key={i}
-                className="bg-white rounded-2xl border border-slate-200 p-3.5 flex items-center gap-3"
-              >
-                <div
-                  className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${stat.color}`}
-                >
-                  <stat.icon className="w-4 h-4" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[11px] text-slate-400 font-medium truncate">
-                    {stat.label}
-                  </p>
-                  <p className="text-base font-bold text-slate-800 truncate">
-                    {isLoading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      stat.value
-                    )}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* ---------------- SEARCH ---------------- */}
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+      {/* Search + limit — compact single row */}
+      <div className="flex gap-2 mb-2.5">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           <Input
-            placeholder="Search by head, paid to, notes, or invoice ref..."
+            placeholder="Search by head, paid to, notes, or invoice ref…"
+            className="pl-9 h-8 text-sm rounded-lg"
             value={searchTerm}
             onChange={handleSearchChange}
-            className="pl-11 h-12 rounded-full bg-slate-100 border-none focus-visible:ring-2 focus-visible:ring-blue-500"
           />
           {searchTerm && (
-            <button
+            <X
               onClick={handleClearSearch}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-            >
-              <X className="w-4 h-4" />
-            </button>
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 cursor-pointer text-gray-400"
+            />
           )}
         </div>
 
-        {/* ---------------- FILTER CHIPS ---------------- */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-            {DATE_FILTERS.map((f) => (
-              <button
-                key={f.value}
-                onClick={() => setActiveDateFilter(f.value)}
-                className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                  activeDateFilter === f.value
-                    ? "bg-blue-600 text-white border-blue-600"
-                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                }`}
-              >
-                {f.label}
-              </button>
+        <Select value={limit} onValueChange={(v) => setLimit(Number(v))}>
+          <SelectTrigger className="w-[100px] h-8 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {[10, 25, 50, 100].map((x) => (
+              <SelectItem key={x} value={x}>
+                {x} / page
+              </SelectItem>
             ))}
-          </div>
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-            {PAYMENT_METHOD_FILTERS.map((f) => (
-              <button
-                key={f.value}
-                onClick={() => setActivePaymentFilter(f.value)}
-                className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                  activePaymentFilter === f.value
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Filter chips — date + payment method combined, Items-page style */}
+      <div className="flex gap-1.5 overflow-x-auto pb-1 mb-2.5 no-scrollbar">
+        {chips.map((chip) => {
+          const active = isChipActive(chip);
+          const isMethodChip = PAYMENT_METHOD_FILTERS.some(
+            (f) => f.value === chip.value,
+          );
+          return (
+            <button
+              key={chip.value}
+              onClick={() => handleChipClick(chip)}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap border transition-colors ${
+                active
+                  ? isMethodChip
                     ? "bg-slate-800 text-white border-slate-800"
-                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
+                    : "bg-blue-600 text-white border-blue-600"
+                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              {chip.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ===== Excel-style dense table ===== */}
+      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+        <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-slate-50">
+          <span className="text-sm font-semibold text-slate-700">Expenses</span>
+          <span className="text-xs text-slate-400">
+            Showing {pagedExpenses.length} of {filteredExpenses.length}
+          </span>
         </div>
 
-        {/* ---------------- EXPENSE LIST ---------------- */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {isLoading ? (
-            [...Array(6)].map((_, i) => (
-              <Skeleton key={i} className="h-40 w-full rounded-2xl" />
-            ))
-          ) : filteredExpenses.length === 0 ? (
-            <div className="col-span-full flex flex-col items-center justify-center py-20 text-center bg-white rounded-2xl border border-slate-200">
-              <Receipt className="w-16 h-16 text-slate-300 mb-4" />
-              <h3 className="text-lg font-bold text-slate-800 mb-1">
-                {searchTerm ? "No Expenses Found" : "No Expenses Yet"}
-              </h3>
-              <p className="text-sm text-slate-400 max-w-sm mb-4">
-                {searchTerm
-                  ? `No expenses match "${searchTerm}".`
-                  : "Start by adding your first expense to begin tracking spending."}
-              </p>
-              {!searchTerm && (
-                <Button onClick={handleAddExpense}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Expense
-                </Button>
-              )}
-            </div>
-          ) : (
-            <AnimatePresence>
-              {filteredExpenses.map((expense, index) => {
-                const headName = expense.head?.[0]?.name || "Uncategorized";
-                const enteredByName = expense.enteredBy?.[0]?.name || "Unknown";
-                const MethodIcon = getPaymentMethodIcon(expense.paymentMethod);
+        {isLoading ? (
+          <div className="flex items-center justify-center py-14 text-slate-400 text-sm">
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Loading expenses...
+          </div>
+        ) : filteredExpenses.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-14 text-center">
+            <Receipt className="w-10 h-10 text-slate-300 mb-2" />
+            <p className="text-sm font-semibold text-slate-700">
+              {searchTerm ? "No Expenses Found" : "No Expenses Yet"}
+            </p>
+            <p className="text-xs text-slate-400 max-w-xs mt-0.5 mb-3">
+              {searchTerm
+                ? `No expenses match "${searchTerm}".`
+                : "Add your first expense to begin tracking spending."}
+            </p>
+            {!searchTerm && (
+              <Button onClick={handleAddExpense} size="sm">
+                <Plus className="w-3.5 h-3.5 mr-1.5" />
+                Add Expense
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wide border-b border-slate-200">
+                  <th className="text-left font-semibold px-3 py-1.5 w-8">#</th>
+                  <th className="text-left font-semibold px-3 py-1.5">Head</th>
+                  <th className="text-left font-semibold px-3 py-1.5">Paid To</th>
+                  <th className="text-left font-semibold px-3 py-1.5">Method</th>
+                  <th className="text-left font-semibold px-3 py-1.5">Date</th>
+                  <th className="text-left font-semibold px-3 py-1.5">Ref / Notes</th>
+                  <th className="text-right font-semibold px-3 py-1.5">Amount</th>
+                  <th className="text-center font-semibold px-3 py-1.5 w-14">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pagedExpenses.map((expense, index) => {
+                  const headName = expense.head?.[0]?.name || "Uncategorized";
+                  const MethodIcon = getPaymentMethodIcon(expense.paymentMethod);
 
-                return (
-                  <motion.div
-                    key={expense._id}
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -12 }}
-                    transition={{ duration: 0.2, delay: index * 0.02 }}
-                    onClick={() => handleEditExpense(expense)}
-                    className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 cursor-pointer hover:shadow-md hover:border-blue-200 transition-all relative group"
-                    style={{ borderLeftWidth: 4, borderLeftColor: "#DC2626" }}
-                  >
-                    {/* Top row — head name + actions menu */}
-                    <div className="flex justify-between items-start gap-2">
-                      <div className="min-w-0 flex items-center gap-1.5">
-                        <FileText className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <p className="font-bold text-slate-800 truncate">
+                  return (
+                    <motion.tr
+                      key={expense._id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.15 }}
+                      onClick={() => handleEditExpense(expense)}
+                      className={`cursor-pointer border-b border-slate-100 last:border-0 hover:bg-blue-50/60 transition-colors ${
+                        index % 2 === 1 ? "bg-slate-50/40" : "bg-white"
+                      }`}
+                    >
+                      <td className="px-3 py-1.5 text-slate-400 text-xs align-middle">
+                        {(page - 1) * limit + index + 1}
+                      </td>
+
+                      <td className="px-3 py-1.5 align-middle">
+                        <span className="font-medium text-slate-800 truncate">
                           {headName}
-                        </p>
-                      </div>
+                        </span>
+                      </td>
 
-                      <div className="flex items-start gap-1 shrink-0">
+                      <td className="px-3 py-1.5 text-slate-500 text-xs align-middle whitespace-nowrap">
+                        <span className="flex items-center gap-1">
+                          <User className="w-3 h-3" />
+                          {expense.paidTo || "—"}
+                        </span>
+                      </td>
+
+                      <td className="px-3 py-1.5 align-middle whitespace-nowrap">
                         <Badge
                           variant="outline"
-                          className="text-[10px] flex items-center gap-1"
+                          className="text-[10px] flex items-center gap-1 w-fit"
                         >
                           <MethodIcon className="w-3 h-3" />
                           {expense.paymentMethod || "—"}
                         </Badge>
-                        <div onClick={(e) => e.stopPropagation()}>
+                      </td>
+
+                      <td className="px-3 py-1.5 text-slate-500 text-xs align-middle whitespace-nowrap">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          {expense.date
+                            ? format(new Date(expense.date), "dd MMM yyyy")
+                            : "—"}
+                        </span>
+                      </td>
+
+                      <td className="px-3 py-1.5 text-slate-400 text-[11px] align-middle max-w-[180px] truncate">
+                        {expense.invoiceRef && (
+                          <span className="flex items-center gap-1">
+                            <Hash className="w-3 h-3" />
+                            {expense.invoiceRef}
+                          </span>
+                        )}
+                        {expense.notes && (
+                          <span className="italic truncate block">
+                            {expense.notes}
+                          </span>
+                        )}
+                        {!expense.invoiceRef && !expense.notes && "—"}
+                      </td>
+
+                      <td className="px-3 py-1.5 text-right align-middle whitespace-nowrap">
+                        <span className="text-rose-600 font-semibold text-xs">
+                          {formatCurrency(expense.amount)}
+                        </span>
+                      </td>
+
+                      <td
+                        className="px-3 py-1.5 align-middle"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex items-center justify-center">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button
@@ -635,68 +643,40 @@ export default function ExpensesPage() {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
-                      </div>
-                    </div>
-
-                    {/* Amount row */}
-                    <div className="flex items-center justify-between mt-3 px-2.5 py-1.5 rounded-lg border border-dashed border-rose-200 bg-rose-50">
-                      <span className="text-[10px] font-bold tracking-wide text-slate-500">
-                        AMOUNT
-                      </span>
-                      <span className="text-sm font-extrabold text-rose-600">
-                        {formatCurrency(expense.amount)}
-                      </span>
-                    </div>
-
-                    {/* Paid to + date row */}
-                    <div className="flex items-center justify-between mt-3">
-                      <div className="flex items-center gap-1 text-xs text-slate-500 min-w-0">
-                        <User className="w-3 h-3 shrink-0" />
-                        <span className="truncate">
-                          {expense.paidTo || "—"}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1 text-[11px] text-slate-400 shrink-0">
-                        <Calendar className="w-3 h-3" />
-                        {expense.date
-                          ? format(new Date(expense.date), "dd MMM yyyy")
-                          : "—"}
-                      </div>
-                    </div>
-
-                    {/* Notes / invoice ref */}
-                    {(expense.notes || expense.invoiceRef) && (
-                      <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-2 pt-2 border-t border-dashed border-slate-100">
-                        {expense.notes && (
-                          <span className="text-[11px] text-slate-400 italic truncate">
-                            {expense.notes}
-                          </span>
-                        )}
-                        {expense.invoiceRef && (
-                          <span className="flex items-center gap-1 text-[11px] text-slate-400 shrink-0">
-                            <Hash className="w-3 h-3" />
-                            Ref: {expense.invoiceRef}
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    <p className="text-[10px] text-slate-400 mt-2">
-                      Entered by {enteredByName}
-                    </p>
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
-          )}
-        </div>
-
-        {!isLoading && filteredExpenses.length > 0 && (
-          <p className="text-center text-xs text-slate-400">
-            Showing {filteredExpenses.length} of {allExpenses.length} expenses
-          </p>
+                      </td>
+                    </motion.tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
+
+      {/* Pagination — compact, Items-page style */}
+      {!isLoading && filteredExpenses.length > 0 && (
+        <div className="flex justify-between items-center mt-3">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page === 1}
+            onClick={() => setPage((p) => p - 1)}
+          >
+            Previous
+          </Button>
+          <p className="text-xs text-slate-500">
+            Page {page} of {totalPages}
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page === totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Next
+          </Button>
+        </div>
+      )}
 
       {/* ---------------- Add/Edit Expense Dialog ---------------- */}
       <Dialog

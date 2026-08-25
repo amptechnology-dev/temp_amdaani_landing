@@ -5,28 +5,10 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
-  Receipt,
-  Users,
-  Package,
-  ShoppingCart,
-  Settings,
-  FileText,
-  ChevronRight,
-  TrendingUp,
-  PackageSearch,
-  BarChart3,
-  Wallet,
   FileBarChart,
-  PieChart,
-  Landmark,
-  UserCheck,
-  BookOpen,
-  MessageSquareHeart,
-  LifeBuoy,
-  ShieldCheck,
-  Building2,
-  CreditCard,
+  Settings,
   LogOut,
+  ChevronRight,
   ChevronsUpDown,
 } from "lucide-react";
 
@@ -55,175 +37,9 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "../../context/AuthContext";
+import { sections, reportSubItems, isItemVisible } from "../lib/navigation"; 
 
-// -----------------------------------------
-// Reports sub-items
-// -----------------------------------------
-const reportSubItems = [
-  {
-    title: "Sales Report",
-    url: "/dashboard/reports/sales",
-    icon: TrendingUp,
-    key: "sales",
-  },
-  {
-    title: "Product Report",
-    url: "/dashboard/reports/products",
-    icon: Package,
-    key: "products",
-  },
-  {
-    title: "Product Wise Sales",
-    url: "/dashboard/reports/product-wise-sales",
-    icon: BarChart3,
-    key: "productWiseSales",
-  },
-  {
-    title: "Expense Report",
-    url: "/dashboard/reports/expenses",
-    icon: Wallet,
-    key: "expenses",
-  },
-  {
-    title: "GST Report",
-    url: "/dashboard/reports/gst",
-    icon: FileBarChart,
-    key: "gst",
-  },
-  {
-    title: "Stock Report",
-    url: "/dashboard/reports/stock",
-    icon: PackageSearch,
-    key: "stock",
-    requiresStock: true,
-  },
-  {
-    title: "Profit & Loss Report",
-    url: "/dashboard/reports/profit-loss",
-    icon: PieChart,
-    key: "profitLoss",
-  },
-  {
-    title: "Purchase Report",
-    url: "/dashboard/reports/purchase",
-    icon: ShoppingCart,
-    key: "purchase",
-    requiresPurchaseOrder: true,
-  },
-  {
-    title: "Creditors Report",
-    url: "/dashboard/reports/creditors",
-    icon: Landmark,
-    key: "creditors",
-  },
-  {
-    title: "Debtors Report",
-    url: "/dashboard/reports/debtors",
-    icon: UserCheck,
-    key: "debtors",
-  },
-];
-
-// -----------------------------------------
-// Grouped sections
-// -----------------------------------------
-const sections = [
-  {
-    label: "Menu",
-    items: [{ title: "Dashboard", url: "/dashboard", icon: LayoutDashboard }],
-  },
-  {
-    label: "Master",
-    items: [
-      { title: "Items", url: "/dashboard/items", icon: Package },
-      {
-        title: "Vendors",
-        url: "/dashboard/vendors",
-        icon: Users,
-        requiresPurchaseOrder: true,
-      },
-      { title: "Customers", url: "/dashboard/customers", icon: Users },
-    ],
-  },
-  {
-    label: "Billing & Other Expenses",
-    items: [
-      {
-        title: "Purchase",
-        url: "/dashboard/purchase",
-        icon: ShoppingCart,
-        requiresPurchaseOrder: true,
-      },
-      { title: "Invoices", url: "/dashboard/sales", icon: Receipt },
-      { title: "Other Expenses", url: "/dashboard/expenses", icon: Wallet },
-    ],
-  },
-  {
-    label: "Reports & Insights",
-    items: [
-      {
-        title: "All Transactions",
-        url: "/dashboard/transactions",
-        icon: FileText,
-      },
-    ],
-  },
-  {
-    label: "Business Setup",
-    items: [
-      { title: "Business Profile", url: "/dashboard/profile", icon: Building2 },
-      {
-        title: "Print Preference",
-        url: "/dashboard/print-preference",
-        icon: FileText,
-      },
-    ],
-  },
-  {
-    label: "Subscriptions",
-    items: [
-      { title: "Plans & Pricing", url: "/dashboard/pricing", icon: CreditCard },
-    ],
-  },
-  {
-    label: "Resources",
-    items: [
-      {
-        title: "Our Products",
-        url: "/dashboard/products",
-        icon: PackageSearch,
-      },
-      { title: "How to Use", url: "/dashboard/how-to-use", icon: BookOpen },
-      {
-        title: "Give Feedback",
-        url: "/dashboard/feedback",
-        icon: MessageSquareHeart,
-      },
-    ],
-  },
-  {
-    label: "Support",
-    items: [
-      { title: "Help & Support", url: "/dashboard/support", icon: LifeBuoy },
-      {
-        title: "Privacy Policy",
-        url: "/dashboard/privacy-policy",
-        icon: ShieldCheck,
-      },
-    ],
-  },
-];
-
-const user = {
-  name: "AMDAANI",
-  email: "m@example.com",
-};
-
-function isItemVisible(item, { isStockEnabled, isPurchaseOrderEnabled }) {
-  if (item.requiresStock && !isStockEnabled) return false;
-  if (item.requiresPurchaseOrder && !isPurchaseOrderEnabled) return false;
-  return true;
-}
+const user = { name: "AMDAANI", email: "m@example.com" };
 
 export function AppSidebar({ ...props }) {
   const pathname = usePathname();

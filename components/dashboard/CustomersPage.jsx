@@ -6,10 +6,11 @@ import { useTheme } from "../../context/ThemeContext";
 import { themeConfig } from "../../utils/ThemeConfig";
 import { useAuth } from "../../context/AuthContext";
 import api from "../../utils/api";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Formik, Form, ErrorMessage } from "formik";
 import * as Yup from "yup";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 // Icons
 import {
@@ -21,16 +22,13 @@ import {
   User,
   Phone,
   PhoneCall,
-  IndianRupee,
   MoreVertical,
   RefreshCw,
-  AlertCircle,
   CheckCircle,
   X,
   MapPin,
   Hash,
   Star,
-  FileText,
   Users,
   Wallet,
 } from "lucide-react";
@@ -46,7 +44,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,7 +58,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
@@ -66,9 +69,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
-import { useRouter } from "next/navigation";
 
 // Helper function for debouncing
 function useDebounce(value, delay) {
@@ -142,30 +143,11 @@ const extractErrorMessage = (error) => {
   return "An unexpected error occurred";
 };
 
-// -----------------------------------------
-// Due severity helper — RN app er getDueSeverity() logic
-// -----------------------------------------
+// Due severity helper
 const getDueSeverity = (amount) => {
-  if (amount >= 10000)
-    return {
-      level: "critical",
-      color: "#DC2626",
-      bg: "#FEF2F2",
-      border: "#FCA5A5",
-    };
-  if (amount >= 5000)
-    return {
-      level: "warning",
-      color: "#F57C00",
-      bg: "#FFF7ED",
-      border: "#FDBA74",
-    };
-  return {
-    level: "normal",
-    color: "#2563EB",
-    bg: "#EFF6FF",
-    border: "#93C5FD",
-  };
+  if (amount >= 10000) return "#DC2626";
+  if (amount >= 5000) return "#F57C00";
+  return "#059669";
 };
 
 export default function CustomersPage() {
@@ -175,10 +157,10 @@ export default function CustomersPage() {
   const router = useRouter();
 
   // State management
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeFilter, setActiveFilter] = useState("all"); // "all" | "due"
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(100); // card view — বড় page size, scroll-based
+  const [pageSize, setPageSize] = useState(10);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isCustomerDialogOpen, setIsCustomerDialogOpen] = useState(false);
@@ -203,7 +185,7 @@ export default function CustomersPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, activeTab]);
+  }, [debouncedSearch, activeFilter]);
 
   useEffect(() => {
     if (!authState?.isAuthenticated) return;
@@ -258,12 +240,12 @@ export default function CustomersPage() {
   };
 
   const customersData = useMemo(() => {
-    return activeTab === "due" ? dueCustomersData : allCustomersData;
-  }, [activeTab, allCustomersData, dueCustomersData]);
+    return activeFilter === "due" ? dueCustomersData : allCustomersData;
+  }, [activeFilter, allCustomersData, dueCustomersData]);
 
-  const isLoading = activeTab === "due" ? isLoadingDue : isLoadingAll;
+  const isLoading = activeFilter === "due" ? isLoadingDue : isLoadingAll;
 
-  // ✅ Top 5 customer IDs (RN app er top5CustomerIds logic) — sorted by totalInvoices
+  // Top 5 customer IDs — sorted by totalInvoices
   const top5CustomerIds = useMemo(() => {
     return [...allCustomersData.items]
       .filter((c) => (c.totalInvoices || 0) > 0)
@@ -385,334 +367,303 @@ export default function CustomersPage() {
 
   const customers = customersData?.items || [];
   const total = customersData?.total || 0;
+  const totalPages = customersData?.totalPages || 1;
 
   const totalCustomers = allCustomersData.total;
-  const totalDueFromAll = allCustomersData.items.reduce(
-    (sum, c) => sum + (c.totalDue || c.dueAmount || 0),
-    0,
-  );
-  const activeCustomers = allCustomersData.items.filter(
-    (c) => !c.status || c.status === "active",
-  ).length;
   const customersWithDue = allCustomersData.items.filter(
     (c) => (c.totalDue || c.dueAmount || 0) > 0,
   ).length;
   const totalDueCustomers = dueCustomersData.total;
 
-  const filteredCustomers = customers.filter((customer) => {
-    if (!searchTerm) return true;
-    const q = searchTerm.toLowerCase();
-    return (
-      customer.name?.toLowerCase().includes(q) ||
-      customer.mobile?.toLowerCase().includes(q) ||
-      customer.gstNumber?.toLowerCase().includes(q) ||
-      customer.address?.toLowerCase().includes(q)
+  const filteredCustomers = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return customers;
+    return customers.filter(
+      (customer) =>
+        customer.name?.toLowerCase().includes(q) ||
+        customer.mobile?.toLowerCase().includes(q) ||
+        customer.gstNumber?.toLowerCase().includes(q) ||
+        customer.address?.toLowerCase().includes(q),
     );
-  });
+  }, [customers, searchTerm]);
 
-  const totalDueAmount = dueCustomersData.items.reduce(
-    (sum, c) => sum + (c.totalDue || c.dueAmount || 0),
-    0,
-  );
+  // Filter chips — All / Due (Items page-er chip pattern)
+  const chips = [
+    { key: "all", label: "All Customers", icon: Users, count: totalCustomers },
+    {
+      key: "due",
+      label: "Due Customers",
+      icon: Wallet,
+      count: totalDueCustomers,
+      danger: true,
+    },
+  ];
 
   return (
-    <div className={`min-h-screen w-full ${currentTheme.background}`}>
-      <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
-        {/* ---------------- HEADER ---------------- */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="space-y-4"
-        >
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div>
-              <h1
-                className={`text-2xl md:text-3xl font-bold ${currentTheme.text}`}
-              >
-                My Customers
-              </h1>
-              <p className={`mt-1 text-sm ${currentTheme.textSecondary}`}>
-                Manage your customers and track outstanding payments
-              </p>
-            </div>
+    <div className={`min-h-screen p-3 md:p-4 ${currentTheme.background}`}>
+      {/* Header — compact, Items-page style */}
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h1 className={`text-lg md:text-xl font-bold ${currentTheme.text}`}>
+            Customers
+          </h1>
+          <p className={`text-xs ${currentTheme.textSecondary}`}>
+            Manage your customers and track outstanding payments
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={refreshData}
+            disabled={isRefreshing}
+          >
+            <RefreshCw
+              className={`w-3.5 h-3.5 mr-1.5 ${isRefreshing ? "animate-spin" : ""}`}
+            />
+            Refresh
+          </Button>
+          <Button onClick={handleAddCustomer} size="sm" className={currentTheme.buttonPrimary}>
+            <Plus className="w-3.5 h-3.5 mr-1.5" />
+            Add Customer
+          </Button>
+        </div>
+      </div>
 
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={refreshData}
-                disabled={isRefreshing}
-              >
-                <RefreshCw
-                  className={`w-4 h-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`}
-                />
-                Refresh
-              </Button>
-              <Button onClick={handleAddCustomer}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Customer
-              </Button>
-            </div>
-          </div>
-
-          {/* Stats strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              {
-                label: "Total Customers",
-                value: totalCustomers,
-                icon: Users,
-                loading: isLoadingAll,
-                color: "text-blue-600 bg-blue-50",
-              },
-              {
-                label: "Total Due",
-                value: `₹${totalDueFromAll.toLocaleString("en-IN")}`,
-                icon: Wallet,
-                loading: isLoadingAll,
-                color: "text-rose-600 bg-rose-50",
-              },
-              {
-                label: "Active",
-                value: activeCustomers,
-                icon: CheckCircle,
-                loading: isLoadingAll,
-                color: "text-emerald-600 bg-emerald-50",
-              },
-              {
-                label: "With Due",
-                value:
-                  activeTab === "due" ? totalDueCustomers : customersWithDue,
-                icon: AlertCircle,
-                loading: isLoadingAll,
-                color: "text-orange-600 bg-orange-50",
-              },
-            ].map((stat, i) => (
-              <div
-                key={i}
-                className="bg-white rounded-2xl border border-slate-200 p-3.5 flex items-center gap-3"
-              >
-                <div
-                  className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${stat.color}`}
-                >
-                  <stat.icon className="w-4 h-4" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[11px] text-slate-400 font-medium truncate">
-                    {stat.label}
-                  </p>
-                  <p className="text-base font-bold text-slate-800 truncate">
-                    {stat.loading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      stat.value
-                    )}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* ---------------- SEARCH ---------------- */}
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+      {/* Search + limit — compact single row */}
+      <div className="flex gap-2 mb-2.5">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           <Input
-            placeholder="Search by name or phone number..."
+            placeholder="Search by name or phone number…"
+            className="pl-9 h-8 text-sm rounded-lg"
             value={searchTerm}
             onChange={handleSearchChange}
-            className="pl-11 h-12 rounded-full bg-slate-100 border-none focus-visible:ring-2 focus-visible:ring-blue-500"
           />
           {searchTerm && (
-            <button
+            <X
               onClick={handleClearSearch}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-            >
-              <X className="w-4 h-4" />
-            </button>
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 cursor-pointer text-gray-400"
+            />
           )}
         </div>
 
-        {/* ---------------- TABS (segmented control, RN app er style) ---------------- */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="w-full grid grid-cols-2 bg-slate-100 p-1 h-12 rounded-xl">
-            <TabsTrigger
-              value="all"
-              className="rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white flex items-center gap-2"
+        <Select value={pageSize} onValueChange={(v) => setPageSize(Number(v))}>
+          <SelectTrigger className="w-[100px] h-8 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {[10, 25, 50, 100].map((x) => (
+              <SelectItem key={x} value={x}>
+                {x} / page
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Filter chips — compact, Items-page style */}
+      <div className="flex gap-1.5 overflow-x-auto pb-1 mb-2.5 no-scrollbar">
+        {chips.map((chip) => {
+          const active = activeFilter === chip.key;
+          const Icon = chip.icon;
+          const loadingCount =
+            chip.key === "due" ? isLoadingDue : isLoadingAll;
+          return (
+            <button
+              key={chip.key}
+              onClick={() => setActiveFilter(chip.key)}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap border transition-colors ${
+                active
+                  ? chip.danger
+                    ? "bg-rose-50 text-rose-600 border-rose-200"
+                    : "bg-emerald-50 text-emerald-600 border-emerald-200"
+                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+              }`}
             >
-              <Users className="w-4 h-4" />
-              All Customers
-              <Badge variant="secondary" className="ml-1">
-                {isLoadingAll ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                ) : (
-                  totalCustomers
-                )}
-              </Badge>
-            </TabsTrigger>
-            <TabsTrigger
-              value="due"
-              className="rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white flex items-center gap-2 relative"
-            >
-              <Wallet className="w-4 h-4" />
-              Due Customers
-              {totalDueCustomers > 0 && (
-                <Badge className="ml-1 bg-red-500 hover:bg-red-500">
-                  {isLoadingDue ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    totalDueCustomers
-                  )}
-                </Badge>
-              )}
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+              <Icon className="w-3 h-3" />
+              {chip.label}
+              <span
+                className={`ml-0.5 px-1.5 rounded-full text-[10px] font-bold ${
+                  active ? "bg-white/70" : "bg-slate-100"
+                }`}
+              >
+                {loadingCount ? "…" : chip.count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
 
-        {/* ---------------- DUE SUMMARY CARD (শুধু Due tab-এ) ---------------- */}
-        {activeTab === "due" && dueCustomersData.items.length > 0 && (
-          <Card className="rounded-2xl border-slate-200 bg-slate-50/60">
-            <CardContent className="p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center">
-                  <IndianRupee className="w-4 h-4 text-rose-600" />
-                </div>
-                <div>
-                  <p className="text-[11px] font-medium text-slate-500">
-                    Total Due
-                  </p>
-                  <p className="text-lg font-bold text-rose-600">
-                    ₹{totalDueAmount.toLocaleString("en-IN")}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="text-right">
-                  <p className="text-[11px] font-medium text-slate-500">
-                    Due Accounts
-                  </p>
-                  <p className="text-lg font-bold text-blue-600">
-                    {totalDueCustomers}
-                  </p>
-                </div>
-                <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center">
-                  <User className="w-4 h-4 text-blue-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+      {/* ===== Excel-style dense table ===== */}
+      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+        <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-slate-50">
+          <span className="text-sm font-semibold text-slate-700">
+            Customers
+          </span>
+          <span className="text-xs text-slate-400">
+            Showing {filteredCustomers.length} of {total}
+          </span>
+        </div>
 
-        {/* ---------------- CUSTOMER LIST  */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {isLoading ? (
-            [...Array(6)].map((_, i) => (
-              <Skeleton key={i} className="h-32 w-full rounded-2xl" />
-            ))
-          ) : filteredCustomers.length === 0 ? (
-            <div className="col-span-full flex flex-col items-center justify-center py-20 text-center bg-white rounded-2xl border border-slate-200">
-              {activeTab === "due" ? (
-                <>
-                  <CheckCircle className="w-16 h-16 text-blue-400 mb-4" />
-                  <h3 className="text-lg font-bold text-slate-800 mb-1">
-                    {searchTerm ? "No Customers Found" : "All Clear! 🎉"}
-                  </h3>
-                  <p className="text-sm text-slate-400 max-w-sm">
-                    {searchTerm
-                      ? `No customers match "${searchTerm}".`
-                      : "Great job! All your customers have cleared their outstanding payments."}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <User className="w-16 h-16 text-slate-300 mb-4" />
-                  <h3 className="text-lg font-bold text-slate-800 mb-1">
-                    {searchTerm ? "No Customers Found" : "No Customers Yet"}
-                  </h3>
-                  <p className="text-sm text-slate-400 max-w-sm mb-4">
-                    {searchTerm
-                      ? `No customers match "${searchTerm}".`
-                      : "Start by adding your first customer to begin tracking sales and payments."}
-                  </p>
-                  {!searchTerm && (
-                    <Button onClick={handleAddCustomer}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Customer
-                    </Button>
-                  )}
-                </>
-              )}
-            </div>
-          ) : (
-            <AnimatePresence>
-              {filteredCustomers.map((customer, index) => {
-                const isDueTab = activeTab === "due";
-                const dueAmount = customer.totalDue || customer.dueAmount || 0;
-                const showDueBadge = isDueTab && dueAmount > 0;
-                const severity = showDueBadge
-                  ? getDueSeverity(dueAmount)
-                  : null;
-                const rank = getCustomerRank(customer._id);
+        {isLoading ? (
+          <div className="flex items-center justify-center py-14 text-slate-400 text-sm">
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Loading customers...
+          </div>
+        ) : filteredCustomers.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-14 text-center">
+            {activeFilter === "due" ? (
+              <>
+                <CheckCircle className="w-10 h-10 text-blue-400 mb-2" />
+                <p className="text-sm font-semibold text-slate-700">
+                  {searchTerm ? "No Customers Found" : "All Clear! 🎉"}
+                </p>
+                <p className="text-xs text-slate-400 max-w-xs mt-0.5">
+                  {searchTerm
+                    ? `No customers match "${searchTerm}".`
+                    : "All your customers have cleared their outstanding payments."}
+                </p>
+              </>
+            ) : (
+              <>
+                <User className="w-10 h-10 text-slate-300 mb-2" />
+                <p className="text-sm font-semibold text-slate-700">
+                  {searchTerm ? "No Customers Found" : "No Customers Yet"}
+                </p>
+                <p className="text-xs text-slate-400 max-w-xs mt-0.5">
+                  {searchTerm
+                    ? `No customers match "${searchTerm}".`
+                    : "Add your first customer to begin tracking sales and payments."}
+                </p>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wide border-b border-slate-200">
+                  <th className="text-left font-semibold px-3 py-1.5 w-8">
+                    #
+                  </th>
+                  <th className="text-left font-semibold px-3 py-1.5">
+                    Customer
+                  </th>
+                  <th className="text-left font-semibold px-3 py-1.5">
+                    Contact
+                  </th>
+                  <th className="text-left font-semibold px-3 py-1.5">
+                    Location
+                  </th>
+                  <th className="text-right font-semibold px-3 py-1.5">
+                    Invoices
+                  </th>
+                  <th className="text-right font-semibold px-3 py-1.5">
+                    {activeFilter === "due" ? "Outstanding" : "Due"}
+                  </th>
+                  <th className="text-center font-semibold px-3 py-1.5 w-20">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCustomers.map((customer, index) => {
+                  const dueAmount =
+                    customer.totalDue || customer.dueAmount || 0;
+                  const dColor = getDueSeverity(dueAmount);
+                  const rank = getCustomerRank(customer._id);
 
-                return (
-                  <motion.div
-                    key={customer._id}
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -12 }}
-                    transition={{ duration: 0.2, delay: index * 0.02 }}
-                    onClick={() => {
-                      if (activeTab === "due") {
-                        router.push(`/dashboard/customers/due/${customer._id}`);
-                      } else {
-                        handleEditCustomer(customer);
-                      }
-                    }}
-                    className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 cursor-pointer hover:shadow-md hover:border-blue-200 transition-all relative group"
-                    style={
-                      showDueBadge
-                        ? {
-                            borderLeftWidth: 4,
-                            borderLeftColor: severity.color,
-                          }
-                        : undefined
-                    }
-                  >
-                    {/* Top row — name + rank + actions menu */}
-                    <div className="flex justify-between items-start gap-2">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <p className="font-bold text-slate-800 capitalize truncate">
-                            {customer.name || "No Name"}
-                          </p>
+                  return (
+                    <motion.tr
+                      key={customer._id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.15 }}
+                      onClick={() => {
+                        if (activeFilter === "due") {
+                          router.push(
+                            `/dashboard/customers/due/${customer._id}`,
+                          );
+                        } else {
+                          handleEditCustomer(customer);
+                        }
+                      }}
+                      className={`cursor-pointer border-b border-slate-100 last:border-0 hover:bg-blue-50/60 transition-colors ${
+                        index % 2 === 1 ? "bg-slate-50/40" : "bg-white"
+                      }`}
+                    >
+                      <td className="px-3 py-1.5 text-slate-400 text-xs align-middle">
+                        {(page - 1) * pageSize + index + 1}
+                      </td>
+
+                      <td className="px-3 py-1.5 align-middle">
+                        <div className="flex items-center gap-1.5 min-w-0">
                           {rank > 0 && (
-                            <span className="flex items-center gap-1 bg-amber-50 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
-                              <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                            <span
+                              title="Top customer"
+                              className="shrink-0 flex items-center gap-0.5 bg-amber-50 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                            >
+                              <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
                               #{rank}
                             </span>
                           )}
+                          <span className="font-medium text-slate-800 capitalize truncate">
+                            {customer.name || "No Name"}
+                          </span>
                         </div>
-                        <div className="flex items-center gap-1 text-xs text-slate-500 mt-0.5">
+                      </td>
+
+                      <td className="px-3 py-1.5 text-slate-500 text-xs align-middle whitespace-nowrap">
+                        <span className="flex items-center gap-1">
                           <Phone className="w-3 h-3" />
                           {customer.mobile || "-"}
-                        </div>
-                      </div>
+                        </span>
+                      </td>
 
-                      <div className="flex items-start gap-1 shrink-0">
-                        {customer.mobile && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCall(customer.mobile);
-                            }}
-                            className="w-6 h-6 rounded-full bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center shrink-0"
-                            title="Call customer"
+                      <td className="px-3 py-1.5 text-slate-500 text-xs align-middle max-w-[180px] truncate">
+                        <span className="flex items-center gap-1">
+                          <MapPin className="w-3 h-3 shrink-0" />
+                          <span className="truncate">
+                            {customer.address || "-"}
+                          </span>
+                        </span>
+                      </td>
+
+                      <td className="px-3 py-1.5 text-right align-middle">
+                        <span className="flex items-center justify-end gap-1 text-slate-500 text-xs">
+                          <Hash className="w-3 h-3" />
+                          {customer.totalInvoices || 0}
+                        </span>
+                      </td>
+
+                      <td className="px-3 py-1.5 text-right align-middle whitespace-nowrap">
+                        {dueAmount > 0 ? (
+                          <span
+                            className="font-bold text-xs"
+                            style={{ color: dColor }}
                           >
-                            <PhoneCall className="w-3 h-3 text-white" />
-                          </button>
+                            ₹{dueAmount.toLocaleString("en-IN")}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 text-xs">—</span>
                         )}
-                        <div onClick={(e) => e.stopPropagation()}>
+                      </td>
+
+                      <td
+                        className="px-3 py-1.5 align-middle"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex items-center justify-center gap-1">
+                          {customer.mobile && (
+                            <button
+                              onClick={() => handleCall(customer.mobile)}
+                              title="Call customer"
+                              className="flex items-center justify-center w-6 h-6 rounded-md bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                            >
+                              <PhoneCall className="w-3 h-3" />
+                            </button>
+                          )}
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button
@@ -741,70 +692,37 @@ export default function CustomersPage() {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
-                      </div>
-                    </div>
-
-                    {/* Due / Invoice count row */}
-                    {showDueBadge ? (
-                      <div
-                        className="flex items-center justify-between mt-3 px-2.5 py-1.5 rounded-lg border border-dashed"
-                        style={{
-                          borderColor: severity.border,
-                          backgroundColor: severity.bg,
-                        }}
-                      >
-                        <span className="text-[10px] font-bold tracking-wide text-slate-500">
-                          OUTSTANDING
-                        </span>
-                        <span
-                          className="text-sm font-extrabold"
-                          style={{ color: severity.color }}
-                        >
-                          ₹{dueAmount.toLocaleString("en-IN")}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1 text-[11px] text-slate-400 mt-2">
-                        <Hash className="w-3 h-3" />
-                        {customer.totalInvoices || 0} Invoice
-                        {customer.totalInvoices !== 1 ? "s" : ""}
-                      </div>
-                    )}
-
-                    {/* Bottom row — address + pending badge */}
-                    <div className="flex justify-between items-center mt-3">
-                      <div className="flex items-center gap-1 text-xs text-slate-400 min-w-0">
-                        <MapPin className="w-3 h-3 shrink-0" />
-                        <span className="truncate">
-                          {customer.address || "-"}
-                        </span>
-                      </div>
-                      {showDueBadge ? (
-                        <span className="text-[10px] font-semibold text-slate-500 flex items-center gap-1 shrink-0">
-                          <FileText className="w-3 h-3" />
-                          {customer.pendingInvoiceCount || 0} Pending
-                        </span>
-                      ) : (
-                        !isDueTab &&
-                        dueAmount > 0 && (
-                          <p className="text-orange-600 font-bold text-xs shrink-0">
-                            ₹{dueAmount.toLocaleString("en-IN")} due
-                          </p>
-                        )
-                      )}
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
-          )}
-        </div>
-
-        {!isLoading && filteredCustomers.length > 0 && (
-          <p className="text-center text-xs text-slate-400">
-            Showing {filteredCustomers.length} of {total} customers
-          </p>
+                      </td>
+                    </motion.tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
+      </div>
+
+      {/* Pagination — compact, Items-page style */}
+      <div className="flex justify-between items-center mt-3">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={page === 1}
+          onClick={() => setPage((p) => p - 1)}
+        >
+          Previous
+        </Button>
+        <p className="text-xs text-slate-500">
+          Page {page} of {totalPages}
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={page === totalPages}
+          onClick={() => setPage((p) => p + 1)}
+        >
+          Next
+        </Button>
       </div>
 
       {/* ---------------- Add/Edit Customer Dialog ---------------- */}
