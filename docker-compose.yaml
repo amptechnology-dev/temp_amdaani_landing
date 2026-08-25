@@ -1,12 +1,14 @@
 services:
   app:
-    build: .
+    image: ghcr.io/amptechnology-dev/temp_amdaani_landing:latest
     container_name: landing-app
     restart: unless-stopped
     env_file:
       - .env
     expose:
       - "7010"
+    mem_limit: 512m
+    cpus: 1.0
     networks:
       - app-network
 
