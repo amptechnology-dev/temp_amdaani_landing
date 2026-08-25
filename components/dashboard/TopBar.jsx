@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Bell,
   Sun,
@@ -21,11 +21,18 @@ import {
   BreadcrumbLink,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { getPageInfo } from "../../src/lib/navigation"; 
 
-export default function Topbar({ theme, pageTitle = "Overview" }) {
+export default function Topbar({ theme, pageTitle }) {
   const { theme: currentTheme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+
+  // Resolve title/parent dynamically from the current route.
+  // If a `pageTitle` prop is explicitly passed, it takes priority (manual override).
+  const { title: derivedTitle, parent } = getPageInfo(pathname);
+  const activeTitle = pageTitle || derivedTitle;
 
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -88,12 +95,27 @@ export default function Topbar({ theme, pageTitle = "Overview" }) {
                     Dashboard
                   </BreadcrumbLink>
                 </BreadcrumbItem>
+
+                {/* Optional middle crumb, e.g. "Reports" for report sub-pages */}
+                {parent && (
+                  <>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                      <span
+                        className={`text-[12px] font-medium ${theme.textSecondary}`}
+                      >
+                        {parent}
+                      </span>
+                    </BreadcrumbItem>
+                  </>
+                )}
+
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
                   <span
                     className={`text-[12px] font-medium ${theme.textSecondary}`}
                   >
-                    {pageTitle}
+                    {activeTitle}
                   </span>
                 </BreadcrumbItem>
               </BreadcrumbList>
@@ -101,7 +123,7 @@ export default function Topbar({ theme, pageTitle = "Overview" }) {
             <h1
               className={`text-[15px] font-bold ${theme.text} leading-tight truncate mt-0.5`}
             >
-              {pageTitle}
+              {activeTitle}
             </h1>
           </div>
 
@@ -109,7 +131,7 @@ export default function Topbar({ theme, pageTitle = "Overview" }) {
           <h1
             className={`md:hidden text-[15px] font-bold ${theme.text} truncate`}
           >
-            {pageTitle}
+            {activeTitle}
           </h1>
         </div>
 

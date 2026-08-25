@@ -20,6 +20,7 @@ import {
   X,
   Trash2,
   Pencil,
+  PackageSearch,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -92,12 +93,10 @@ function InlineProductCombobox({ products, onSelect, onCreateNew }) {
     (p) => p.name?.toLowerCase().trim() === query.trim().toLowerCase(),
   );
 
-  // ✅ Reset highlight whenever the visible list changes (new query / open)
   useEffect(() => {
     setHighlightIndex(-1);
   }, [query, open]);
 
-  // ✅ Keep the highlighted row scrolled into view
   useEffect(() => {
     if (highlightIndex >= 0 && itemRefs.current[highlightIndex]) {
       itemRefs.current[highlightIndex].scrollIntoView({ block: "nearest" });
@@ -151,6 +150,7 @@ function InlineProductCombobox({ products, onSelect, onCreateNew }) {
   return (
     <div className="relative w-full">
       <div className="relative">
+        <PackageSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300 pointer-events-none" />
         <input
           ref={inputRef}
           value={query}
@@ -160,7 +160,8 @@ function InlineProductCombobox({ products, onSelect, onCreateNew }) {
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={handleKeyDown}
-          className="w-full max-w-[220px] h-8 px-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+          placeholder="Search or add a product…"
+          className="w-full max-w-[240px] h-9 pl-8 pr-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-white transition-colors"
         />
       </div>
 
@@ -176,7 +177,7 @@ function InlineProductCombobox({ products, onSelect, onCreateNew }) {
               width: coords.width,
               zIndex: 9999,
             }}
-            className="bg-white border border-slate-200 rounded-md shadow-lg max-h-72 overflow-y-auto"
+            className="bg-white border border-slate-200 rounded-xl shadow-xl max-h-72 overflow-y-auto"
           >
             {filtered.map((p, idx) => (
               <div
@@ -241,6 +242,10 @@ const emptyCustomerForm = {
   gstNumber: "",
 };
 
+// Smaller, compact input style for the Customer Details form
+const inputClass =
+  "w-full h-8 pl-7 pr-2.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-slate-50/60 focus:bg-white transition-colors";
+
 export default function NewInvoiceFormPage({
   isLoading,
   isEditMode,
@@ -297,18 +302,12 @@ export default function NewInvoiceFormPage({
   const [selectedCustomerId, setSelectedCustomerId] = useState(
     selectedCustomer?._id || "",
   );
-  // ✅ which field's typeahead dropdown is currently open: "name" | "mobile" | null
   const [activeField, setActiveField] = useState(null);
-  // ✅ keyboard highlight index shared between mobile/name dropdown (only one open at a time)
   const [customerHighlightIndex, setCustomerHighlightIndex] = useState(-1);
   const customerItemRefs = useRef([]);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [newItemPrefillName, setNewItemPrefillName] = useState("");
   const customerGridRef = useRef(null);
-
-  // ✅ NEW — jokhon pencil icon click hoy kono existing cart item-e, ei state-e
-  // sei item-take rakha hoy — AddItemFormModal ta tokhon "editItem" pabe ar
-  // full Add/Edit Item form-ta pre-filled edit mode-e khulbe (Image 2 style).
   const [editingCartItem, setEditingCartItem] = useState(null);
 
   useEffect(() => {
@@ -324,13 +323,11 @@ export default function NewInvoiceFormPage({
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
-  // ✅ EDIT MODE — customers list loaded pore, existing customer ke mobile diye match kore
-  // fields e select kore dey (jehetu edit-e _id thake na loaded invoice-e)
   const editSeededRef = useRef(false);
 
   useEffect(() => {
     if (isLoading) {
-      editSeededRef.current = false; // next load-er jonno reset
+      editSeededRef.current = false;
       return;
     }
 
@@ -355,7 +352,6 @@ export default function NewInvoiceFormPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, isEditMode, selectedCustomer, customers]);
 
-  // ✅ Push customerForm up to parent as selectedCustomer whenever it changes
   useEffect(() => {
     const hasData = customerForm.name || customerForm.mobile;
     setSelectedCustomer(
@@ -366,7 +362,6 @@ export default function NewInvoiceFormPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerForm, selectedCustomerId]);
 
-  // ✅ Typeahead suggestions — filtered live by whichever field (name/mobile) is active
   const customerSuggestions = (() => {
     if (!activeField) return [];
     const q = (
@@ -380,12 +375,10 @@ export default function NewInvoiceFormPage({
       .slice(0, 8);
   })();
 
-  // ✅ Reset highlight whenever active field or the query changes
   useEffect(() => {
     setCustomerHighlightIndex(-1);
   }, [activeField, customerForm.mobile, customerForm.name]);
 
-  // ✅ Keep the highlighted row scrolled into view
   useEffect(() => {
     if (
       customerHighlightIndex >= 0 &&
@@ -421,14 +414,12 @@ export default function NewInvoiceFormPage({
     const v = e.target.value;
     setCustomerForm((prev) => ({ ...prev, [field]: v }));
 
-    // ✅ jodi user select kora customer-er field change kore, detach kore dao
     if (selectedCustomerId) {
       const matched = customers.find((c) => c._id === selectedCustomerId);
       if (matched && matched[field] !== v) setSelectedCustomerId("");
     }
   };
 
-  // ✅ Arrow-key navigation for the mobile/name typeahead fields
   const handleCustomerFieldKeyDown = (fieldName) => (e) => {
     const isOpen = activeField === fieldName && customerSuggestions.length > 0;
 
@@ -478,16 +469,10 @@ export default function NewInvoiceFormPage({
     setNewItemPrefillName("");
   };
 
-  // ✅ NEW — jokhon "Edit Item" form theke ekta EXISTING cart item update kore
-  // save deya hoy: (1) product master already update hoye geche AddItemFormModal
-  // er nijer PUT call diye, (2) ekhon shei fresh product data theke cart line
-  // item-er discount/GST/price ইত্যাদি abar bose jabe — thik addToCart() er moto
-  // logic diye.
   const handleCartItemUpdated = (updatedProduct) => {
     if (!editingCartItem || !updatedProduct) return;
     const cartItemId = editingCartItem._id;
 
-    // ✅ allProducts list-eo notun data sync kore rakhi
     setAllProducts?.((prev) =>
       prev.map((p) => (p._id === updatedProduct._id ? updatedProduct : p)),
     );
@@ -522,11 +507,8 @@ export default function NewInvoiceFormPage({
     handleUpdateItemField(cartItemId, "discountType", productDiscountType);
   };
 
-  // -------------------------------
-  // ✅ Number field helpers — free typing (0, 1, 10, decimals etc.)
-  // -------------------------------
   const handleQtyChange = (id) => (e) => {
-    const v = e.target.value.replace(/[^\d]/g, ""); // digits only
+    const v = e.target.value.replace(/[^\d]/g, "");
     handleUpdateItemField(id, "qty", v);
   };
   const handleQtyBlur = (id) => (e) => {
@@ -545,8 +527,6 @@ export default function NewInvoiceFormPage({
     handleUpdateItemField(id, field, isNaN(n) ? 0 : n);
   };
 
-  // ✅ Discount field — same free-typing behaviour, but on blur clamp to 0-100
-  // when discount type is "percent" so it can never push the price negative.
   const handleDiscountBlur = (id, discountType) => (e) => {
     let n = parseFloat(e.target.value);
     if (isNaN(n) || n < 0) n = 0;
@@ -565,62 +545,65 @@ export default function NewInvoiceFormPage({
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-5">
-        {/* Header */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-4 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onBack}
-              className="rounded-full hover:bg-slate-100"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
-                  {isEditMode ? "Edit Invoice" : "New Invoice"}
-                </h1>
-                {isEditMode && (
-                  <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">
-                    Editing
-                  </Badge>
-                )}
+        {/* Header — compact, blue-accented */}
+        <div className="relative bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="h-1 w-full bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-500" />
+          <div className="px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={onBack}
+                className="rounded-full border-slate-200 hover:bg-slate-50 hover:border-slate-300 shrink-0 h-8 w-8"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+              </Button>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
+                    {isEditMode ? "Edit Invoice" : "New Invoice"}
+                  </h1>
+                  {isEditMode && (
+                    <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border border-amber-200 text-[10px] px-1.5 py-0">
+                      Editing
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                  <Sparkles className="w-3 h-3 text-blue-500" />
+                  Add a customer and items to{" "}
+                  {isEditMode ? "update" : "generate"} the invoice
+                </p>
               </div>
-              <p className="text-sm text-slate-400 flex items-center gap-1 mt-0.5">
-                <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-                Add a customer and items to {isEditMode
-                  ? "update"
-                  : "generate"}{" "}
-                the invoice
-              </p>
             </div>
-          </div>
 
-          <div className="flex flex-wrap gap-2">
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-full text-sm text-slate-600">
-              <Calendar className="w-3.5 h-3.5 text-slate-400" />
-              {format(new Date(), "dd MMM yyyy")}
-            </div>
-            <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-full text-sm text-blue-700 font-medium">
-              <Hash className="w-3.5 h-3.5" />
-              {invoiceNumber || "Loading..."}
+            <div className="flex flex-wrap gap-2">
+              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-full text-xs text-slate-600 font-medium">
+                <Calendar className="w-3 h-3 text-slate-400" />
+                {format(new Date(), "dd MMM yyyy")}
+              </div>
+              <div className="flex items-center gap-1.5 bg-blue-600 px-2.5 py-1 rounded-full text-xs text-white font-semibold shadow-sm shadow-blue-200">
+                <Hash className="w-3 h-3 text-blue-200" />
+                {invoiceNumber || "Loading..."}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Customer */}
-        <Card className="rounded-xl border-slate-200 shadow-sm overflow-visible relative">
-          <CardHeader className="bg-slate-50 border-b border-slate-100 py-2.5 px-4 rounded-t-xl">
-            <CardTitle className="flex items-center justify-between text-sm font-semibold text-slate-700">
+        {/* Customer — compact form, now placed below Items */}
+        <Card className="rounded-2xl border-slate-200 shadow-sm overflow-visible relative">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-transparent border-b border-slate-100 py-2 px-4 rounded-t-2xl">
+            <CardTitle className="flex items-center justify-between text-xs font-semibold text-slate-700">
               <span className="flex items-center gap-2">
-                <UserCircle2 className="w-4 h-4 text-blue-600" />
-                Customer
+                <span className="w-6 h-6 rounded-lg bg-blue-600 flex items-center justify-center shadow-sm shadow-blue-200">
+                  <UserCircle2 className="w-3 h-3 text-white" />
+                </span>
+                Customer Details
               </span>
               {(customerForm.name || customerForm.mobile) && (
                 <button
                   onClick={handleClearCustomer}
-                  className="flex items-center gap-1 text-xs text-rose-500 hover:underline font-medium"
+                  className="flex items-center gap-1 text-[11px] text-rose-500 hover:text-rose-600 hover:underline font-medium"
                 >
                   <X className="w-3 h-3" />
                   Clear
@@ -628,14 +611,13 @@ export default function NewInvoiceFormPage({
               )}
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div
               ref={customerGridRef}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
+              className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2"
             >
-              {/* Mobile — typeahead */}
               <div className="relative">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 z-10" />
+                <Phone className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 z-10" />
                 <input
                   value={customerForm.mobile}
                   onChange={updateField("mobile")}
@@ -643,10 +625,10 @@ export default function NewInvoiceFormPage({
                   onKeyDown={handleCustomerFieldKeyDown("mobile")}
                   maxLength={10}
                   placeholder="Mobile *"
-                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className={inputClass}
                 />
                 {activeField === "mobile" && customerSuggestions.length > 0 && (
-                  <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-56 overflow-y-auto">
+                  <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-56 overflow-y-auto">
                     {customerSuggestions.map((c, idx) => (
                       <div
                         key={c._id}
@@ -673,19 +655,18 @@ export default function NewInvoiceFormPage({
                 )}
               </div>
 
-              {/* Name — typeahead */}
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 z-10" />
+                <User className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 z-10" />
                 <input
                   value={customerForm.name}
                   onChange={updateField("name")}
                   onFocus={() => setActiveField("name")}
                   onKeyDown={handleCustomerFieldKeyDown("name")}
                   placeholder="Name"
-                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className={inputClass}
                 />
                 {activeField === "name" && customerSuggestions.length > 0 && (
-                  <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-56 overflow-y-auto">
+                  <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-56 overflow-y-auto">
                     {customerSuggestions.map((c, idx) => (
                       <div
                         key={c._id}
@@ -713,7 +694,7 @@ export default function NewInvoiceFormPage({
               </div>
 
               <div className="relative">
-                <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <FileText className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
                 <input
                   value={customerForm.gstNumber}
                   onChange={(e) =>
@@ -723,58 +704,59 @@ export default function NewInvoiceFormPage({
                     }))
                   }
                   placeholder="GSTIN (optional)"
-                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-
-              <div className="relative sm:col-span-2 lg:col-span-1">
-                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                <input
-                  value={customerForm.address}
-                  onChange={updateField("address")}
-                  placeholder="Address"
-                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className={inputClass}
                 />
               </div>
 
               <div className="relative">
-                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                <input
+                  value={customerForm.address}
+                  onChange={updateField("address")}
+                  placeholder="Address"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="relative">
+                <Building2 className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
                 <input
                   value={customerForm.city}
                   onChange={updateField("city")}
                   placeholder="City"
-                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className={inputClass}
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <input
+                value={customerForm.state}
+                onChange={updateField("state")}
+                placeholder="State"
+                className="w-full h-8 px-2.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-slate-50/60 focus:bg-white transition-colors"
+              />
+
+              <div className="relative">
+                <Locate className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
                 <input
-                  value={customerForm.state}
-                  onChange={updateField("state")}
-                  placeholder="State"
-                  className="w-full h-10 px-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  value={customerForm.postalCode}
+                  onChange={updateField("postalCode")}
+                  maxLength={6}
+                  placeholder="Postal Code"
+                  className={inputClass}
                 />
-                <div className="relative">
-                  <Locate className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                  <input
-                    value={customerForm.postalCode}
-                    onChange={updateField("postalCode")}
-                    maxLength={6}
-                    placeholder="Postal Code"
-                    className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Items — excel-style table */}
-        <Card className="rounded-xl border-slate-200 shadow-sm overflow-hidden">
-          <CardHeader className="bg-slate-50 border-b border-slate-100 py-2.5 px-4">
+        {/* Items — moved up to where Customer used to be, now the primary focus */}
+        <Card className="rounded-2xl border-slate-200 shadow-sm overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-transparent border-b border-slate-100 py-3 px-4">
             <CardTitle className="flex items-center justify-between text-sm font-semibold text-slate-700">
-              <span className="flex items-center gap-2">
-                <ShoppingBag className="w-4 h-4 text-blue-600" />
+              <span className="flex items-center gap-2.5">
+                <span className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center shadow-sm shadow-blue-200">
+                  <ShoppingBag className="w-3.5 h-3.5 text-white" />
+                </span>
                 Items
                 {cartItems.length > 0 && (
                   <Badge className="ml-1 bg-blue-600 hover:bg-blue-600 text-[10px]">
@@ -784,13 +766,12 @@ export default function NewInvoiceFormPage({
               </span>
               <Button
                 size="sm"
-                variant="outline"
                 onClick={() => {
                   setEditingCartItem(null);
                   setNewItemPrefillName("");
                   setShowAddItemModal(true);
                 }}
-                className="h-7 rounded-full text-xs gap-1"
+                className="h-8 rounded-full text-xs gap-1 bg-blue-600 hover:bg-blue-700 shadow-sm shadow-blue-200"
               >
                 <Plus className="w-3.5 h-3.5" />
                 New Product
@@ -800,42 +781,47 @@ export default function NewInvoiceFormPage({
           <CardContent className="p-0 overflow-x-auto">
             <table className="w-full text-sm border-collapse min-w-[900px]">
               <thead>
-                <tr className="bg-slate-50 text-slate-500 text-xs">
-                  <th className="text-left font-medium px-3 py-2 border-b border-slate-100 w-10">
+                <tr className="bg-blue-50/70 text-blue-900/70 text-[11px] uppercase tracking-wide">
+                  <th className="text-left font-semibold px-3 py-2.5 border-b border-blue-100 w-10">
                     #
                   </th>
-                  <th className="text-left font-medium px-3 py-2 border-b border-slate-100">
+                  <th className="text-left font-semibold px-3 py-2.5 border-b border-blue-100">
                     Product
                   </th>
-                  <th className="text-left font-medium px-3 py-2 border-b border-slate-100 w-20">
+                  <th className="text-left font-semibold px-3 py-2.5 border-b border-blue-100 w-20">
                     HSN
                   </th>
-                  <th className="text-left font-medium px-3 py-2 border-b border-slate-100 w-16">
+                  <th className="text-left font-semibold px-3 py-2.5 border-b border-blue-100 w-16">
                     Unit
                   </th>
-                  <th className="text-center font-medium px-3 py-2 border-b border-slate-100 w-20">
+                  <th className="text-center font-semibold px-3 py-2.5 border-b border-blue-100 w-20">
                     Qty
                   </th>
-                  <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-24">
+                  <th className="text-right font-semibold px-3 py-2.5 border-b border-blue-100 w-24">
                     Price
                   </th>
-                  <th className="text-center font-medium px-3 py-2 border-b border-slate-100 w-32">
+                  <th className="text-center font-semibold px-3 py-2.5 border-b border-blue-100 w-32">
                     Discount
                   </th>
-                  <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-16">
+                  <th className="text-right font-semibold px-3 py-2.5 border-b border-blue-100 w-16">
                     GST%
                   </th>
-                  <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-28">
+                  <th className="text-right font-semibold px-3 py-2.5 border-b border-blue-100 w-28">
                     Total
                   </th>
-                  <th className="w-16 border-b border-slate-100"></th>
+                  <th className="w-16 border-b border-blue-100"></th>
                 </tr>
               </thead>
               <tbody>
                 {cartItems.map((item, i) => {
                   const discountType = item.discountType || "amount";
                   return (
-                    <tr key={item._id} className="hover:bg-slate-50/60">
+                    <tr
+                      key={item._id}
+                      className={`hover:bg-blue-50/50 transition-colors ${
+                        i % 2 === 1 ? "bg-slate-50/40" : "bg-white"
+                      }`}
+                    >
                       <td className="px-3 py-1.5 border-b border-slate-100 text-slate-400">
                         {i + 1}
                       </td>
@@ -906,7 +892,7 @@ export default function NewInvoiceFormPage({
                       <td className="px-3 py-1.5 border-b border-slate-100 text-right text-slate-500">
                         {item.gstRate || 0}%
                       </td>
-                      <td className="px-3 py-1.5 border-b border-slate-100 text-right font-semibold text-blue-600">
+                      <td className="px-3 py-1.5 border-b border-slate-100 text-right font-bold text-blue-600">
                         ₹{Number(item.total ?? 0).toFixed(2)}
                       </td>
                       <td className="px-2 py-1.5 border-b border-slate-100">
@@ -935,21 +921,33 @@ export default function NewInvoiceFormPage({
                 })}
 
                 {/* Add-row */}
-                <tr>
-                  <td className="px-3 py-2 text-slate-300">
+                <tr className="bg-blue-50/30">
+                  <td className="px-3 py-2.5 text-blue-300 font-medium">
                     {cartItems.length + 1}
                   </td>
-                  <td className="px-2 py-2">
+                  <td className="px-2 py-2.5">
                     <InlineProductCombobox
                       products={products}
                       onSelect={handleAddRow}
                       onCreateNew={handleCreateNewProduct}
                     />
                   </td>
-                  <td colSpan={8} className="px-3 py-2"></td>
+                  <td colSpan={8} className="px-3 py-2.5"></td>
                 </tr>
               </tbody>
             </table>
+
+            {cartItems.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-8 text-center border-t border-slate-100">
+                <ShoppingBag className="w-8 h-8 text-slate-200 mb-2" />
+                <p className="text-sm font-medium text-slate-500">
+                  No items added yet
+                </p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Start typing a product name above to add it
+                </p>
+              </div>
+            )}
 
             {cartItems.length > 0 && (
               <div className="flex justify-end px-3 py-2 border-t border-slate-100">
@@ -965,7 +963,7 @@ export default function NewInvoiceFormPage({
         </Card>
 
         {/* Invoice Summary — Preview + Create only */}
-        <Card className="rounded-xl border-slate-200 shadow-sm overflow-hidden">
+        <Card className="rounded-2xl border-slate-200 shadow-md overflow-hidden ring-1 ring-blue-100">
           <CardContent className="pt-4">
             <InvoiceSummary
               discount={discount}

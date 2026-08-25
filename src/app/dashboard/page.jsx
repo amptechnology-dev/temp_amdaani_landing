@@ -67,14 +67,14 @@ export default function DashboardPage() {
         arr.reduce((acc, item) => acc + (Number(item?.[key]) || 0), 0);
 
       const invoicesThisYear = invoices.filter(
-        (inv) => new Date(inv.invoiceDate).getFullYear() === currentYear
+        (inv) => new Date(inv.invoiceDate).getFullYear() === currentYear,
       );
       const invoicesLastYear = invoices.filter(
-        (inv) => new Date(inv.invoiceDate).getFullYear() === currentYear - 1
+        (inv) => new Date(inv.invoiceDate).getFullYear() === currentYear - 1,
       );
 
       const todayInvoices = invoices.filter(
-        (inv) => format(new Date(inv.invoiceDate), "yyyy-MM-dd") === todayStr
+        (inv) => format(new Date(inv.invoiceDate), "yyyy-MM-dd") === todayStr,
       );
 
       const thisMonthInvoices = invoices.filter((inv) => {
@@ -172,7 +172,7 @@ export default function DashboardPage() {
         totalCustomers: dueCustomers.length,
         totalPendingInvoices: dueCustomers.reduce(
           (acc, c) => acc + (c.pendingInvoiceCount || 0),
-          0
+          0,
         ),
       };
 
@@ -239,14 +239,14 @@ export default function DashboardPage() {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
-        <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 text-center">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-center">
           <h2 className="text-xl font-bold text-slate-800 mb-2">
             Error Loading Dashboard
           </h2>
-          <p className="text-slate-400 mb-6">{error.message}</p>
+          <p className="text-slate-400 mb-4">{error.message}</p>
           <button
             onClick={() => refetch()}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-medium transition-colors"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl font-medium transition-colors"
           >
             Retry
           </button>
@@ -257,14 +257,15 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-5">
+      {/* 👇 outer padding + vertical rhythm kome dewa hoyeche (p-4/6 -> p-3/4, space-y-5 -> space-y-3) */}
+      <div className="max-w-7xl mx-auto p-3 md:p-4 space-y-3">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-slate-900">
+            <h1 className="text-xl md:text-2xl font-bold text-slate-900">
               Dashboard
             </h1>
-            <p className="text-sm text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-400 mt-0.5">
               {format(new Date(), "MMMM dd, yyyy")}
             </p>
           </div>
@@ -272,7 +273,7 @@ export default function DashboardPage() {
             <select
               value={dateRange}
               onChange={(e) => setDateRange(e.target.value)}
-              className="bg-white border border-slate-200 text-slate-700 rounded-xl px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="bg-white border border-slate-200 text-slate-700 rounded-xl px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="today">Today</option>
               <option value="week">This Week</option>
@@ -282,7 +283,7 @@ export default function DashboardPage() {
             <button
               onClick={() => refetch()}
               disabled={isRefetching}
-              className="flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl px-3.5 py-2 text-sm font-medium transition-colors"
+              className="flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl px-3 py-1.5 text-sm font-medium transition-colors"
             >
               <RefreshCw
                 className={`w-3.5 h-3.5 ${isRefetching ? "animate-spin" : ""}`}
@@ -290,14 +291,32 @@ export default function DashboardPage() {
               Refresh
             </button>
 
-            {/* ✅ Direct shortcut → opens NewInvoiceFormPage instantly (skips the list) */}
+            {/* ✅ Always-glowing animated New Invoice button (self-contained, no external CSS needed) */}
             <button
               onClick={() => router.push("/dashboard/sales?new=true")}
-              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2.5 text-sm font-semibold shadow-sm shadow-blue-200 ring-1 ring-blue-600/50 transition-colors"
+              className="new-invoice-btn relative flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-1.5 text-sm font-semibold transition-all duration-200 hover:scale-[1.05] active:scale-[0.96]"
             >
               <Plus className="w-4 h-4" />
               New Invoice
             </button>
+
+            <style jsx>{`
+              .new-invoice-btn {
+                box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.55);
+                animation: newInvoiceGlow 1.8s ease-in-out infinite;
+              }
+              @keyframes newInvoiceGlow {
+                0% {
+                  box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.55);
+                }
+                50% {
+                  box-shadow: 0 0 0 9px rgba(37, 99, 235, 0);
+                }
+                100% {
+                  box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+                }
+              }
+            `}</style>
           </div>
         </div>
 
@@ -305,8 +324,8 @@ export default function DashboardPage() {
           <SkeletonGrid />
         ) : (
           <>
-            {/* Key Metrics — 2x2 like mobile app */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Key Metrics — gap-4 -> gap-3 */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <MetricCard
                 title="Annual Sales"
                 value={dashboardData?.metrics?.annualSale || 0}
@@ -355,31 +374,35 @@ export default function DashboardPage() {
               />
             </div>
 
-            <CarouselSlider />
+            {/* 👇 Ads/Carousel section — height chotoo kore wrap kora holo, border/overflow control korar jonno */}
+            <div className="max-h-[140px] overflow-hidden rounded-xl border-0">
+              <CarouselSlider />
+            </div>
 
             <SummaryPanel
               dueSummary={dashboardData?.dueSummary}
               receivedSummary={dashboardData?.receivedSummary}
             />
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* gap-5 -> gap-3 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               <ChartCard
                 title="Monthly Revenue Trend"
                 subtitle="Last 6 months"
                 type="bar"
                 data={dashboardData?.monthlyRevenue?.data || []}
-                height={260}
+                height={220}
               />
               <ChartCard
                 title="Weekly Sales Trend"
                 subtitle="Current week (Sun–Sat)"
                 type="line"
                 data={dashboardData?.weeklyTrend?.data || []}
-                height={260}
+                height={220}
               />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               <TopCustomers
                 customers={dashboardData?.topCustomers?.sorted || []}
                 percentage={dashboardData?.topCustomers?.percentage || 0}
@@ -387,9 +410,7 @@ export default function DashboardPage() {
               <TopProducts products={dashboardData?.topProducts || []} />
             </div>
 
-            <RecentActivity
-              activities={dashboardData?.recentActivity || []}
-            />
+            <RecentActivity activities={dashboardData?.recentActivity || []} />
           </>
         )}
       </div>

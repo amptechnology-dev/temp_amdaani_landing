@@ -23,6 +23,7 @@ import {
   X,
   PlusCircle,
   MinusCircle,
+  PackageSearch,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -154,6 +155,7 @@ function InlineProductCombobox({ products, onSelect, onCreateNew, onRefresh }) {
   return (
     <div className="relative w-full">
       <div className="relative">
+        <PackageSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300 pointer-events-none" />
         <input
           ref={inputRef}
           value={query}
@@ -163,7 +165,8 @@ function InlineProductCombobox({ products, onSelect, onCreateNew, onRefresh }) {
           }}
           onFocus={handleFocus}
           onKeyDown={handleKeyDown}
-          className="w-full max-w-[220px] h-8 px-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+          placeholder="Search or add a product…"
+          className="w-full max-w-[240px] h-9 pl-8 pr-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-white transition-colors"
         />
       </div>
 
@@ -179,7 +182,7 @@ function InlineProductCombobox({ products, onSelect, onCreateNew, onRefresh }) {
               width: coords.width,
               zIndex: 9999,
             }}
-            className="bg-white border border-slate-200 rounded-md shadow-lg max-h-72 overflow-y-auto"
+            className="bg-white border border-slate-200 rounded-xl shadow-xl max-h-72 overflow-y-auto"
           >
             {filtered.map((p, idx) => (
               <div
@@ -243,6 +246,10 @@ const emptyVendorForm = {
   postalCode: "",
   gstNumber: "",
 };
+
+// Smaller, compact input style for the Vendor Details form (matches Customer form)
+const inputClass =
+  "w-full h-8 pl-7 pr-2.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-slate-50/60 focus:bg-white transition-colors";
 
 export default function NewPurchaseFormPage({
   isLoading,
@@ -559,77 +566,75 @@ export default function NewPurchaseFormPage({
   }
 
   return (
-    // ✅ FIX — "min-w-0" jog kora holo. Layout-e ei page ta sombhoboto ekta
-    // flex container-er (sidebar + content) child, ar flex item-er default
-    // min-width: auto thake — mane ei div nijer content (table-er min-w-1100)
-    // er cheye choto hote "raji hoy na", fole pura flex container (sidebar shoho)
-    // prosस्रित hoye body-level horizontal scrollbar toiri kore. min-w-0 dile
-    // ei div flex container-e proper vabe shrink korte parbe, ar internal
-    // overflow-x-auto (table wrapper) e i shudhu scroll thakbe.
     <div className="min-h-screen bg-slate-50 overflow-x-hidden w-full min-w-0">
       <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-5">
-        {/* Header */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-4 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onBack}
-              className="rounded-full hover:bg-slate-100"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
-                  {isEditMode ? "Edit Purchase" : "New Purchase"}
-                </h1>
-                {isEditMode && (
-                  <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">
-                    Editing
-                  </Badge>
+        {/* Header — compact, blue-accented (matches Invoice form) */}
+        <div className="relative bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="h-1 w-full bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-500" />
+          <div className="px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={onBack}
+                className="rounded-full border-slate-200 hover:bg-slate-50 hover:border-slate-300 shrink-0 h-8 w-8"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+              </Button>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
+                    {isEditMode ? "Edit Purchase" : "New Purchase"}
+                  </h1>
+                  {isEditMode && (
+                    <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border border-amber-200 text-[10px] px-1.5 py-0">
+                      Editing
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                  <Sparkles className="w-3 h-3 text-blue-500" />
+                  Add a vendor and items to{" "}
+                  {isEditMode ? "update" : "record"} the purchase
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-full text-xs text-slate-600 font-medium">
+                <Calendar className="w-3 h-3 text-slate-400" />
+                {format(new Date(), "dd MMM yyyy")}
+              </div>
+              <div className="flex items-center gap-1.5 bg-blue-600 px-2.5 py-1 rounded-full text-xs text-white font-semibold shadow-sm shadow-blue-200">
+                <Hash className="w-3 h-3 text-blue-200" />
+                {isEditMode ? (
+                  purchaseNumber || "Loading..."
+                ) : (
+                  <input
+                    value={purchaseNumber}
+                    onChange={(e) => setPurchaseNumber(e.target.value)}
+                    className="bg-transparent outline-none w-24 placeholder:text-blue-200 text-white text-xs"
+                  />
                 )}
               </div>
-              <p className="text-sm text-slate-400 flex items-center gap-1 mt-0.5">
-                <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-                Add a vendor and items to {isEditMode ? "update" : "record"} the
-                purchase
-              </p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-full text-sm text-slate-600">
-              <Calendar className="w-3.5 h-3.5 text-slate-400" />
-              {format(new Date(), "dd MMM yyyy")}
-            </div>
-            <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-full text-sm text-blue-700 font-medium">
-              <Hash className="w-3.5 h-3.5" />
-              {isEditMode ? (
-                purchaseNumber || "Loading..."
-              ) : (
-                <input
-                  value={purchaseNumber}
-                  onChange={(e) => setPurchaseNumber(e.target.value)}
-                  className="bg-transparent outline-none w-28"
-                />
-              )}
             </div>
           </div>
         </div>
 
-        {/* Vendor */}
-        <Card className="rounded-xl border-slate-200 shadow-sm overflow-visible relative">
-          <CardHeader className="bg-slate-50 border-b border-slate-100 py-2.5 px-4 rounded-t-xl">
-            <CardTitle className="flex items-center justify-between text-sm font-semibold text-slate-700">
+        {/* Vendor — compact form, same pattern as Customer Details */}
+        <Card className="rounded-2xl border-slate-200 shadow-sm overflow-visible relative">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-transparent border-b border-slate-100 py-2 px-4 rounded-t-2xl">
+            <CardTitle className="flex items-center justify-between text-xs font-semibold text-slate-700">
               <span className="flex items-center gap-2">
-                <Truck className="w-4 h-4 text-blue-600" />
-                Vendor
+                <span className="w-6 h-6 rounded-lg bg-blue-600 flex items-center justify-center shadow-sm shadow-blue-200">
+                  <Truck className="w-3 h-3 text-white" />
+                </span>
+                Vendor Details
               </span>
               {(vendorForm.name || vendorForm.mobile) && (
                 <button
                   onClick={handleClearVendor}
-                  className="flex items-center gap-1 text-xs text-rose-500 hover:underline font-medium"
+                  className="flex items-center gap-1 text-[11px] text-rose-500 hover:text-rose-600 hover:underline font-medium"
                 >
                   <X className="w-3 h-3" />
                   Clear
@@ -637,13 +642,13 @@ export default function NewPurchaseFormPage({
               )}
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div
               ref={vendorGridRef}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
+              className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2"
             >
               <div className="relative">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 z-10" />
+                <Phone className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 z-10" />
                 <input
                   value={vendorForm.mobile}
                   onChange={updateField("mobile")}
@@ -651,10 +656,10 @@ export default function NewPurchaseFormPage({
                   onKeyDown={handleVendorFieldKeyDown("mobile")}
                   maxLength={10}
                   placeholder="Mobile *"
-                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className={inputClass}
                 />
                 {activeField === "mobile" && vendorSuggestions.length > 0 && (
-                  <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-56 overflow-y-auto">
+                  <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-56 overflow-y-auto">
                     {vendorSuggestions.map((v, idx) => (
                       <div
                         key={v._id}
@@ -682,17 +687,17 @@ export default function NewPurchaseFormPage({
               </div>
 
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 z-10" />
+                <User className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 z-10" />
                 <input
                   value={vendorForm.name}
                   onChange={updateField("name")}
                   onFocus={() => setActiveField("name")}
                   onKeyDown={handleVendorFieldKeyDown("name")}
                   placeholder="Name"
-                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className={inputClass}
                 />
                 {activeField === "name" && vendorSuggestions.length > 0 && (
-                  <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-56 overflow-y-auto">
+                  <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-56 overflow-y-auto">
                     {vendorSuggestions.map((v, idx) => (
                       <div
                         key={v._id}
@@ -720,7 +725,7 @@ export default function NewPurchaseFormPage({
               </div>
 
               <div className="relative">
-                <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <FileText className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
                 <input
                   value={vendorForm.gstNumber}
                   onChange={(e) =>
@@ -730,58 +735,59 @@ export default function NewPurchaseFormPage({
                     }))
                   }
                   placeholder="GSTIN (optional)"
-                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-
-              <div className="relative sm:col-span-2 lg:col-span-1">
-                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                <input
-                  value={vendorForm.address}
-                  onChange={updateField("address")}
-                  placeholder="Address"
-                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className={inputClass}
                 />
               </div>
 
               <div className="relative">
-                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                <input
+                  value={vendorForm.address}
+                  onChange={updateField("address")}
+                  placeholder="Address"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="relative">
+                <Building2 className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
                 <input
                   value={vendorForm.city}
                   onChange={updateField("city")}
                   placeholder="City"
-                  className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className={inputClass}
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <input
+                value={vendorForm.state}
+                onChange={updateField("state")}
+                placeholder="State"
+                className="w-full h-8 px-2.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-slate-50/60 focus:bg-white transition-colors"
+              />
+
+              <div className="relative">
+                <Locate className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
                 <input
-                  value={vendorForm.state}
-                  onChange={updateField("state")}
-                  placeholder="State"
-                  className="w-full h-10 px-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  value={vendorForm.postalCode}
+                  onChange={updateField("postalCode")}
+                  maxLength={6}
+                  placeholder="Postal Code"
+                  className={inputClass}
                 />
-                <div className="relative">
-                  <Locate className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                  <input
-                    value={vendorForm.postalCode}
-                    onChange={updateField("postalCode")}
-                    maxLength={6}
-                    placeholder="Postal Code"
-                    className="w-full h-10 pl-9 pr-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Items — excel-style table */}
-        <Card className="rounded-xl border-slate-200 shadow-sm overflow-hidden">
-          <CardHeader className="bg-slate-50 border-b border-slate-100 py-2.5 px-4">
+        <Card className="rounded-2xl border-slate-200 shadow-sm overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-transparent border-b border-slate-100 py-3 px-4">
             <CardTitle className="flex items-center justify-between text-sm font-semibold text-slate-700">
-              <span className="flex items-center gap-2">
-                <ShoppingBag className="w-4 h-4 text-blue-600" />
+              <span className="flex items-center gap-2.5">
+                <span className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center shadow-sm shadow-blue-200">
+                  <ShoppingBag className="w-3.5 h-3.5 text-white" />
+                </span>
                 Items
                 {cartItems.length > 0 && (
                   <Badge className="ml-1 bg-blue-600 hover:bg-blue-600 text-[10px]">
@@ -791,12 +797,11 @@ export default function NewPurchaseFormPage({
               </span>
               <Button
                 size="sm"
-                variant="outline"
                 onClick={() => {
                   setNewItemPrefillName("");
                   setShowAddItemModal(true);
                 }}
-                className="h-7 rounded-full text-xs gap-1"
+                className="h-8 rounded-full text-xs gap-1 bg-blue-600 hover:bg-blue-700 shadow-sm shadow-blue-200"
               >
                 <Plus className="w-3.5 h-3.5" />
                 New Product
@@ -808,45 +813,50 @@ export default function NewPurchaseFormPage({
             <div className="min-w-[1100px]">
               <table className="w-full text-sm border-collapse">
                 <thead>
-                  <tr className="bg-slate-50 text-slate-500 text-xs">
-                    <th className="text-left font-medium px-3 py-2 border-b border-slate-100 w-10">
+                  <tr className="bg-blue-50/70 text-blue-900/70 text-[11px] uppercase tracking-wide">
+                    <th className="text-left font-semibold px-3 py-2.5 border-b border-blue-100 w-10">
                       #
                     </th>
-                    <th className="text-left font-medium px-3 py-2 border-b border-slate-100">
+                    <th className="text-left font-semibold px-3 py-2.5 border-b border-blue-100">
                       Product
                     </th>
-                    <th className="text-left font-medium px-3 py-2 border-b border-slate-100 w-28">
+                    <th className="text-left font-semibold px-3 py-2.5 border-b border-blue-100 w-28">
                       HSN
                     </th>
-                    <th className="text-left font-medium px-3 py-2 border-b border-slate-100 w-16">
+                    <th className="text-left font-semibold px-3 py-2.5 border-b border-blue-100 w-16">
                       Unit
                     </th>
-                    <th className="text-center font-medium px-3 py-2 border-b border-slate-100 w-20">
+                    <th className="text-center font-semibold px-3 py-2.5 border-b border-blue-100 w-20">
                       Qty
                     </th>
-                    <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-36">
+                    <th className="text-right font-semibold px-3 py-2.5 border-b border-blue-100 w-36">
                       Cost Price
                     </th>
-                    <th className="text-center font-medium px-3 py-2 border-b border-slate-100 w-32">
+                    <th className="text-center font-semibold px-3 py-2.5 border-b border-blue-100 w-32">
                       Discount
                     </th>
-                    <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-20">
+                    <th className="text-right font-semibold px-3 py-2.5 border-b border-blue-100 w-20">
                       GST%
                     </th>
                     {isMrpEnabled && (
-                      <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-24">
+                      <th className="text-right font-semibold px-3 py-2.5 border-b border-blue-100 w-24">
                         MRP
                       </th>
                     )}
-                    <th className="text-right font-medium px-3 py-2 border-b border-slate-100 w-28">
+                    <th className="text-right font-semibold px-3 py-2.5 border-b border-blue-100 w-28">
                       Total
                     </th>
-                    <th className="w-16 border-b border-slate-100"></th>
+                    <th className="w-16 border-b border-blue-100"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {cartItems.map((item, i) => (
-                    <tr key={item._id} className="hover:bg-slate-50/60">
+                    <tr
+                      key={item._id}
+                      className={`hover:bg-blue-50/50 transition-colors ${
+                        i % 2 === 1 ? "bg-slate-50/40" : "bg-white"
+                      }`}
+                    >
                       <td className="px-3 py-1.5 border-b border-slate-100 text-slate-400">
                         {i + 1}
                       </td>
@@ -979,7 +989,7 @@ export default function NewPurchaseFormPage({
                         </td>
                       )}
 
-                      <td className="px-3 py-1.5 border-b border-slate-100 text-right font-semibold text-blue-600">
+                      <td className="px-3 py-1.5 border-b border-slate-100 text-right font-bold text-blue-600">
                         ₹{Number(item.total ?? 0).toFixed(2)}
                       </td>
                       <td className="px-2 py-1.5 border-b border-slate-100 text-center whitespace-nowrap">
@@ -1007,11 +1017,11 @@ export default function NewPurchaseFormPage({
                   ))}
 
                   {/* Add-row */}
-                  <tr>
-                    <td className="px-3 py-2 text-slate-300">
+                  <tr className="bg-blue-50/30">
+                    <td className="px-3 py-2.5 text-blue-300 font-medium">
                       {cartItems.length + 1}
                     </td>
-                    <td className="px-2 py-2">
+                    <td className="px-2 py-2.5">
                       <InlineProductCombobox
                         products={products}
                         onSelect={handleAddRow}
@@ -1019,11 +1029,23 @@ export default function NewPurchaseFormPage({
                         onRefresh={onRefreshProducts}
                       />
                     </td>
-                    <td colSpan={addRowColSpan} className="px-3 py-2"></td>
+                    <td colSpan={addRowColSpan} className="px-3 py-2.5"></td>
                   </tr>
                 </tbody>
               </table>
             </div>
+
+            {cartItems.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-8 text-center border-t border-slate-100">
+                <ShoppingBag className="w-8 h-8 text-slate-200 mb-2" />
+                <p className="text-sm font-medium text-slate-500">
+                  No items added yet
+                </p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Start typing a product name above to add it
+                </p>
+              </div>
+            )}
 
             {cartItems.length > 0 && (
               <div className="flex justify-end px-3 py-2 border-t border-slate-100">
@@ -1039,7 +1061,7 @@ export default function NewPurchaseFormPage({
         </Card>
 
         {/* Purchase Summary — Preview + Create only */}
-        <Card className="rounded-xl border-slate-200 shadow-sm overflow-hidden">
+        <Card className="rounded-2xl border-slate-200 shadow-md overflow-hidden ring-1 ring-blue-100">
           <CardContent className="pt-4">
             <PurchaseSummary
               invoiceCalculations={invoiceCalculations}
