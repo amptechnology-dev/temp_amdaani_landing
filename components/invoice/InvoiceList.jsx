@@ -1,7 +1,13 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { format, isToday, isYesterday, startOfWeek, isWithinInterval } from "date-fns";
+import {
+  format,
+  isToday,
+  isYesterday,
+  startOfWeek,
+  isWithinInterval,
+} from "date-fns";
 import { toast } from "sonner";
 import {
   Search,
@@ -17,6 +23,7 @@ import {
 } from "lucide-react";
 
 import api from "../../utils/api";
+import { useAuth } from "../../context/AuthContext";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -59,10 +66,19 @@ export default function InvoiceListPage({
   refreshKey,
   onCreateNew,
   onEditInvoice,
-  storedata = {},
 }) {
+  // ⚠️ ADJUST: change `storedata` below to whatever key your AuthContext
+  // actually exposes (e.g. `store`, `storeData`, `currentStore`). Check
+  // AuthContext.js — AddItemFormModal.js already pulls `isMrpEnabled` from
+  // this same context, so the full store object is very likely here too.
+  const auth = useAuth();
+  const contextStoredata =
+    auth?.storedata || auth?.store || auth?.storeData || null;
+
   const [invoices, setInvoices] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [storedata, setStoredata] = useState(contextStoredata || {});
+  const [storeLoading, setStoreLoading] = useState(!contextStoredata);
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFilter, setDateFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -79,6 +95,46 @@ export default function InvoiceListPage({
     fetchInvoices();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
+
+  // ✅ Keep in sync if AuthContext resolves store data after mount (e.g.
+  // context itself was still loading on first render)
+  useEffect(() => {
+    if (contextStoredata && Object.keys(contextStoredata).length > 0) {
+      setStoredata(contextStoredata);
+      setStoreLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contextStoredata]);
+
+  // ✅ Fallback — only fetches if AuthContext didn't already provide store data.
+  // Errors are now surfaced (not silently swallowed) so a broken endpoint
+  // is obvious instead of just showing a blank invoice header again.
+  useEffect(() => {
+    if (contextStoredata && Object.keys(contextStoredata).length > 0) return;
+
+    const fetchStore = async () => {
+      setStoreLoading(true);
+      try {
+        // ⚠️ ADJUST: confirm this matches the exact endpoint that returns
+        // the JSON you shared (name, logoUrl, bankDetails, gstNumber, etc.)
+        const res = await api.get("/store");
+        const doc = res?.data?.data || res?.data;
+        if (doc && typeof doc === "object") {
+          setStoredata(doc);
+        } else {
+          console.error("Store API returned unexpected shape:", res?.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch store data:", err);
+        toast.error("Couldn't load store details for invoice preview");
+      } finally {
+        setStoreLoading(false);
+      }
+    };
+
+    fetchStore();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contextStoredata]);
 
   const fetchInvoices = async () => {
     setIsLoading(true);
@@ -108,10 +164,14 @@ export default function InvoiceListPage({
         if (dateFilter === "yesterday" && !isYesterday(createdAt)) return false;
         if (dateFilter === "thisWeek") {
           const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
-          if (!isWithinInterval(createdAt, { start: weekStart, end: new Date() })) return false;
+          if (
+            !isWithinInterval(createdAt, { start: weekStart, end: new Date() })
+          )
+            return false;
         }
       }
-      if (statusFilter !== "all" && inv.paymentStatus !== statusFilter) return false;
+      if (statusFilter !== "all" && inv.paymentStatus !== statusFilter)
+        return false;
       return true;
     });
   }, [invoices, searchQuery, dateFilter, statusFilter]);
@@ -121,7 +181,10 @@ export default function InvoiceListPage({
   }, [searchQuery, dateFilter, statusFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredInvoices.length / limit));
-  const pagedInvoices = filteredInvoices.slice((page - 1) * limit, page * limit);
+  const pagedInvoices = filteredInvoices.slice(
+    (page - 1) * limit,
+    page * limit,
+  );
 
   const chips = [...DATE_FILTERS, ...STATUS_FILTERS];
 
@@ -140,22 +203,12 @@ export default function InvoiceListPage({
     }
   };
 
-  // ---------------------------------------------------------------------
-  // ✅ FIXED — row click preview
-  //
-  // Bugs that were here before:
-  // 1) invoiceData.subTotal/discountTotal/roundOff/grandTotal were never
-  //    set, but generateInvoiceHTML reads them (invoiceData?.subTotal etc.)
-  //    whenever createdInvoice:true → Number(undefined) → NaN → "₹NaN" /
-  //    "Zero Rupees Only".
-  // 2) invoiceCalculations.gstBreakdown was never set. The template does
-  //    Object.entries(invoiceCalculations.gstBreakdown) unconditionally —
-  //    with it undefined this throws, lands in the catch block, and the
-  //    modal never opens ("failed to load invoice preview" toast).
-  // 3) Cart item field-name fallbacks were too narrow (qty/rate/taxable
-  //    value/gst amount showed as 0 for documents using different keys).
-  // ---------------------------------------------------------------------
   const handleRowClick = async (inv) => {
+    if (storeLoading) {
+      toast.info("Store details are still loading, try again in a moment");
+      return;
+    }
+
     try {
       setPreviewLoadingId(inv._id);
 
@@ -170,18 +223,24 @@ export default function InvoiceListPage({
       const cartItems = rawItems.map((it) => {
         const qty = Number(it.qty ?? it.quantity ?? 0);
         const baseRate = Number(
-          it.price ?? it.sellingPrice ?? it.baseRate ?? it.rate ?? it.unitPrice ?? 0,
+          it.price ??
+            it.sellingPrice ??
+            it.baseRate ??
+            it.rate ??
+            it.unitPrice ??
+            0,
         );
         const gstRate = Number(it.gstRate ?? 0);
         const isTaxInclusive = Boolean(it.isTaxInclusive);
         const discountType =
-          it.discountType === "percentage" ? "percent" : it.discountType || "amount";
+          it.discountType === "percentage"
+            ? "percent"
+            : it.discountType || "amount";
         const discount = Number(it.discount ?? 0);
 
         const perUnitDiscount =
           discountType === "percent" ? (baseRate * discount) / 100 : discount;
 
-        // Prefer a persisted taxableValue; otherwise derive it.
         let taxableValue =
           it.taxableValue != null ? Number(it.taxableValue) : undefined;
         if (taxableValue === undefined) {
@@ -193,9 +252,12 @@ export default function InvoiceListPage({
         }
 
         const gstAmount =
-          it.gstAmount != null ? Number(it.gstAmount) : (taxableValue * gstRate) / 100;
+          it.gstAmount != null
+            ? Number(it.gstAmount)
+            : (taxableValue * gstRate) / 100;
 
-        const total = it.total != null ? Number(it.total) : taxableValue + gstAmount;
+        const total =
+          it.total != null ? Number(it.total) : taxableValue + gstAmount;
 
         return {
           _id: it._id || it.product,
@@ -217,22 +279,30 @@ export default function InvoiceListPage({
         };
       });
 
-      // ⚠️ ADJUST: if your invoice doc stores these under different top-level
-      // keys, point them here. gstBreakdown MUST always resolve to an object.
-      const subTotal = Number(doc.invoiceCalculations?.subTotal ?? doc.subTotal ?? 0);
-      const discountTotal = Number(
-        doc.invoiceCalculations?.discountTotal ?? doc.discountTotal ?? doc.totalDiscount ?? 0,
+      const subTotal = Number(
+        doc.invoiceCalculations?.subTotal ?? doc.subTotal ?? 0,
       );
-      const grandTotal = Number(doc.invoiceCalculations?.grandTotal ?? doc.grandTotal ?? 0);
-      const roundOff = Number(doc.invoiceCalculations?.roundOff ?? doc.roundOff ?? 0);
-      const gstBreakdown = doc.invoiceCalculations?.gstBreakdown || doc.gstBreakdown || {};
+      const discountTotal = Number(
+        doc.invoiceCalculations?.discountTotal ??
+          doc.discountTotal ??
+          doc.totalDiscount ??
+          0,
+      );
+      const grandTotal = Number(
+        doc.invoiceCalculations?.grandTotal ?? doc.grandTotal ?? 0,
+      );
+      const roundOff = Number(
+        doc.invoiceCalculations?.roundOff ?? doc.roundOff ?? 0,
+      );
+      const gstBreakdown =
+        doc.invoiceCalculations?.gstBreakdown || doc.gstBreakdown || {};
 
       const invoiceCalculations = {
         subtotal: subTotal,
         discountTotal,
         grandTotal,
         roundOff,
-        gstBreakdown, // never undefined — prevents the crash that blocked the modal
+        gstBreakdown,
         totalQuantity:
           doc.invoiceCalculations?.totalQuantity ??
           doc.totalQuantity ??
@@ -262,7 +332,6 @@ export default function InvoiceListPage({
           paymentNote: doc.paymentNote,
           status: doc.status,
           isIgst: Boolean(doc.isIgst),
-          // ✅ the fields that were missing and caused NaN / "Zero Rupees Only"
           subTotal,
           discountTotal,
           roundOff,
@@ -274,7 +343,7 @@ export default function InvoiceListPage({
         invoiceNumber: doc.invoiceNumber,
         currentDate: format(dateObj, "dd-MMM-yyyy"),
         currentTime: format(dateObj, "hh:mm a"),
-        storedata,
+        storedata, // ✅ now guaranteed to be populated (context or fallback fetch)
         invoiceDate: dateObj,
         isGstInvoice: doc.type === "gst",
         isMrpEnabled: Boolean(doc.isMrpEnabled),
@@ -324,7 +393,9 @@ export default function InvoiceListPage({
         <div className="flex items-center gap-1.5">
           <ReceiptText className="w-4 h-4 text-blue-600" />
           <div>
-            <h1 className="text-lg md:text-xl font-bold text-slate-900">Invoices</h1>
+            <h1 className="text-lg md:text-xl font-bold text-slate-900">
+              Invoices
+            </h1>
             <p className="text-xs text-slate-400">Manage your sales invoices</p>
           </div>
         </div>
@@ -407,9 +478,13 @@ export default function InvoiceListPage({
         ) : filteredInvoices.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-14 text-center">
             <ReceiptText className="w-10 h-10 text-slate-300 mb-2" />
-            <p className="text-sm font-semibold text-slate-700">No Invoices Found</p>
+            <p className="text-sm font-semibold text-slate-700">
+              No Invoices Found
+            </p>
             <p className="text-xs text-slate-400 max-w-xs mt-0.5 mb-3">
-              {searchQuery ? `No invoices match "${searchQuery}".` : "Start by creating your first invoice."}
+              {searchQuery
+                ? `No invoices match "${searchQuery}".`
+                : "Start by creating your first invoice."}
             </p>
             {!searchQuery && (
               <Button onClick={onCreateNew} size="sm">
@@ -424,13 +499,23 @@ export default function InvoiceListPage({
               <thead>
                 <tr className="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wide border-b border-slate-200">
                   <th className="text-left font-semibold px-3 py-1.5 w-8">#</th>
-                  <th className="text-left font-semibold px-3 py-1.5">Customer</th>
+                  <th className="text-left font-semibold px-3 py-1.5">
+                    Customer
+                  </th>
                   <th className="text-left font-semibold px-3 py-1.5">Phone</th>
-                  <th className="text-left font-semibold px-3 py-1.5">Invoice #</th>
+                  <th className="text-left font-semibold px-3 py-1.5">
+                    Invoice #
+                  </th>
                   <th className="text-left font-semibold px-3 py-1.5">Date</th>
-                  <th className="text-center font-semibold px-3 py-1.5">Status</th>
-                  <th className="text-right font-semibold px-3 py-1.5">Amount</th>
-                  <th className="text-center font-semibold px-3 py-1.5 w-16">Action</th>
+                  <th className="text-center font-semibold px-3 py-1.5">
+                    Status
+                  </th>
+                  <th className="text-right font-semibold px-3 py-1.5">
+                    Amount
+                  </th>
+                  <th className="text-center font-semibold px-3 py-1.5 w-16">
+                    Action
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -451,7 +536,10 @@ export default function InvoiceListPage({
                         <span className="font-medium text-slate-800 truncate">
                           {inv.customerName || "No Customer Found"}
                         </span>
-                        <Badge variant="outline" className="text-[9px] px-1 py-0 shrink-0">
+                        <Badge
+                          variant="outline"
+                          className="text-[9px] px-1 py-0 shrink-0"
+                        >
                           {inv.type === "gst" ? "GST" : "Non-GST"}
                         </Badge>
                       </div>
@@ -471,7 +559,10 @@ export default function InvoiceListPage({
                     <td className="px-3 py-1.5 text-slate-500 text-xs align-middle whitespace-nowrap">
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
-                        {format(new Date(inv.createdAt || inv.invoiceDate), "dd MMM yyyy, hh:mm a")}
+                        {format(
+                          new Date(inv.createdAt || inv.invoiceDate),
+                          "dd MMM yyyy, hh:mm a",
+                        )}
                       </span>
                     </td>
 
@@ -522,7 +613,12 @@ export default function InvoiceListPage({
       {/* Pagination */}
       {!isLoading && filteredInvoices.length > 0 && (
         <div className="flex justify-between items-center mt-3">
-          <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page === 1}
+            onClick={() => setPage((p) => p - 1)}
+          >
             Previous
           </Button>
           <p className="text-xs text-slate-500">
@@ -539,11 +635,13 @@ export default function InvoiceListPage({
         </div>
       )}
 
-      {/* Preview Dialog */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-3xl w-full h-[85vh] p-0 flex flex-col overflow-hidden">
           <DialogHeader className="px-4 py-2 border-b shrink-0 flex flex-row items-center justify-between pr-10 space-y-0">
-            <DialogTitle>Invoice Preview {activePreviewNumber ? `#${activePreviewNumber}` : ""}</DialogTitle>
+            <DialogTitle>
+              Invoice Preview{" "}
+              {activePreviewNumber ? `#${activePreviewNumber}` : ""}
+            </DialogTitle>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" onClick={handlePrint}>
                 <Printer className="w-3.5 h-3.5 mr-1.5" />

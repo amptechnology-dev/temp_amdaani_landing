@@ -641,7 +641,9 @@ function HsnCodeSection({ value, gstRate, onHsnSelect }) {
             type="button"
             className="mt-0.5 w-full h-9 px-3 rounded-md border border-slate-200 bg-white flex items-center justify-between text-sm hover:bg-slate-50"
           >
-            <span className={`text-xs ${value ? "text-slate-800" : "text-slate-400"}`}>
+            <span
+              className={`text-xs ${value ? "text-slate-800" : "text-slate-400"}`}
+            >
               {value
                 ? `${value}${gstRate ? ` (${gstRate}% GST)` : ""}`
                 : "Select HSN code"}
@@ -882,7 +884,9 @@ function TaxRateSection({ value, onChange, disabled }) {
             disabled={disabled}
             className="mt-0.5 w-full h-9 px-3 rounded-md border border-slate-200 bg-white flex items-center justify-between text-sm hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <span className={`text-xs ${value ? "text-slate-800" : "text-slate-400"}`}>
+            <span
+              className={`text-xs ${value ? "text-slate-800" : "text-slate-400"}`}
+            >
               {value ? value.label : "Select tax rate"}
             </span>
             <ChevronDown className="w-4 h-4 text-slate-400" />
@@ -1356,7 +1360,7 @@ export default function AddItemFormModal({
               return (
                 <Form className="space-y-2">
                   {/* ---- Item basic fields (single clean row) ---- */}
-                  <div className="grid grid-cols-1 sm:grid-cols-6 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
                     <div className="sm:col-span-2">
                       <Label>Item Name *</Label>
                       <Input
@@ -1401,17 +1405,6 @@ export default function AddItemFormModal({
                       value={values.category}
                       onChange={(v) => setFieldValue("category", v)}
                     />
-
-                    <div>
-                      <Label>SKU (optional)</Label>
-                      <Input
-                        name="itemCode"
-                        value={values.itemCode}
-                        onChange={handleChange}
-                        placeholder="Item code"
-                        className="mt-0.5 h-9 placeholder:text-xs"
-                      />
-                    </div>
 
                     <HsnCodeSection
                       value={values.hsnCode}
@@ -1518,8 +1511,7 @@ export default function AddItemFormModal({
                                   priceForConversion > 0
                                     ? parseFloat(
                                         (
-                                          (currentInput /
-                                            priceForConversion) *
+                                          (currentInput / priceForConversion) *
                                           100
                                         ).toFixed(2),
                                       )
