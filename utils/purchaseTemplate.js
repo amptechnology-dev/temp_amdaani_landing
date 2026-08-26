@@ -38,7 +38,9 @@ export const generatePurchaseHTML = ({
   const getPerUnitDiscountAmount = (item) => {
     const costPrice = Number(item.costPrice ?? item.rate ?? item.price ?? 0);
     const discountType = item.purchaseDiscountType || "amount";
-    const rawDiscountInput = Number(item.purchaseDiscount ?? item.discount ?? 0);
+    const rawDiscountInput = Number(
+      item.purchaseDiscount ?? item.discount ?? 0,
+    );
     return discountType === "percentage"
       ? (costPrice * rawDiscountInput) / 100
       : rawDiscountInput;
@@ -251,7 +253,9 @@ export const generatePurchaseHTML = ({
     1 + // net total
     (effectiveDiscountTotal > 0 ? 1 : 0) +
     (Number(roundOffValue) !== 0 ? 1 : 0) +
-    (showPaymentDetails && (payment.status !== "paid" || payment.due > 0) ? 2 : 0);
+    (showPaymentDetails && (payment.status !== "paid" || payment.due > 0)
+      ? 2
+      : 0);
 
   return /*html*/ `
   <!DOCTYPE html>

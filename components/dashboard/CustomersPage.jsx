@@ -423,7 +423,11 @@ export default function CustomersPage() {
             />
             Refresh
           </Button>
-          <Button onClick={handleAddCustomer} size="sm" className={currentTheme.buttonPrimary}>
+          <Button
+            onClick={handleAddCustomer}
+            size="sm"
+            className={currentTheme.buttonPrimary}
+          >
             <Plus className="w-3.5 h-3.5 mr-1.5" />
             Add Customer
           </Button>
@@ -467,8 +471,7 @@ export default function CustomersPage() {
         {chips.map((chip) => {
           const active = activeFilter === chip.key;
           const Icon = chip.icon;
-          const loadingCount =
-            chip.key === "due" ? isLoadingDue : isLoadingAll;
+          const loadingCount = chip.key === "due" ? isLoadingDue : isLoadingAll;
           return (
             <button
               key={chip.key}
@@ -544,9 +547,7 @@ export default function CustomersPage() {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wide border-b border-slate-200">
-                  <th className="text-left font-semibold px-3 py-1.5 w-8">
-                    #
-                  </th>
+                  <th className="text-left font-semibold px-3 py-1.5 w-8">#</th>
                   <th className="text-left font-semibold px-3 py-1.5">
                     Customer
                   </th>
@@ -887,7 +888,11 @@ export default function CustomersPage() {
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={isSubmitting}>
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
                     {isSubmitting ? (
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     ) : isUpdate ? (
