@@ -420,7 +420,11 @@ export default function VendorsPage() {
             />
             Refresh
           </Button>
-          <Button onClick={handleAddVendor} size="sm" className={currentTheme.buttonPrimary}>
+          <Button
+            onClick={handleAddVendor}
+            size="sm"
+            className={currentTheme.buttonPrimary}
+          >
             <Plus className="w-3.5 h-3.5 mr-1.5" />
             Add Vendor
           </Button>
@@ -464,8 +468,7 @@ export default function VendorsPage() {
         {chips.map((chip) => {
           const active = activeFilter === chip.key;
           const Icon = chip.icon;
-          const loadingCount =
-            chip.key === "due" ? isLoadingDue : isLoadingAll;
+          const loadingCount = chip.key === "due" ? isLoadingDue : isLoadingAll;
           return (
             <button
               key={chip.key}
@@ -495,9 +498,7 @@ export default function VendorsPage() {
       {/* ===== Excel-style dense table ===== */}
       <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
         <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-slate-50">
-          <span className="text-sm font-semibold text-slate-700">
-            Vendors
-          </span>
+          <span className="text-sm font-semibold text-slate-700">Vendors</span>
           <span className="text-xs text-slate-400">
             Showing {filteredVendors.length} of {total}
           </span>
@@ -541,9 +542,7 @@ export default function VendorsPage() {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wide border-b border-slate-200">
-                  <th className="text-left font-semibold px-3 py-1.5 w-8">
-                    #
-                  </th>
+                  <th className="text-left font-semibold px-3 py-1.5 w-8">#</th>
                   <th className="text-left font-semibold px-3 py-1.5">
                     Vendor
                   </th>
@@ -553,9 +552,7 @@ export default function VendorsPage() {
                   <th className="text-left font-semibold px-3 py-1.5">
                     Location
                   </th>
-                  <th className="text-left font-semibold px-3 py-1.5">
-                    GSTIN
-                  </th>
+                  <th className="text-left font-semibold px-3 py-1.5">GSTIN</th>
                   <th className="text-right font-semibold px-3 py-1.5">
                     {activeFilter === "due" ? "Outstanding" : "Due"}
                   </th>
@@ -919,7 +916,11 @@ export default function VendorsPage() {
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={isSubmitting}>
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
                     {isSubmitting ? (
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     ) : isUpdate ? (
