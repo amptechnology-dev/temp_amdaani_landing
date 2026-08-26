@@ -32,6 +32,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import api from "../../utils/api";
+import { useAuth } from "../../context/AuthContext";
 
 import { generatePurchaseHTML } from "../../utils/purchaseTemplate";
 
@@ -44,14 +45,16 @@ const statusStyles = {
 const DATE_FILTERS = ["All", "Today", "Yesterday", "This Week"];
 const STATUS_FILTERS = ["All", "Paid", "Partial", "Unpaid"];
 
-export default function PurchaseListPage({
-  refreshKey,
-  onCreateNew,
-  onEditPurchase,
-  storedata = {},
-}) {
+export default function PurchaseListPage({ refreshKey, onCreateNew, onEditPurchase }) {
+  // ⚠️ ADJUST: change `storedata` below to whatever key your AuthContext
+  // actually exposes (e.g. `store`, `storeData`, `currentStore`).
+  const auth = useAuth();
+  const contextStoredata = auth?.storedata || auth?.store || auth?.storeData || null;
+
   const [purchases, setPurchases] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [storedata, setStoredata] = useState(contextStoredata || {});
+  const [storeLoading, setStoreLoading] = useState(!contextStoredata);
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -68,6 +71,43 @@ export default function PurchaseListPage({
     fetchPurchases();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
+
+  // ✅ Keep in sync if AuthContext resolves store data after mount
+  useEffect(() => {
+    if (contextStoredata && Object.keys(contextStoredata).length > 0) {
+      setStoredata(contextStoredata);
+      setStoreLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contextStoredata]);
+
+  // ✅ Fallback — only fetches if AuthContext didn't already provide store data.
+  useEffect(() => {
+    if (contextStoredata && Object.keys(contextStoredata).length > 0) return;
+
+    const fetchStore = async () => {
+      setStoreLoading(true);
+      try {
+        // ⚠️ ADJUST: confirm this matches the exact endpoint that returns
+        // your store JSON (name, logoUrl, bankDetails, gstNumber, etc.)
+        const res = await api.get("/store");
+        const doc = res?.data?.data || res?.data;
+        if (doc && typeof doc === "object") {
+          setStoredata(doc);
+        } else {
+          console.error("Store API returned unexpected shape:", res?.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch store data:", err);
+        toast.error("Couldn't load store details for purchase preview");
+      } finally {
+        setStoreLoading(false);
+      }
+    };
+
+    fetchStore();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contextStoredata]);
 
   const fetchPurchases = async () => {
     setIsLoading(true);
@@ -140,16 +180,12 @@ export default function PurchaseListPage({
     }
   };
 
-  // ---------------------------------------------------------------------
-  // ✅ FIXED — same root causes as InvoiceListPage:
-  // 1) invoiceData.subTotal/discountTotal/roundOff/grandTotal were never
-  //    passed → NaN / "Zero Rupees Only" (matches your screenshot exactly).
-  // 2) invoiceCalculations.gstBreakdown was never defaulted → crashed →
-  //    modal silently failed to open on some rows.
-  // 3) cartItems mapping widened + derives taxableValue/gstAmount when
-  //    the backend doc doesn't persist them.
-  // ---------------------------------------------------------------------
   const handleRowClick = async (p) => {
+    if (storeLoading) {
+      toast.info("Store details are still loading, try again in a moment");
+      return;
+    }
+
     try {
       setPreviewLoadingId(p._id);
 
@@ -267,7 +303,7 @@ export default function PurchaseListPage({
         invoiceNumber: doc.invoiceNumber,
         currentDate: format(dateObj, "dd-MMM-yyyy"),
         currentTime: format(dateObj, "hh:mm a"),
-        storedata,
+        storedata, // ✅ now guaranteed to be populated (context or fallback fetch)
         invoiceDate: dateObj,
         isGstInvoice: Boolean(doc.vendorGstNumber),
         isMrpEnabled: Boolean(doc.isMrpEnabled),
