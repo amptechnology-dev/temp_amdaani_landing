@@ -2,7 +2,8 @@
 
 import { useState, useRef } from "react";
 import { format } from "date-fns";
-import { FileText, Check, Loader2, Printer, Download } from "lucide-react";
+import { FileText, Check, Loader2, Printer, MessageCircle } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -31,9 +32,9 @@ export default function PurchaseSummary({
 }) {
   const [previewHtml, setPreviewHtml] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const iframeRef = useRef(null);
 
-  // Same print preference invoice o purchase dutoyate apply hobe
   const pageFormat = storedata?.settings?.printMode === "a5" ? "a5" : "a4";
 
   const buildHtml = () => {
@@ -74,17 +75,185 @@ export default function PurchaseSummary({
     win.print();
   };
 
-  const handleDownload = () => {
-    if (!previewHtml) return;
-    const blob = new Blob([previewHtml], { type: "text/html" });
+  const toDataURL = async (url) => {
+    try {
+      const proxyUrl = `/api/image-proxy?url=${encodeURIComponent(url)}`;
+      const res = await fetch(proxyUrl);
+      if (!res.ok) throw new Error(`Proxy fetch failed: ${res.status}`);
+      const blob = await res.blob();
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (err) {
+      console.warn("Image fetch failed, keeping original src:", url, err);
+      return null;
+    }
+  };
+
+  const inlineImagesAsBase64 = async (doc) => {
+    const imgs = Array.from(doc.querySelectorAll("img"));
+    await Promise.all(
+      imgs.map(async (img) => {
+        const src = img.getAttribute("src");
+        if (!src || src.startsWith("data:")) return; // already base64
+        const dataUrl = await toDataURL(src);
+        if (dataUrl) img.src = dataUrl;
+      }),
+    );
+  };
+
+  // ── Shob img.onload/onerror complete howa porjonto wait kori,
+  // fixed timeout er upor bhorosa na kore ────────────────────────
+  const waitForImagesToLoad = (doc) => {
+    const imgs = Array.from(doc.querySelectorAll("img"));
+    return Promise.all(
+      imgs.map((img) => {
+        if (img.complete) return Promise.resolve();
+        return new Promise((resolve) => {
+          img.addEventListener("load", resolve, { once: true });
+          img.addEventListener("error", resolve, { once: true }); // fail holeo block na kore egiye jai
+        });
+      }),
+    );
+  };
+
+  // ── PDF generate — Preview iframe-e jeta dekhacche (perfect A4/A5
+  // print layout) hubohu SEI content thekei capture kori.
+  // html2canvas-pro use kora hocche karon eta oklch()/lab() moto modern
+  // CSS color function support kore — vanilla html2canvas eigulo parse
+  // korte parena, tai WhatsApp/PDF generate korar somoy
+  // "unsupported color function" error dito ───────────────────────────
+  const generatePdfBlob = async () => {
+    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+      import("html2canvas-pro"),
+      import("jspdf"),
+    ]);
+
+    const idoc = iframeRef.current?.contentDocument;
+    if (!idoc || !idoc.body) {
+      throw new Error("Preview not ready yet");
+    }
+
+    // 1) Cross-origin image gulo ke base64 e convert kore niচ্ছি —
+    //    ei step ta CORS taint problem ta root theke fix kore dey
+    await inlineImagesAsBase64(idoc);
+
+    // 2) Base64 e convert howar por abar load howa wait kori
+    await waitForImagesToLoad(idoc);
+
+    // ei choto extra wait ta layout settle howar jonno rekhe dilam
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const canvas = await html2canvas(idoc.body, {
+      scale: 2,
+      backgroundColor: "#ffffff",
+      useCORS: true,
+      allowTaint: false, // base64 howar por eta ar dorkar hobe na, tai false e rakha safe
+      windowWidth: idoc.documentElement.scrollWidth,
+      windowHeight: idoc.documentElement.scrollHeight,
+    });
+
+    const imgData = canvas.toDataURL("image/jpeg", 0.98);
+
+    const pdf = new jsPDF({
+      unit: "mm",
+      format: pageFormat === "a5" ? "a5" : "a4",
+      orientation: "portrait",
+    });
+
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = pageWidth;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+    if (imgHeight <= pageHeight) {
+      pdf.addImage(imgData, "JPEG", 0, 0, imgWidth, imgHeight);
+    } else {
+      let heightLeft = imgHeight;
+      let position = 0;
+      pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+    }
+
+    return pdf.output("blob");
+  };
+
+  const downloadBlob = (blob, filename) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `Purchase-${purchaseNumber}.html`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+  };
+
+  // ── WhatsApp: PDF automatic download hoy (kono dialog/click chara),
+  // mobile-e Web Share API thakle PDF sotti sotti WhatsApp share sheet-e
+  // attach hoye khule jay; desktop-e download hoye WhatsApp Web-er chat
+  // khule jay ──────────────────────────────────────────────────────────
+  const handleWhatsAppShare = async () => {
+    if (!cartItems?.length) return;
+
+    const rawNumber =
+      formValues?.contactNumber ||
+      formValues?.vendorNumber ||
+      formValues?.vendorMobile ||
+      "";
+    const phoneDigits = rawNumber.replace(/\D/g, "");
+
+    if (!phoneDigits) {
+      toast.error("Ei bill-e vendor-er phone number pawa jayni");
+      return;
+    }
+
+    try {
+      setSendingWhatsApp(true);
+      const blob = await generatePdfBlob();
+      const filename = `Purchase-${purchaseNumber}.pdf`;
+      const message = `Hello ${
+        formValues?.vendorName || formValues?.partyName || "Vendor"
+      },\nHere is the purchase invoice #${purchaseNumber}.\nTotal Amount: ₹${
+        invoiceCalculations?.grandTotal ?? 0
+      }`;
+      const waNumber =
+        phoneDigits.length === 10 ? `91${phoneDigits}` : phoneDigits;
+
+      const file = new File([blob], filename, { type: "application/pdf" });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: `Purchase Invoice #${purchaseNumber}`,
+          text: message,
+        });
+        return;
+      }
+
+      downloadBlob(blob, filename);
+      toast.success("Purchase PDF download successfully");
+      window.open(
+        `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`,
+        "_blank",
+      );
+    } catch (err) {
+      if (err?.name !== "AbortError") {
+        console.error("WhatsApp share error:", err);
+        toast.error("WhatsApp-e pathano failed");
+      }
+    } finally {
+      setSendingWhatsApp(false);
+    }
   };
 
   return (
@@ -125,13 +294,23 @@ export default function PurchaseSummary({
           <DialogHeader className="px-4 py-2 border-b shrink-0 flex flex-row items-center justify-between pr-10 space-y-0">
             <DialogTitle>Purchase Preview</DialogTitle>
             <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleWhatsAppShare}
+                disabled={sendingWhatsApp}
+                className="text-green-600 border-green-200 hover:bg-green-50"
+              >
+                {sendingWhatsApp ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <MessageCircle className="w-3.5 h-3.5 mr-1.5" />
+                )}
+                WhatsApp
+              </Button>
               <Button size="sm" variant="outline" onClick={handlePrint}>
                 <Printer className="w-3.5 h-3.5 mr-1.5" />
                 Print
-              </Button>
-              <Button size="sm" variant="outline" onClick={handleDownload}>
-                <Download className="w-3.5 h-3.5 mr-1.5" />
-                Download
               </Button>
             </div>
           </DialogHeader>

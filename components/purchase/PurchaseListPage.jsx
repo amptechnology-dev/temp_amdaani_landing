@@ -2,7 +2,13 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
-import { format, isToday, isYesterday, isWithinInterval, subDays } from "date-fns";
+import {
+  format,
+  isToday,
+  isYesterday,
+  isWithinInterval,
+  subDays,
+} from "date-fns";
 import {
   Search,
   Plus,
@@ -13,7 +19,7 @@ import {
   Loader2,
   Pencil,
   Printer,
-  Download,
+  MessageCircle,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -45,11 +51,16 @@ const statusStyles = {
 const DATE_FILTERS = ["All", "Today", "Yesterday", "This Week"];
 const STATUS_FILTERS = ["All", "Paid", "Partial", "Unpaid"];
 
-export default function PurchaseListPage({ refreshKey, onCreateNew, onEditPurchase }) {
+export default function PurchaseListPage({
+  refreshKey,
+  onCreateNew,
+  onEditPurchase,
+}) {
   // ⚠️ ADJUST: change `storedata` below to whatever key your AuthContext
   // actually exposes (e.g. `store`, `storeData`, `currentStore`).
   const auth = useAuth();
-  const contextStoredata = auth?.storedata || auth?.store || auth?.storeData || null;
+  const contextStoredata =
+    auth?.storedata || auth?.store || auth?.storeData || null;
 
   const [purchases, setPurchases] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -65,7 +76,16 @@ export default function PurchaseListPage({ refreshKey, onCreateNew, onEditPurcha
   const [previewHtml, setPreviewHtml] = useState("");
   const [previewLoadingId, setPreviewLoadingId] = useState(null);
   const [activePreviewNumber, setActivePreviewNumber] = useState("");
+  // ✅ WhatsApp-er jonno dorkari info — row click korar shomoy save kore rakhi
+  const [activePreviewMeta, setActivePreviewMeta] = useState({
+    vendorName: "",
+    vendorMobile: "",
+    grandTotal: 0,
+  });
+  const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const iframeRef = useRef(null);
+
+  const pageFormat = storedata?.settings?.printMode === "a5" ? "a5" : "a4";
 
   useEffect(() => {
     fetchPurchases();
@@ -130,7 +150,7 @@ export default function PurchaseListPage({ refreshKey, onCreateNew, onEditPurcha
         (p) =>
           p.vendorName?.toLowerCase().includes(q) ||
           p.vendorMobile?.toLowerCase().includes(q) ||
-          p.invoiceNumber?.toLowerCase().includes(q)
+          p.invoiceNumber?.toLowerCase().includes(q),
       );
     }
 
@@ -140,14 +160,19 @@ export default function PurchaseListPage({ refreshKey, onCreateNew, onEditPurcha
         if (dateFilter === "Today") return isToday(d);
         if (dateFilter === "Yesterday") return isYesterday(d);
         if (dateFilter === "This Week")
-          return isWithinInterval(d, { start: subDays(new Date(), 7), end: new Date() });
+          return isWithinInterval(d, {
+            start: subDays(new Date(), 7),
+            end: new Date(),
+          });
         return true;
       });
     }
 
     if (statusFilter !== "All") {
       list = list.filter(
-        (p) => (p.paymentStatus || "unpaid").toLowerCase() === statusFilter.toLowerCase()
+        (p) =>
+          (p.paymentStatus || "unpaid").toLowerCase() ===
+          statusFilter.toLowerCase(),
       );
     }
 
@@ -159,11 +184,17 @@ export default function PurchaseListPage({ refreshKey, onCreateNew, onEditPurcha
   }, [searchTerm, dateFilter, statusFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredPurchases.length / limit));
-  const pagedPurchases = filteredPurchases.slice((page - 1) * limit, page * limit);
+  const pagedPurchases = filteredPurchases.slice(
+    (page - 1) * limit,
+    page * limit,
+  );
 
   const chips = [
     ...DATE_FILTERS.map((f) => ({ kind: "date", label: f })),
-    ...STATUS_FILTERS.filter((f) => f !== "All").map((f) => ({ kind: "status", label: f })),
+    ...STATUS_FILTERS.filter((f) => f !== "All").map((f) => ({
+      kind: "status",
+      label: f,
+    })),
   ];
 
   const isChipActive = (chip) => {
@@ -204,8 +235,11 @@ export default function PurchaseListPage({ refreshKey, onCreateNew, onEditPurcha
         );
         const gstRate = Number(it.gstRate ?? 0);
         const isPurchaseTaxInclusive = Boolean(it.isPurchaseTaxInclusive);
-        const purchaseDiscountType = it.purchaseDiscountType || it.discountType || "amount";
-        const purchaseDiscount = Number(it.purchaseDiscount ?? it.discount ?? 0);
+        const purchaseDiscountType =
+          it.purchaseDiscountType || it.discountType || "amount";
+        const purchaseDiscount = Number(
+          it.purchaseDiscount ?? it.discount ?? 0,
+        );
 
         const perUnitDiscount =
           purchaseDiscountType === "percentage"
@@ -223,9 +257,12 @@ export default function PurchaseListPage({ refreshKey, onCreateNew, onEditPurcha
         }
 
         const gstAmount =
-          it.gstAmount != null ? Number(it.gstAmount) : (taxableValue * gstRate) / 100;
+          it.gstAmount != null
+            ? Number(it.gstAmount)
+            : (taxableValue * gstRate) / 100;
 
-        const total = it.total != null ? Number(it.total) : taxableValue + gstAmount;
+        const total =
+          it.total != null ? Number(it.total) : taxableValue + gstAmount;
 
         return {
           _id: it._id || it.product,
@@ -247,13 +284,23 @@ export default function PurchaseListPage({ refreshKey, onCreateNew, onEditPurcha
 
       // ⚠️ ADJUST: if your purchase doc stores these under different top-level
       // keys, point them here. gstBreakdown MUST always resolve to an object.
-      const subTotal = Number(doc.invoiceCalculations?.subTotal ?? doc.subTotal ?? 0);
-      const discountTotal = Number(
-        doc.invoiceCalculations?.discountTotal ?? doc.discountTotal ?? doc.totalDiscount ?? 0,
+      const subTotal = Number(
+        doc.invoiceCalculations?.subTotal ?? doc.subTotal ?? 0,
       );
-      const grandTotal = Number(doc.invoiceCalculations?.grandTotal ?? doc.grandTotal ?? 0);
-      const roundOff = Number(doc.invoiceCalculations?.roundOff ?? doc.roundOff ?? 0);
-      const gstBreakdown = doc.invoiceCalculations?.gstBreakdown || doc.gstBreakdown || {};
+      const discountTotal = Number(
+        doc.invoiceCalculations?.discountTotal ??
+          doc.discountTotal ??
+          doc.totalDiscount ??
+          0,
+      );
+      const grandTotal = Number(
+        doc.invoiceCalculations?.grandTotal ?? doc.grandTotal ?? 0,
+      );
+      const roundOff = Number(
+        doc.invoiceCalculations?.roundOff ?? doc.roundOff ?? 0,
+      );
+      const gstBreakdown =
+        doc.invoiceCalculations?.gstBreakdown || doc.gstBreakdown || {};
 
       const invoiceCalculations = {
         subtotal: subTotal,
@@ -278,7 +325,6 @@ export default function PurchaseListPage({ refreshKey, onCreateNew, onEditPurcha
         vendorGstNumber: doc.vendorGstNumber,
       };
 
-      const pageFormat = storedata?.settings?.printMode === "a5" ? "a5" : "a4";
       const dateObj = new Date(doc.createdAt || doc.date);
 
       const html = generatePurchaseHTML({
@@ -316,6 +362,12 @@ export default function PurchaseListPage({ refreshKey, onCreateNew, onEditPurcha
       });
 
       setActivePreviewNumber(doc.invoiceNumber);
+      // ✅ WhatsApp button-er jonno vendor info save kore rakhi
+      setActivePreviewMeta({
+        vendorName: doc.vendorName || "",
+        vendorMobile: doc.vendorMobile || "",
+        grandTotal,
+      });
       setPreviewHtml(html);
       setPreviewOpen(true);
     } catch (err) {
@@ -333,17 +385,181 @@ export default function PurchaseListPage({ refreshKey, onCreateNew, onEditPurcha
     win.print();
   };
 
-  const handleDownload = () => {
-    if (!previewHtml) return;
-    const blob = new Blob([previewHtml], { type: "text/html" });
+  const toDataURL = async (url) => {
+    try {
+      const proxyUrl = `/api/image-proxy?url=${encodeURIComponent(url)}`;
+      const res = await fetch(proxyUrl);
+      if (!res.ok) throw new Error(`Proxy fetch failed: ${res.status}`);
+      const blob = await res.blob();
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (err) {
+      console.warn("Image fetch failed, keeping original src:", url, err);
+      return null;
+    }
+  };
+
+  const inlineImagesAsBase64 = async (doc) => {
+    const imgs = Array.from(doc.querySelectorAll("img"));
+    await Promise.all(
+      imgs.map(async (img) => {
+        const src = img.getAttribute("src");
+        if (!src || src.startsWith("data:")) return; // already base64
+        const dataUrl = await toDataURL(src);
+        if (dataUrl) img.src = dataUrl;
+      }),
+    );
+  };
+
+  // ── Shob img.onload/onerror complete howa porjonto wait kori,
+  // fixed timeout er upor bhorosa na kore ────────────────────────
+  const waitForImagesToLoad = (doc) => {
+    const imgs = Array.from(doc.querySelectorAll("img"));
+    return Promise.all(
+      imgs.map((img) => {
+        if (img.complete) return Promise.resolve();
+        return new Promise((resolve) => {
+          img.addEventListener("load", resolve, { once: true });
+          img.addEventListener("error", resolve, { once: true }); // fail holeo block na kore egiye jai
+        });
+      }),
+    );
+  };
+
+  // ── PDF generate — Preview iframe-e jeta dekhacche (perfect A4/A5
+  // print layout) hubohu SEI content thekei capture kori.
+  // html2canvas-pro use kora hocche karon eta oklch()/lab() moto modern
+  // CSS color function support kore — vanilla html2canvas eigulo parse
+  // korte parena, tai WhatsApp/PDF generate korar somoy
+  // "unsupported color function" error dito ───────────────────────────
+  const generatePdfBlob = async () => {
+    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+      import("html2canvas-pro"),
+      import("jspdf"),
+    ]);
+
+    const idoc = iframeRef.current?.contentDocument;
+    if (!idoc || !idoc.body) {
+      throw new Error("Preview not ready yet");
+    }
+
+    // 1) Cross-origin image gulo ke base64 e convert kore niচ্ছি —
+    //    ei step ta CORS taint problem ta root theke fix kore dey
+    await inlineImagesAsBase64(idoc);
+
+    // 2) Base64 e convert howar por abar load howa wait kori
+    await waitForImagesToLoad(idoc);
+
+    // ei choto extra wait ta layout settle howar jonno rekhe dilam
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const canvas = await html2canvas(idoc.body, {
+      scale: 2,
+      backgroundColor: "#ffffff",
+      useCORS: true,
+      allowTaint: false,
+      windowWidth: idoc.documentElement.scrollWidth,
+      windowHeight: idoc.documentElement.scrollHeight,
+    });
+
+    const imgData = canvas.toDataURL("image/jpeg", 0.98);
+
+    const pdf = new jsPDF({
+      unit: "mm",
+      format: pageFormat === "a5" ? "a5" : "a4",
+      orientation: "portrait",
+    });
+
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = pageWidth;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+    if (imgHeight <= pageHeight) {
+      pdf.addImage(imgData, "JPEG", 0, 0, imgWidth, imgHeight);
+    } else {
+      let heightLeft = imgHeight;
+      let position = 0;
+      pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+    }
+
+    return pdf.output("blob");
+  };
+
+  const downloadBlob = (blob, filename) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `Purchase-${activePreviewNumber || "preview"}.html`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+  };
+
+  // ── WhatsApp: PDF automatic download hoy (kono dialog/click chara),
+  // mobile-e Web Share API thakle PDF sotti sotti WhatsApp share sheet-e
+  // attach hoye khule jay; desktop-e download hoye WhatsApp Web-er chat
+  // khule jay ──────────────────────────────────────────────────────────
+  const handleWhatsAppShare = async () => {
+    const phoneDigits = (activePreviewMeta.vendorMobile || "").replace(
+      /\D/g,
+      "",
+    );
+
+    if (!phoneDigits) {
+      toast.error("Ei bill-e vendor-er phone number pawa jayni");
+      return;
+    }
+
+    try {
+      setSendingWhatsApp(true);
+      const blob = await generatePdfBlob();
+      const filename = `Purchase-${activePreviewNumber}.pdf`;
+      const message = `Hello ${
+        activePreviewMeta.vendorName || "Vendor"
+      },\nHere is the purchase invoice #${activePreviewNumber}.\nTotal Amount: ₹${
+        activePreviewMeta.grandTotal ?? 0
+      }`;
+      const waNumber =
+        phoneDigits.length === 10 ? `91${phoneDigits}` : phoneDigits;
+
+      const file = new File([blob], filename, { type: "application/pdf" });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: `Purchase Invoice #${activePreviewNumber}`,
+          text: message,
+        });
+        return;
+      }
+
+      downloadBlob(blob, filename);
+      toast.success("Purchase PDF download hoyeche — WhatsApp-e attach kore dao");
+      window.open(
+        `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`,
+        "_blank",
+      );
+    } catch (err) {
+      if (err?.name !== "AbortError") {
+        console.error("WhatsApp share error:", err);
+        toast.error("WhatsApp-e pathano failed");
+      }
+    } finally {
+      setSendingWhatsApp(false);
+    }
   };
 
   return (
@@ -351,7 +567,9 @@ export default function PurchaseListPage({ refreshKey, onCreateNew, onEditPurcha
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h1 className="text-lg md:text-xl font-bold text-slate-900">Purchases</h1>
+          <h1 className="text-lg md:text-xl font-bold text-slate-900">
+            Purchases
+          </h1>
           <p className="text-xs text-slate-400">Manage your vendor purchases</p>
         </div>
         <Button onClick={onCreateNew} size="sm">
@@ -418,7 +636,9 @@ export default function PurchaseListPage({ refreshKey, onCreateNew, onEditPurcha
       {/* Table */}
       <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
         <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-slate-50">
-          <span className="text-sm font-semibold text-slate-700">Purchases</span>
+          <span className="text-sm font-semibold text-slate-700">
+            Purchases
+          </span>
           <span className="text-xs text-slate-400">
             Showing {pagedPurchases.length} of {filteredPurchases.length}
           </span>
@@ -432,9 +652,13 @@ export default function PurchaseListPage({ refreshKey, onCreateNew, onEditPurcha
         ) : filteredPurchases.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-14 text-center">
             <Truck className="w-10 h-10 text-slate-300 mb-2" />
-            <p className="text-sm font-semibold text-slate-700">No Purchases Found</p>
+            <p className="text-sm font-semibold text-slate-700">
+              No Purchases Found
+            </p>
             <p className="text-xs text-slate-400 max-w-xs mt-0.5 mb-3">
-              {searchTerm ? `No purchases match "${searchTerm}".` : "Start by creating your first purchase."}
+              {searchTerm
+                ? `No purchases match "${searchTerm}".`
+                : "Start by creating your first purchase."}
             </p>
             {!searchTerm && (
               <Button onClick={onCreateNew} size="sm">
@@ -449,13 +673,23 @@ export default function PurchaseListPage({ refreshKey, onCreateNew, onEditPurcha
               <thead>
                 <tr className="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wide border-b border-slate-200">
                   <th className="text-left font-semibold px-3 py-1.5 w-8">#</th>
-                  <th className="text-left font-semibold px-3 py-1.5">Vendor</th>
+                  <th className="text-left font-semibold px-3 py-1.5">
+                    Vendor
+                  </th>
                   <th className="text-left font-semibold px-3 py-1.5">Phone</th>
-                  <th className="text-left font-semibold px-3 py-1.5">Invoice #</th>
+                  <th className="text-left font-semibold px-3 py-1.5">
+                    Invoice #
+                  </th>
                   <th className="text-left font-semibold px-3 py-1.5">Date</th>
-                  <th className="text-center font-semibold px-3 py-1.5">Status</th>
-                  <th className="text-right font-semibold px-3 py-1.5">Amount</th>
-                  <th className="text-center font-semibold px-3 py-1.5 w-16">Action</th>
+                  <th className="text-center font-semibold px-3 py-1.5">
+                    Status
+                  </th>
+                  <th className="text-right font-semibold px-3 py-1.5">
+                    Amount
+                  </th>
+                  <th className="text-center font-semibold px-3 py-1.5 w-16">
+                    Action
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -476,7 +710,10 @@ export default function PurchaseListPage({ refreshKey, onCreateNew, onEditPurcha
                         <span className="font-medium text-slate-800 truncate">
                           {p.vendorName || "No Vendor"}
                         </span>
-                        <Badge variant="outline" className="text-[9px] px-1 py-0 shrink-0">
+                        <Badge
+                          variant="outline"
+                          className="text-[9px] px-1 py-0 shrink-0"
+                        >
                           {p.vendorGstNumber ? "GST" : "Non-GST"}
                         </Badge>
                       </div>
@@ -496,7 +733,10 @@ export default function PurchaseListPage({ refreshKey, onCreateNew, onEditPurcha
                     <td className="px-3 py-1.5 text-slate-500 text-xs align-middle whitespace-nowrap">
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
-                        {format(new Date(p.createdAt || p.date), "dd MMM yyyy, hh:mm a")}
+                        {format(
+                          new Date(p.createdAt || p.date),
+                          "dd MMM yyyy, hh:mm a",
+                        )}
                       </span>
                     </td>
 
@@ -547,7 +787,12 @@ export default function PurchaseListPage({ refreshKey, onCreateNew, onEditPurcha
       {/* Pagination */}
       {!isLoading && filteredPurchases.length > 0 && (
         <div className="flex justify-between items-center mt-3">
-          <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page === 1}
+            onClick={() => setPage((p) => p - 1)}
+          >
             Previous
           </Button>
           <p className="text-xs text-slate-500">
@@ -568,15 +813,28 @@ export default function PurchaseListPage({ refreshKey, onCreateNew, onEditPurcha
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-3xl w-full h-[85vh] p-0 flex flex-col overflow-hidden">
           <DialogHeader className="px-4 py-2 border-b shrink-0 flex flex-row items-center justify-between pr-10 space-y-0">
-            <DialogTitle>Purchase Preview {activePreviewNumber ? `#${activePreviewNumber}` : ""}</DialogTitle>
+            <DialogTitle>
+              Purchase Preview{" "}
+              {activePreviewNumber ? `#${activePreviewNumber}` : ""}
+            </DialogTitle>
             <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleWhatsAppShare}
+                disabled={sendingWhatsApp}
+                className="text-green-600 border-green-200 hover:bg-green-50"
+              >
+                {sendingWhatsApp ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <MessageCircle className="w-3.5 h-3.5 mr-1.5" />
+                )}
+                WhatsApp
+              </Button>
               <Button size="sm" variant="outline" onClick={handlePrint}>
                 <Printer className="w-3.5 h-3.5 mr-1.5" />
                 Print
-              </Button>
-              <Button size="sm" variant="outline" onClick={handleDownload}>
-                <Download className="w-3.5 h-3.5 mr-1.5" />
-                Download
               </Button>
             </div>
           </DialogHeader>
