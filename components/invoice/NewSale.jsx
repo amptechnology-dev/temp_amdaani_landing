@@ -547,11 +547,8 @@ export default function SalesFlow() {
     hasUserEditedPaid.current = false;
   };
 
-  // -------------------------------
-  // Create / Update invoice submit
-  // -------------------------------
   const handleCreateInvoice = async () => {
-    if (!selectedCustomer || cartItems.length === 0) return;
+    if (!selectedCustomer || cartItems.length === 0) return null;
     setIsSubmitting(true);
     try {
       const paymentStatus =
@@ -623,19 +620,23 @@ export default function SalesFlow() {
         },
       });
 
-      openInvoiceInPrintWindow(html);
       toast.success(isEditMode ? "Invoice updated!" : "Invoice created!");
       setInvoiceRefreshKey((k) => k + 1);
 
-      await resetFormState();
-      setStep("list");
+      return html;
     } catch {
       toast.error(
         isEditMode ? "Invoice update failed" : "Invoice creation failed",
       );
+      return null;
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleInvoiceModalClose = async () => {
+    await resetFormState();
+    setStep("list");
   };
 
   // -------------------------------
@@ -682,6 +683,7 @@ export default function SalesFlow() {
       addToCart={addToCart}
       onOpenAddItems={() => setStep("items")}
       onBack={handleBackToList}
+      onInvoiceModalClose={handleInvoiceModalClose}
       discount={discount}
       setDiscount={setDiscount}
       invoiceCalculations={invoiceCalculations}

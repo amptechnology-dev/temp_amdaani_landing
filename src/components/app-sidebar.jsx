@@ -37,7 +37,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "../../context/AuthContext";
-import { sections, reportSubItems, isItemVisible } from "../lib/navigation"; 
+import { sections, reportSubItems, isItemVisible } from "../lib/navigation";
 
 const user = { name: "AMDAANI", email: "m@example.com" };
 
@@ -64,12 +64,12 @@ export function AppSidebar({ ...props }) {
     <Sidebar
       collapsible="icon"
       {...props}
-      className="border-r border-slate-200/70 bg-white"
+      className="border-r border-slate-200 bg-gradient-to-b from-white via-slate-50/40 to-slate-50/60 shadow-[4px_0_24px_-8px_rgba(15,23,42,0.08)]"
     >
       {/* ---------------- HEADER ---------------- */}
-      <SidebarHeader className="border-b border-slate-100 px-3 py-4">
+      <SidebarHeader className="border-b border-slate-200/80 bg-white/60 backdrop-blur-sm px-3 py-4">
         <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
-          <div className="relative flex items-center justify-center w-11 h-11 rounded-2xl bg-white shrink-0 shadow-sm ring-1 ring-slate-200/80 overflow-hidden">
+          <div className="relative flex items-center justify-center w-11 h-11 rounded-2xl bg-white shrink-0 shadow-sm ring-1 ring-slate-200 overflow-hidden">
             <Image
               src="/images/Tapplogo.png"
               alt="AMDAANI logo"
@@ -91,7 +91,7 @@ export function AppSidebar({ ...props }) {
       </SidebarHeader>
 
       {/* ---------------- NAV ---------------- */}
-      <SidebarContent className="px-2.5 py-2 gap-0.5">
+      <SidebarContent className="px-2.5 py-3 gap-0.5">
         {sections.map((section, sIdx) => {
           const visibleItems = section.items.filter((item) =>
             isItemVisible(item, flags),
@@ -104,7 +104,7 @@ export function AppSidebar({ ...props }) {
           return (
             <React.Fragment key={section.label}>
               <SidebarGroup className="py-1">
-                <SidebarGroupLabel className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider px-2 mb-1">
+                <SidebarGroupLabel className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider px-2 mb-1.5">
                   {section.label}
                 </SidebarGroupLabel>
                 <SidebarMenu className="gap-0.5">
@@ -120,23 +120,25 @@ export function AppSidebar({ ...props }) {
                           onClick={() => router.push(item.url)}
                           isActive={isActive}
                           tooltip={item.title}
-                          className={`relative h-10 rounded-xl px-3 transition-all duration-150 cursor-pointer ${
+                          className={`relative h-10 rounded-xl px-3 transition-all duration-150 cursor-pointer border ${
                             isActive
-                              ? "bg-gradient-to-r from-blue-600 to-blue-600/95 hover:from-blue-600 hover:to-blue-600/95 shadow-sm shadow-blue-200"
-                              : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                              ? "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-600 hover:to-blue-700 shadow-md shadow-blue-300/50 border-blue-700/30"
+                              : "text-slate-600 border-transparent hover:bg-white hover:border-slate-200 hover:shadow-sm hover:text-slate-900"
                           }`}
                         >
                           {isActive && (
-                            <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full bg-white/90 group-data-[collapsible=icon]:hidden" />
+                            <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-[3.5px] rounded-full bg-white group-data-[collapsible=icon]:hidden" />
                           )}
                           <item.icon
                             className={`w-[18px] h-[18px] shrink-0 ${
-                              isActive ? "!text-white" : "text-slate-400"
+                              isActive ? "!text-white" : "text-slate-500"
                             }`}
-                            strokeWidth={2}
+                            strokeWidth={2.2}
                           />
                           <span
-                            className={`font-semibold text-[13.5px] ${isActive ? "!text-white" : ""}`}
+                            className={`font-semibold text-[13.5px] ${
+                              isActive ? "!text-white" : "text-slate-700"
+                            }`}
                           >
                             {item.title}
                           </span>
@@ -151,34 +153,34 @@ export function AppSidebar({ ...props }) {
                         onClick={() => setReportsOpen((prev) => !prev)}
                         isActive={isReportsActive}
                         tooltip="Reports"
-                        className={`relative h-10 rounded-xl px-3 transition-all duration-150 cursor-pointer ${
+                        className={`relative h-10 rounded-xl px-3 transition-all duration-150 cursor-pointer border ${
                           isReportsActive
-                            ? "bg-gradient-to-r from-blue-600 to-blue-600/95 hover:from-blue-600 hover:to-blue-600/95 shadow-sm shadow-blue-200"
-                            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                            ? "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-600 hover:to-blue-700 shadow-md shadow-blue-300/50 border-blue-700/30"
+                            : "text-slate-600 border-transparent hover:bg-white hover:border-slate-200 hover:shadow-sm hover:text-slate-900"
                         }`}
                       >
                         {isReportsActive && (
-                          <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full bg-white/90 group-data-[collapsible=icon]:hidden" />
+                          <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-[3.5px] rounded-full bg-white group-data-[collapsible=icon]:hidden" />
                         )}
                         <FileBarChart
-                          className={`w-[18px] h-[18px] shrink-0 ${isReportsActive ? "!text-white" : "text-slate-400"}`}
-                          strokeWidth={2}
+                          className={`w-[18px] h-[18px] shrink-0 ${isReportsActive ? "!text-white" : "text-slate-500"}`}
+                          strokeWidth={2.2}
                         />
                         <span
-                          className={`font-semibold text-[13.5px] ${isReportsActive ? "!text-white" : ""}`}
+                          className={`font-semibold text-[13.5px] ${isReportsActive ? "!text-white" : "text-slate-700"}`}
                         >
                           Reports
                         </span>
                         <ChevronRight
                           className={`ml-auto w-4 h-4 shrink-0 transition-transform duration-200 group-data-[collapsible=icon]:hidden ${
                             reportsOpen ? "rotate-90" : ""
-                          } ${isReportsActive ? "!text-white" : "text-slate-400"}`}
-                          strokeWidth={2}
+                          } ${isReportsActive ? "!text-white" : "text-slate-500"}`}
+                          strokeWidth={2.2}
                         />
                       </SidebarMenuButton>
 
                       {reportsOpen && (
-                        <SidebarMenuSub className="mt-0.5 ml-3.5 pl-3 border-l border-slate-100 gap-0.5 group-data-[collapsible=icon]:hidden">
+                        <SidebarMenuSub className="mt-0.5 ml-3.5 pl-3 border-l-2 border-slate-200 gap-0.5 group-data-[collapsible=icon]:hidden">
                           {visibleReportItems.map((item) => {
                             const isSubActive = pathname === item.url;
                             return (
@@ -186,15 +188,15 @@ export function AppSidebar({ ...props }) {
                                 <SidebarMenuSubButton
                                   onClick={() => router.push(item.url)}
                                   isActive={isSubActive}
-                                  className={`h-8 rounded-lg px-2.5 text-[13px] font-medium transition-all duration-150 cursor-pointer ${
+                                  className={`h-8 rounded-lg px-2.5 text-[13px] font-semibold transition-all duration-150 cursor-pointer border ${
                                     isSubActive
-                                      ? "bg-blue-50 text-blue-700"
-                                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                                      ? "bg-blue-50 text-blue-700 border-blue-200 shadow-sm"
+                                      : "text-slate-600 border-transparent hover:bg-white hover:border-slate-200 hover:text-slate-900"
                                   }`}
                                 >
                                   <item.icon
-                                    className={`w-[15px] h-[15px] shrink-0 ${isSubActive ? "text-blue-600" : "text-slate-400"}`}
-                                    strokeWidth={2}
+                                    className={`w-[15px] h-[15px] shrink-0 ${isSubActive ? "text-blue-600" : "text-slate-500"}`}
+                                    strokeWidth={2.2}
                                   />
                                   <span className="truncate">{item.title}</span>
                                 </SidebarMenuSubButton>
@@ -209,7 +211,7 @@ export function AppSidebar({ ...props }) {
               </SidebarGroup>
 
               {sIdx < sections.length - 1 && (
-                <SidebarSeparator className="my-1" />
+                <SidebarSeparator className="my-1 bg-slate-200/70" />
               )}
             </React.Fragment>
           );
@@ -217,14 +219,14 @@ export function AppSidebar({ ...props }) {
       </SidebarContent>
 
       {/* ---------------- FOOTER ---------------- */}
-      <SidebarFooter className="border-t border-slate-100 px-2.5 py-2.5">
+      <SidebarFooter className="border-t border-slate-200/80 bg-white/60 backdrop-blur-sm px-2.5 py-2.5">
         <SidebarMenu className="gap-0.5">
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton
                   size="lg"
-                  className="h-13 rounded-xl px-2.5 mt-1 hover:bg-slate-50 data-[state=open]:bg-slate-50 border border-transparent hover:border-slate-100 cursor-pointer"
+                  className="h-13 rounded-xl px-2.5 mt-1 hover:bg-white hover:shadow-sm data-[state=open]:bg-white data-[state=open]:shadow-sm border border-transparent hover:border-slate-200 cursor-pointer transition-all duration-150"
                 >
                   <Avatar className="h-8 w-8 rounded-lg border border-slate-200 shrink-0 bg-white">
                     <AvatarImage

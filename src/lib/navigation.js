@@ -119,7 +119,7 @@ export const sections = [
         icon: ShoppingCart,
         requiresPurchaseOrder: true,
       },
-      { title: "Invoices", url: "/dashboard/sales", icon: Receipt },
+      { title: "Sales", url: "/dashboard/sales", icon: Receipt },
       { title: "Other Expenses", url: "/dashboard/expenses", icon: Wallet },
     ],
   },

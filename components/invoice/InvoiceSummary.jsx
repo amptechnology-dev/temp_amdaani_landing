@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { format } from "date-fns";
-import { FileText, Check, Loader2, Printer, MessageCircle } from "lucide-react";
+import { FileText, Check, Loader2, Printer, MessageCircle, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +20,7 @@ export default function InvoiceSummary({
   paymentNote,
   remarks,
   handleCreateInvoice,
+  onInvoiceModalClose,
   isLoading,
   disabled,
   payment,
@@ -35,22 +36,20 @@ export default function InvoiceSummary({
 }) {
   const [previewHtml, setPreviewHtml] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [isCreatedInvoice, setIsCreatedInvoice] = useState(false);
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false); // 👈 notun state
   const iframeRef = useRef(null);
 
   const pageFormat = storedata?.settings?.printMode === "a5" ? "a5" : "a4";
 
-  const buildHtml = () => {
+  const buildPreviewHtml = () => {
     const now = new Date();
     return generateInvoiceHTML({
       preview: false,
       createdInvoice: false,
-      invoiceData: {
-        transactions: [],
-        remarks,
-        paymentMethod,
-        paymentNote,
-      },
+      invoiceData: { transactions: [], remarks, paymentMethod, paymentNote },
       formValues,
       cartItems,
       invoiceCalculations,
@@ -74,8 +73,35 @@ export default function InvoiceSummary({
 
   const handlePreview = () => {
     if (!cartItems?.length) return;
-    setPreviewHtml(buildHtml());
+    setIsCreatedInvoice(false);
+    setPreviewHtml(buildPreviewHtml());
     setPreviewOpen(true);
+  };
+
+  const handleCreateClick = async () => {
+    try {
+      setIsCreating(true);
+      const html = await handleCreateInvoice();
+
+      if (!html) return;
+
+      setIsCreatedInvoice(true);
+      setPreviewHtml(html);
+      setPreviewOpen(true);
+    } catch (err) {
+      console.error("Create invoice failed:", err);
+      toast.error("Invoice create korte problem hoyeche");
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleModalOpenChange = (open) => {
+    setPreviewOpen(open);
+    if (!open && isCreatedInvoice) {
+      onInvoiceModalClose?.();
+      setIsCreatedInvoice(false);
+    }
   };
 
   const handlePrint = () => {
@@ -108,15 +134,13 @@ export default function InvoiceSummary({
     await Promise.all(
       imgs.map(async (img) => {
         const src = img.getAttribute("src");
-        if (!src || src.startsWith("data:")) return; // already base64
+        if (!src || src.startsWith("data:")) return;
         const dataUrl = await toDataURL(src);
         if (dataUrl) img.src = dataUrl;
       }),
     );
   };
 
-  // ── Shob img.onload/onerror complete howa porjonto wait kori,
-  // fixed 150ms timeout er upor bhorosa na kore ────────────────────────
   const waitForImagesToLoad = (doc) => {
     const imgs = Array.from(doc.querySelectorAll("img"));
     return Promise.all(
@@ -124,7 +148,7 @@ export default function InvoiceSummary({
         if (img.complete) return Promise.resolve();
         return new Promise((resolve) => {
           img.addEventListener("load", resolve, { once: true });
-          img.addEventListener("error", resolve, { once: true }); // fail holeo block na kore egiye jai
+          img.addEventListener("error", resolve, { once: true });
         });
       }),
     );
@@ -141,21 +165,15 @@ export default function InvoiceSummary({
       throw new Error("Preview not ready yet");
     }
 
-    // 1) Cross-origin image gulo ke base64 e convert kore niচ্ছি —
-    //    ei step ta CORS taint problem ta root theke fix kore dey
     await inlineImagesAsBase64(idoc);
-
-    // 2) Base64 e convert howar por abar load howa wait kori
     await waitForImagesToLoad(idoc);
-
-    // ei choto extra wait ta layout settle howar jonno rekhe dilam
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     const canvas = await html2canvas(idoc.body, {
       scale: 2,
       backgroundColor: "#ffffff",
       useCORS: true,
-      allowTaint: false, // base64 howar por eta ar dorkar hobe na, tai false e rakha safe
+      allowTaint: false,
       windowWidth: idoc.documentElement.scrollWidth,
       windowHeight: idoc.documentElement.scrollHeight,
     });
@@ -202,10 +220,23 @@ export default function InvoiceSummary({
     URL.revokeObjectURL(url);
   };
 
-  // ── WhatsApp: PDF automatic download hoy (kono dialog/click chara),
-  // mobile-e Web Share API thakle PDF sotti sotti WhatsApp share sheet-e
-  // attach hoye khule jay; desktop-e download hoye WhatsApp Web-er chat
-  // khule jay ──────────────────────────────────────────────────────────
+  // ── Download button — direct PDF banaye download kore dey,
+  // WhatsApp share-er kono dependency nei (phone number lagbe na) ──────
+  const handleDownloadClick = async () => {
+    try {
+      setIsDownloading(true);
+      const blob = await generatePdfBlob();
+      const filename = `Invoice-${invoiceNumber}.pdf`;
+      downloadBlob(blob, filename);
+      toast.success("Invoice PDF download successfully");
+    } catch (err) {
+      console.error("Download error:", err);
+      toast.error("PDF download korte problem hoyeche");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   const handleWhatsAppShare = async () => {
     if (!cartItems?.length) return;
 
@@ -242,9 +273,7 @@ export default function InvoiceSummary({
       }
 
       downloadBlob(blob, filename);
-      toast.success(
-        "Invoice PDF download successfully",
-      );
+      toast.success("Invoice PDF download successfully");
       window.open(
         `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`,
         "_blank",
@@ -274,11 +303,11 @@ export default function InvoiceSummary({
         </Button>
 
         <Button
-          onClick={handleCreateInvoice}
-          disabled={disabled || isLoading}
+          onClick={handleCreateClick}
+          disabled={disabled || isLoading || isCreating}
           className="flex-1"
         >
-          {isLoading ? (
+          {isLoading || isCreating ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               {submitLabel === "Update Invoice" ? "Updating..." : "Creating..."}
@@ -292,11 +321,27 @@ export default function InvoiceSummary({
         </Button>
       </div>
 
-      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+      <Dialog open={previewOpen} onOpenChange={handleModalOpenChange}>
         <DialogContent className="max-w-3xl w-full h-[85vh] p-0 flex flex-col overflow-hidden">
           <DialogHeader className="px-4 py-2 border-b shrink-0 flex flex-row items-center justify-between pr-10 space-y-0">
-            <DialogTitle>Invoice Preview</DialogTitle>
+            <DialogTitle>
+              {isCreatedInvoice ? "Invoice Created" : "Invoice Preview"}
+            </DialogTitle>
             <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleDownloadClick}
+                disabled={isDownloading}
+                className="text-blue-600 border-blue-200 hover:bg-blue-50"
+              >
+                {isDownloading ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <Download className="w-3.5 h-3.5 mr-1.5" />
+                )}
+                Download
+              </Button>
               <Button
                 size="sm"
                 variant="outline"

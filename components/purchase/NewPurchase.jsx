@@ -11,14 +11,6 @@ import PurchaseListPage from "./PurchaseListPage";
 import NewPurchaseFormPage from "./NewPurchaseFormPage";
 import AddPurchaseItemsPage from "./AddPurchaseItemsPage";
 
-const openInPrintWindow = (html) => {
-  const w = window.open("", "_blank");
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
-  setTimeout(() => w.print(), 500);
-};
-
 function determineGstType(storeGst, vendorGst, storeState, vendorState) {
   const extractStateCode = (gst) => gst?.substring(0, 2);
   let isIgst = false;
@@ -374,10 +366,6 @@ export default function PurchaseFlow() {
           p._id === product._id ? { ...p, qty: p.qty + 1 } : p,
         );
 
-      // ✅ FIX — product-এ যেভাবে discount saved আছে (type অনুযায়ী
-      // amount বা percentage), ঠিক সেভাবেই cart-এ বসাও। আগে এখানে
-      // হার্ডকোড 0 / "amount" বসানো ছিল, যেটা product-এর real
-      // purchase discount data সম্পূর্ণ ignore করে দিচ্ছিল।
       const purchaseDiscountType = product.purchaseDiscountType || "amount";
       const purchaseDiscountDisplayValue =
         purchaseDiscountType === "percentage"
@@ -391,8 +379,8 @@ export default function PurchaseFlow() {
           product: product._id,
           name: product.name,
           costPrice: Number(product.costPrice || 0),
-          purchaseDiscount: purchaseDiscountDisplayValue, // ✅ FIX
-          purchaseDiscountType, // ✅ FIX
+          purchaseDiscount: purchaseDiscountDisplayValue,
+          purchaseDiscountType,
           gstRate: Number(product.purchaseGstRate ?? product.gstRate ?? 0),
           isPurchaseTaxInclusive: Boolean(product.isPurchaseTaxInclusive),
           unit: product.unit || "PCS",
@@ -444,7 +432,8 @@ export default function PurchaseFlow() {
   // Create / Update
   // -------------------------------
   const handleCreatePurchase = async () => {
-    if (!selectedVendor || cartItems.length === 0) return;
+    // ✅ vendor mandatory na — shudhu cart empty check thakbe
+    if (cartItems.length === 0) return null;
 
     const isValidObjectId = (id) => /^[0-9a-fA-F]{24}$/.test(String(id || ""));
     const invalidItems = invoiceCalculations.computedItems.filter(
@@ -457,7 +446,7 @@ export default function PurchaseFlow() {
       toast.error(
         `"${invalidItems[0].name}" ekhon ar valid product hishebe pawa jacche na. Item ta remove kore abar add korun.`,
       );
-      return;
+      return null;
     }
 
     setIsSubmitting(true);
@@ -469,15 +458,18 @@ export default function PurchaseFlow() {
             ? "paid"
             : "partial";
 
+      // ✅ vendor na thakle "Walk-in Vendor" fallback
+      const vendor = selectedVendor || { name: "Walk-in Vendor", mobile: "" };
+
       const purchaseData = {
         invoiceNumber: purchaseNumber,
-        vendor: isEditMode ? undefined : selectedVendor._id || null,
-        vendorName: selectedVendor.name,
-        vendorMobile: selectedVendor.mobile,
-        vendorAddress: selectedVendor.address || "",
-        vendorGstNumber: selectedVendor.gstNumber || "",
-        vendorState: selectedVendor.state || "",
-        vendorPostalCode: selectedVendor.postalCode || "",
+        vendor: isEditMode ? undefined : vendor._id || null,
+        vendorName: vendor.name,
+        vendorMobile: vendor.mobile,
+        vendorAddress: vendor.address || "",
+        vendorGstNumber: vendor.gstNumber || "",
+        vendorState: vendor.state || "",
+        vendorPostalCode: vendor.postalCode || "",
         date: format(new Date(), "yyyy-MM-dd"),
         isIgst,
         items: invoiceCalculations.computedItems.map((item) => {
@@ -544,17 +536,24 @@ export default function PurchaseFlow() {
         },
       });
 
-      openInPrintWindow(html);
       toast.success(isEditMode ? "Purchase updated!" : "Purchase created!");
       setPurchaseRefreshKey((k) => k + 1);
 
-      await resetFormState();
-      setStep("list");
+      // ⚠️ resetFormState() + setStep("list") ekhon r ekhane call hocche na.
+      // Modal close howar por handlePurchaseModalClose e giye reset hobe.
+
+      return html;
     } catch (error) {
-      toast.error(isEditMode ? error?.message : error?.message);
+      toast.error(error?.message || "Purchase creation failed");
+      return null;
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handlePurchaseModalClose = async () => {
+    await resetFormState();
+    setStep("list");
   };
 
   // -------------------------------
@@ -597,6 +596,7 @@ export default function PurchaseFlow() {
       addToCart={addToCart}
       setAllProducts={setAllProducts}
       onBack={handleBackToList}
+      onPurchaseModalClose={handlePurchaseModalClose}
       invoiceCalculations={invoiceCalculations}
       paymentMethod={paymentMethod}
       paymentNote={paymentNote}

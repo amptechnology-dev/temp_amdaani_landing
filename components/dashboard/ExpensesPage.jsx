@@ -404,13 +404,13 @@ export default function ExpensesPage() {
 
   return (
     <div className={`min-h-screen p-3 md:p-4 ${currentTheme.background}`}>
-      {/* Header — compact, Items-page style */}
+      {/* Header — compact */}
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h1 className={`text-lg md:text-xl font-bold ${currentTheme.text}`}>
+          <h1 className={`text-xl md:text-2xl font-bold ${currentTheme.text}`}>
             Expenses
           </h1>
-          <p className={`text-xs ${currentTheme.textSecondary}`}>
+          <p className={`text-sm ${currentTheme.textSecondary}`}>
             Track and manage your business expenses
           </p>
         </div>
@@ -418,46 +418,51 @@ export default function ExpensesPage() {
           <Button
             variant="outline"
             size="sm"
+            className="text-sm h-9"
             onClick={refreshData}
             disabled={isRefreshing}
           >
             <RefreshCw
-              className={`w-3.5 h-3.5 mr-1.5 ${isRefreshing ? "animate-spin" : ""}`}
+              className={`w-4 h-4 mr-1.5 ${isRefreshing ? "animate-spin" : ""}`}
             />
             Refresh
           </Button>
-          <Button onClick={handleAddExpense} size="sm" className={currentTheme.buttonPrimary}>
-            <Plus className="w-3.5 h-3.5 mr-1.5" />
+          <Button
+            onClick={handleAddExpense}
+            size="sm"
+            className={`text-sm h-9 px-4 ${currentTheme.buttonPrimary}`}
+          >
+            <Plus className="w-4 h-4 mr-1.5" />
             Add Expense
           </Button>
         </div>
       </div>
 
       {/* Search + limit — compact single row */}
-      <div className="flex gap-2 mb-2.5">
+      <div className="flex gap-2 mb-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
             placeholder="Search by head, paid to, notes, or invoice ref…"
-            className="pl-9 h-8 text-sm rounded-lg"
+            className="pl-9 h-9 text-sm rounded-lg"
             value={searchTerm}
             onChange={handleSearchChange}
           />
           {searchTerm && (
             <X
               onClick={handleClearSearch}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 cursor-pointer text-gray-400"
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 cursor-pointer text-gray-400"
             />
           )}
         </div>
 
         <Select value={limit} onValueChange={(v) => setLimit(Number(v))}>
-          <SelectTrigger className="w-[100px] h-8 text-sm">
+          <SelectTrigger className="w-[110px] h-9 text-sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {[10, 25, 50, 100].map((x) => (
-              <SelectItem key={x} value={x}>
+              <SelectItem key={x} value={x} className="text-sm">
                 {x} / page
               </SelectItem>
             ))}
@@ -465,8 +470,8 @@ export default function ExpensesPage() {
         </Select>
       </div>
 
-      {/* Filter chips — date + payment method combined, Items-page style */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1 mb-2.5 no-scrollbar">
+      {/* Filter chips — date + payment method combined */}
+      <div className="flex gap-2 overflow-x-auto pb-1 mb-3 no-scrollbar">
         {chips.map((chip) => {
           const active = isChipActive(chip);
           const isMethodChip = PAYMENT_METHOD_FILTERS.some(
@@ -476,7 +481,7 @@ export default function ExpensesPage() {
             <button
               key={chip.value}
               onClick={() => handleChipClick(chip)}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap border transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap border transition-colors ${
                 active
                   ? isMethodChip
                     ? "bg-slate-800 text-white border-slate-800"
@@ -492,32 +497,32 @@ export default function ExpensesPage() {
 
       {/* ===== Excel-style dense table ===== */}
       <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-        <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-slate-50">
-          <span className="text-sm font-semibold text-slate-700">Expenses</span>
-          <span className="text-xs text-slate-400">
+        <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-200 bg-slate-50">
+          <span className="text-base font-semibold text-slate-700">Expenses</span>
+          <span className="text-sm text-slate-400">
             Showing {pagedExpenses.length} of {filteredExpenses.length}
           </span>
         </div>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-14 text-slate-400 text-sm">
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
             Loading expenses...
           </div>
         ) : filteredExpenses.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-14 text-center">
-            <Receipt className="w-10 h-10 text-slate-300 mb-2" />
-            <p className="text-sm font-semibold text-slate-700">
+            <Receipt className="w-11 h-11 text-slate-300 mb-2" />
+            <p className="text-base font-semibold text-slate-700">
               {searchTerm ? "No Expenses Found" : "No Expenses Yet"}
             </p>
-            <p className="text-xs text-slate-400 max-w-xs mt-0.5 mb-3">
+            <p className="text-sm text-slate-400 max-w-xs mt-0.5 mb-3">
               {searchTerm
                 ? `No expenses match "${searchTerm}".`
                 : "Add your first expense to begin tracking spending."}
             </p>
             {!searchTerm && (
-              <Button onClick={handleAddExpense} size="sm">
-                <Plus className="w-3.5 h-3.5 mr-1.5" />
+              <Button onClick={handleAddExpense} size="sm" className="text-sm h-9">
+                <Plus className="w-4 h-4 mr-1.5" />
                 Add Expense
               </Button>
             )}
@@ -526,15 +531,15 @@ export default function ExpensesPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wide border-b border-slate-200">
-                  <th className="text-left font-semibold px-3 py-1.5 w-8">#</th>
-                  <th className="text-left font-semibold px-3 py-1.5">Head</th>
-                  <th className="text-left font-semibold px-3 py-1.5">Paid To</th>
-                  <th className="text-left font-semibold px-3 py-1.5">Method</th>
-                  <th className="text-left font-semibold px-3 py-1.5">Date</th>
-                  <th className="text-left font-semibold px-3 py-1.5">Ref / Notes</th>
-                  <th className="text-right font-semibold px-3 py-1.5">Amount</th>
-                  <th className="text-center font-semibold px-3 py-1.5 w-14">Actions</th>
+                <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide border-b border-slate-200">
+                  <th className="text-left font-semibold px-3 py-2 w-8">#</th>
+                  <th className="text-left font-semibold px-3 py-2">Head</th>
+                  <th className="text-left font-semibold px-3 py-2">Paid To</th>
+                  <th className="text-left font-semibold px-3 py-2">Method</th>
+                  <th className="text-left font-semibold px-3 py-2">Date</th>
+                  <th className="text-left font-semibold px-3 py-2">Ref / Notes</th>
+                  <th className="text-right font-semibold px-3 py-2">Amount</th>
+                  <th className="text-center font-semibold px-3 py-2 w-16">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -553,46 +558,46 @@ export default function ExpensesPage() {
                         index % 2 === 1 ? "bg-slate-50/40" : "bg-white"
                       }`}
                     >
-                      <td className="px-3 py-1.5 text-slate-400 text-xs align-middle">
+                      <td className="px-3 py-2 text-slate-400 text-sm align-middle">
                         {(page - 1) * limit + index + 1}
                       </td>
 
-                      <td className="px-3 py-1.5 align-middle">
-                        <span className="font-medium text-slate-800 truncate">
+                      <td className="px-3 py-2 align-middle">
+                        <span className="font-medium text-slate-800 truncate text-sm">
                           {headName}
                         </span>
                       </td>
 
-                      <td className="px-3 py-1.5 text-slate-500 text-xs align-middle whitespace-nowrap">
-                        <span className="flex items-center gap-1">
-                          <User className="w-3 h-3" />
+                      <td className="px-3 py-2 text-slate-500 text-sm align-middle whitespace-nowrap">
+                        <span className="flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5" />
                           {expense.paidTo || "—"}
                         </span>
                       </td>
 
-                      <td className="px-3 py-1.5 align-middle whitespace-nowrap">
+                      <td className="px-3 py-2 align-middle whitespace-nowrap">
                         <Badge
                           variant="outline"
-                          className="text-[10px] flex items-center gap-1 w-fit"
+                          className="text-[11px] flex items-center gap-1 w-fit"
                         >
-                          <MethodIcon className="w-3 h-3" />
+                          <MethodIcon className="w-3.5 h-3.5" />
                           {expense.paymentMethod || "—"}
                         </Badge>
                       </td>
 
-                      <td className="px-3 py-1.5 text-slate-500 text-xs align-middle whitespace-nowrap">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
+                      <td className="px-3 py-2 text-slate-500 text-sm align-middle whitespace-nowrap">
+                        <span className="flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5" />
                           {expense.date
                             ? format(new Date(expense.date), "dd MMM yyyy")
                             : "—"}
                         </span>
                       </td>
 
-                      <td className="px-3 py-1.5 text-slate-400 text-[11px] align-middle max-w-[180px] truncate">
+                      <td className="px-3 py-2 text-slate-400 text-xs align-middle max-w-[180px] truncate">
                         {expense.invoiceRef && (
                           <span className="flex items-center gap-1">
-                            <Hash className="w-3 h-3" />
+                            <Hash className="w-3.5 h-3.5" />
                             {expense.invoiceRef}
                           </span>
                         )}
@@ -604,14 +609,14 @@ export default function ExpensesPage() {
                         {!expense.invoiceRef && !expense.notes && "—"}
                       </td>
 
-                      <td className="px-3 py-1.5 text-right align-middle whitespace-nowrap">
-                        <span className="text-rose-600 font-semibold text-xs">
+                      <td className="px-3 py-2 text-right align-middle whitespace-nowrap">
+                        <span className="text-rose-600 font-semibold text-sm">
                           {formatCurrency(expense.amount)}
                         </span>
                       </td>
 
                       <td
-                        className="px-3 py-1.5 align-middle"
+                        className="px-3 py-2 align-middle"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <div className="flex items-center justify-center">
@@ -620,14 +625,15 @@ export default function ExpensesPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-6 w-6 p-0"
+                                className="h-7 w-7 p-0"
                               >
-                                <MoreVertical className="w-3.5 h-3.5" />
+                                <MoreVertical className="w-4 h-4" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem
                                 onClick={() => handleEditExpense(expense)}
+                                className="text-sm"
                               >
                                 <Edit className="w-4 h-4 mr-2" />
                                 Edit
@@ -635,7 +641,7 @@ export default function ExpensesPage() {
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
                                 onClick={() => handleDeleteExpense(expense)}
-                                className="text-red-600"
+                                className="text-red-600 text-sm"
                               >
                                 <Trash className="w-4 h-4 mr-2" />
                                 Delete
@@ -653,23 +659,25 @@ export default function ExpensesPage() {
         )}
       </div>
 
-      {/* Pagination — compact, Items-page style */}
+      {/* Pagination — compact */}
       {!isLoading && filteredExpenses.length > 0 && (
         <div className="flex justify-between items-center mt-3">
           <Button
             variant="outline"
             size="sm"
+            className="text-sm h-9"
             disabled={page === 1}
             onClick={() => setPage((p) => p - 1)}
           >
             Previous
           </Button>
-          <p className="text-xs text-slate-500">
+          <p className="text-sm text-slate-500">
             Page {page} of {totalPages}
           </p>
           <Button
             variant="outline"
             size="sm"
+            className="text-sm h-9"
             disabled={page === totalPages}
             onClick={() => setPage((p) => p + 1)}
           >

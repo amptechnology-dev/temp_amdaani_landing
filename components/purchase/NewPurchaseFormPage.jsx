@@ -264,6 +264,7 @@ export default function NewPurchaseFormPage({
   addToCart,
   setAllProducts,
   onBack,
+  onPurchaseModalClose,
   invoiceCalculations,
   paymentMethod,
   paymentNote,
@@ -347,9 +348,10 @@ export default function NewPurchaseFormPage({
   useEffect(() => {
     const hasData = vendorForm.name || vendorForm.mobile;
     setSelectedVendor(
-      hasData ? { _id: selectedVendorId || undefined, ...vendorForm } : null,
+      hasData
+        ? { _id: selectedVendorId || undefined, ...vendorForm }
+        : { _id: undefined, name: "Walk-in Vendor", mobile: "" },
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendorForm, selectedVendorId]);
 
   const vendorSuggestions = (() => {
@@ -594,8 +596,10 @@ export default function NewPurchaseFormPage({
                 </div>
                 <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
                   <Sparkles className="w-3 h-3 text-blue-500" />
-                  Add a vendor and items to{" "}
-                  {isEditMode ? "update" : "record"} the purchase
+                  Add a vendor and items to {isEditMode
+                    ? "update"
+                    : "record"}{" "}
+                  the purchase
                 </p>
               </div>
             </div>
@@ -894,7 +898,10 @@ export default function NewPurchaseFormPage({
                             type="text"
                             inputMode="decimal"
                             value={item.costPrice ?? 0}
-                            onChange={handleDecimalChange(item._id, "costPrice")}
+                            onChange={handleDecimalChange(
+                              item._id,
+                              "costPrice",
+                            )}
                             onBlur={handleDecimalBlur(item._id, "costPrice")}
                             className="w-20 h-8 text-right px-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                           />
@@ -1068,11 +1075,9 @@ export default function NewPurchaseFormPage({
               paymentMethod={paymentMethod}
               paymentNote={paymentNote}
               handleCreatePurchase={handleCreatePurchase}
+              onPurchaseModalClose={onPurchaseModalClose}
               isLoading={isSubmitting}
-              disabled={
-                !(vendorForm.name || vendorForm.mobile) ||
-                cartItems.length === 0
-              }
+              disabled={cartItems.length === 0}
               payment={payment}
               cartItems={cartItems}
               formValues={formValues}

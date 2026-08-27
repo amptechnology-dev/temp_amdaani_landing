@@ -258,6 +258,7 @@ export default function NewInvoiceFormPage({
   addToCart,
   setAllProducts,
   onBack,
+  onInvoiceModalClose,
   discount,
   setDiscount,
   invoiceCalculations,
@@ -349,7 +350,6 @@ export default function NewInvoiceFormPage({
       );
       if (matched) setSelectedCustomerId(matched._id);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, isEditMode, selectedCustomer, customers]);
 
   useEffect(() => {
@@ -357,9 +357,8 @@ export default function NewInvoiceFormPage({
     setSelectedCustomer(
       hasData
         ? { _id: selectedCustomerId || undefined, ...customerForm }
-        : null,
+        : { _id: undefined, name: "Walk-in Customer", mobile: "" },
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerForm, selectedCustomerId]);
 
   const customerSuggestions = (() => {
@@ -978,11 +977,9 @@ export default function NewInvoiceFormPage({
               remarks={remarks}
               setRemarks={setRemarks}
               handleCreateInvoice={handleCreateInvoice}
+              onInvoiceModalClose={onInvoiceModalClose}
               isLoading={isSubmitting}
-              disabled={
-                !(customerForm.name || customerForm.mobile) ||
-                cartItems.length === 0
-              }
+              disabled={cartItems.length === 0}
               payment={payment}
               cartItems={cartItems}
               formValues={formValues}

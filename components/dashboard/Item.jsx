@@ -248,47 +248,47 @@ export default function ItemsPage() {
       {/* Header — compact */}
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h1 className={`text-lg md:text-xl font-bold ${currentTheme.text}`}>Items</h1>
-          <p className={`text-xs ${currentTheme.textSecondary}`}>Manage your inventory items</p>
+          <h1 className={`text-xl md:text-2xl font-bold ${currentTheme.text}`}>Items</h1>
+          <p className={`text-sm ${currentTheme.textSecondary}`}>Manage your inventory items</p>
         </div>
-        <Button onClick={handleAdd} size="sm" className={currentTheme.buttonPrimary}>
-          <Plus className="w-3.5 h-3.5 mr-1.5" />
+        <Button onClick={handleAdd} size="sm" className={`text-sm h-9 px-4 ${currentTheme.buttonPrimary}`}>
+          <Plus className="w-4 h-4 mr-1.5" />
           Add Item
         </Button>
       </div>
 
       {/* Search + limit — compact single row */}
-      <div className="flex gap-2 mb-2.5">
+      <div className="flex gap-2 mb-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
             placeholder="Search items…"
-            className="pl-9 h-8 text-sm rounded-lg"
+            className="pl-9 h-9 text-sm rounded-lg"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
           {search && (
             <X
               onClick={() => setSearch("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 cursor-pointer text-gray-400"
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 cursor-pointer text-gray-400"
             />
           )}
         </div>
 
         <Select value={limit} onValueChange={(v) => setLimit(Number(v))}>
-          <SelectTrigger className="w-[100px] h-8 text-sm">
+          <SelectTrigger className="w-[110px] h-9 text-sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {[10, 25, 50, 100].map((x) => (
-              <SelectItem key={x} value={x}>{x} / page</SelectItem>
+              <SelectItem key={x} value={x} className="text-sm">{x} / page</SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
 
       {/* Filter chips — compact */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1 mb-2.5 no-scrollbar">
+      <div className="flex gap-2 overflow-x-auto pb-1 mb-3 no-scrollbar">
         {allChips.map((chip) => {
           const active = isChipActive(chip);
           const Icon = chip.icon;
@@ -296,14 +296,14 @@ export default function ItemsPage() {
             <button
               key={chip.kind === "category" ? `cat-${chip.label}` : `${chip.kind}-${chip.label}`}
               onClick={() => handleChipClick(chip)}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap border transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap border transition-colors ${
                 active
                   ? "bg-emerald-50 text-emerald-600 border-emerald-200"
                   : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
               }`}
             >
               {active && chip.kind === "all" && <span>✓</span>}
-              {Icon && <Icon className="w-3 h-3" />}
+              {Icon && <Icon className="w-3.5 h-3.5" />}
               {chip.label}
             </button>
           );
@@ -312,16 +312,16 @@ export default function ItemsPage() {
 
       {/* ===== Excel-style dense table ===== */}
       <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-        <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-slate-50">
-          <span className="text-sm font-semibold text-slate-700">Items</span>
-          <span className="text-xs text-slate-400">
+        <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-200 bg-slate-50">
+          <span className="text-base font-semibold text-slate-700">Items</span>
+          <span className="text-sm text-slate-400">
             Showing {orderedItems.length} of {total}
           </span>
         </div>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-14 text-slate-400 text-sm">
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
             Loading items...
           </div>
         ) : orderedItems.length === 0 ? (
@@ -330,16 +330,16 @@ export default function ItemsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wide border-b border-slate-200">
-                  <th className="text-left font-semibold px-3 py-1.5 w-8">#</th>
-                  <th className="text-left font-semibold px-3 py-1.5">Item</th>
-                  <th className="text-left font-semibold px-3 py-1.5">Category</th>
+                <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide border-b border-slate-200">
+                  <th className="text-left font-semibold px-3 py-2 w-8">#</th>
+                  <th className="text-left font-semibold px-3 py-2">Item</th>
+                  <th className="text-left font-semibold px-3 py-2">Category</th>
                   {isStockEnabled && (
-                    <th className="text-right font-semibold px-3 py-1.5">Stock</th>
+                    <th className="text-right font-semibold px-3 py-2">Stock</th>
                   )}
-                  <th className="text-right font-semibold px-3 py-1.5">Price</th>
-                  <th className="text-right font-semibold px-3 py-1.5">Sold</th>
-                  <th className="text-center font-semibold px-3 py-1.5 w-20">Actions</th>
+                  <th className="text-right font-semibold px-3 py-2">Price</th>
+                  <th className="text-right font-semibold px-3 py-2">Sold</th>
+                  <th className="text-center font-semibold px-3 py-2 w-24">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -363,40 +363,40 @@ export default function ItemsPage() {
                         index % 2 === 1 ? "bg-slate-50/40" : "bg-white"
                       }`}
                     >
-                      <td className="px-3 py-1.5 text-slate-400 text-xs align-middle">
+                      <td className="px-3 py-2 text-slate-400 text-sm align-middle">
                         {(page - 1) * limit + index + 1}
                       </td>
 
-                      <td className="px-3 py-1.5 align-middle">
-                        <div className="flex items-center gap-1.5 min-w-0">
+                      <td className="px-3 py-2 align-middle">
+                        <div className="flex items-center gap-2 min-w-0">
                           {isTopSelling && (
                             <span
                               title="Top Selling"
-                              className="shrink-0 flex items-center gap-0.5 bg-blue-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                              className="shrink-0 flex items-center gap-0.5 bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full"
                             >
-                              <Trophy className="w-2.5 h-2.5" />
+                              <Trophy className="w-3 h-3" />
                               TOP
                             </span>
                           )}
-                          <span className="font-medium text-slate-800 capitalize truncate">
+                          <span className="font-medium text-slate-800 capitalize truncate text-sm">
                             {item.name}
                           </span>
                           {item.hsn && (
-                            <Badge variant="outline" className="text-[9px] px-1 py-0 shrink-0">
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 shrink-0">
                               HSN {item.hsn}
                             </Badge>
                           )}
                         </div>
                       </td>
 
-                      <td className="px-3 py-1.5 text-slate-500 text-xs capitalize align-middle whitespace-nowrap">
+                      <td className="px-3 py-2 text-slate-500 text-sm capitalize align-middle whitespace-nowrap">
                         {(item.category?.name || item.category || "Uncategorised")} · {item.unit}
                       </td>
 
                       {isStockEnabled && (
-                        <td className="px-3 py-1.5 text-right align-middle">
+                        <td className="px-3 py-2 text-right align-middle">
                           <span
-                            className="font-bold text-xs"
+                            className="font-bold text-sm"
                             style={{ color: sColor }}
                           >
                             {stock}
@@ -404,55 +404,55 @@ export default function ItemsPage() {
                         </td>
                       )}
 
-                      <td className="px-3 py-1.5 text-right align-middle whitespace-nowrap">
+                      <td className="px-3 py-2 text-right align-middle whitespace-nowrap">
                         {item.discountPrice > 0 ? (
-                          <span className="flex items-center justify-end gap-1">
-                            <span className="text-blue-600 font-semibold text-xs">
+                          <span className="flex items-center justify-end gap-1.5">
+                            <span className="text-blue-600 font-semibold text-sm">
                               {formatCurrency(displayPrice)}
                             </span>
-                            <span className="text-[10px] text-slate-400 line-through">
+                            <span className="text-xs text-slate-400 line-through">
                               {formatCurrency(item.sellingPrice)}
                             </span>
                           </span>
                         ) : (
-                          <span className="text-blue-600 font-semibold text-xs">
+                          <span className="text-blue-600 font-semibold text-sm">
                             {formatCurrency(item.sellingPrice)}
                           </span>
                         )}
                       </td>
 
-                      <td className="px-3 py-1.5 text-right align-middle">
-                        <span className="flex items-center justify-end gap-1 text-slate-500 text-xs">
-                          <ShoppingCart className="w-3 h-3" />
+                      <td className="px-3 py-2 text-right align-middle">
+                        <span className="flex items-center justify-end gap-1 text-slate-500 text-sm">
+                          <ShoppingCart className="w-3.5 h-3.5" />
                           {item.sellCount || 0}
                         </span>
                       </td>
 
-                      <td className="px-3 py-1.5 align-middle" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-center gap-1">
+                      <td className="px-3 py-2 align-middle" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center gap-1.5">
                           {canManageStock && (
                             <button
                               onClick={() => openStockModal(item)}
                               title="Adjust Stock"
-                              className="flex items-center justify-center w-6 h-6 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+                              className="flex items-center justify-center w-7 h-7 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
                             >
-                              <PackagePlus className="w-3 h-3" />
+                              <PackagePlus className="w-3.5 h-3.5" />
                             </button>
                           )}
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                                <MoreVertical className="w-3.5 h-3.5" />
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                                <MoreVertical className="w-4 h-4" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleEdit(item)}>
+                              <DropdownMenuItem onClick={() => handleEdit(item)} className="text-sm">
                                 <Edit className="w-4 h-4 mr-2" />
                                 Edit
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleDelete(item)}
-                                className="text-red-600"
+                                className="text-red-600 text-sm"
                               >
                                 <Trash className="w-4 h-4 mr-2" />
                                 Delete
@@ -472,11 +472,11 @@ export default function ItemsPage() {
 
       {/* Pagination — compact */}
       <div className="flex justify-between items-center mt-3">
-        <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
+        <Button variant="outline" size="sm" className="text-sm h-9" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
           Previous
         </Button>
-        <p className="text-xs text-slate-500">Page {page} of {totalPages}</p>
-        <Button variant="outline" size="sm" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)}>
+        <p className="text-sm text-slate-500">Page {page} of {totalPages}</p>
+        <Button variant="outline" size="sm" className="text-sm h-9" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)}>
           Next
         </Button>
       </div>
@@ -502,7 +502,7 @@ export default function ItemsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <h2 className="text-lg font-bold">Delete Item</h2>
-            <p>Are you sure you want to delete <strong>{selectedItem?.name}</strong>?</p>
+            <p className="text-sm">Are you sure you want to delete <strong>{selectedItem?.name}</strong>?</p>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>

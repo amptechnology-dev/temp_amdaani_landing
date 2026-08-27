@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { format } from "date-fns";
-import { FileText, Check, Loader2, Printer, MessageCircle } from "lucide-react";
+import { FileText, Check, Loader2, Printer, MessageCircle, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +19,7 @@ export default function PurchaseSummary({
   paymentMethod,
   paymentNote,
   handleCreatePurchase,
+  onPurchaseModalClose,
   isLoading,
   disabled,
   payment,
@@ -32,12 +33,15 @@ export default function PurchaseSummary({
 }) {
   const [previewHtml, setPreviewHtml] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [isCreatedPurchase, setIsCreatedPurchase] = useState(false);
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false); // 👈 notun state
   const iframeRef = useRef(null);
 
   const pageFormat = storedata?.settings?.printMode === "a5" ? "a5" : "a4";
 
-  const buildHtml = () => {
+  const buildPreviewHtml = () => {
     const now = new Date();
     return generatePurchaseHTML({
       preview: false,
@@ -64,8 +68,35 @@ export default function PurchaseSummary({
 
   const handlePreview = () => {
     if (!cartItems?.length) return;
-    setPreviewHtml(buildHtml());
+    setIsCreatedPurchase(false);
+    setPreviewHtml(buildPreviewHtml());
     setPreviewOpen(true);
+  };
+
+  const handleCreateClick = async () => {
+    try {
+      setIsCreating(true);
+      const html = await handleCreatePurchase();
+
+      if (!html) return;
+
+      setIsCreatedPurchase(true);
+      setPreviewHtml(html);
+      setPreviewOpen(true);
+    } catch (err) {
+      console.error("Create purchase failed:", err);
+      toast.error("Purchase create korte problem hoyeche");
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleModalOpenChange = (open) => {
+    setPreviewOpen(open);
+    if (!open && isCreatedPurchase) {
+      onPurchaseModalClose?.();
+      setIsCreatedPurchase(false);
+    }
   };
 
   const handlePrint = () => {
@@ -98,15 +129,13 @@ export default function PurchaseSummary({
     await Promise.all(
       imgs.map(async (img) => {
         const src = img.getAttribute("src");
-        if (!src || src.startsWith("data:")) return; // already base64
+        if (!src || src.startsWith("data:")) return;
         const dataUrl = await toDataURL(src);
         if (dataUrl) img.src = dataUrl;
       }),
     );
   };
 
-  // ── Shob img.onload/onerror complete howa porjonto wait kori,
-  // fixed timeout er upor bhorosa na kore ────────────────────────
   const waitForImagesToLoad = (doc) => {
     const imgs = Array.from(doc.querySelectorAll("img"));
     return Promise.all(
@@ -114,18 +143,12 @@ export default function PurchaseSummary({
         if (img.complete) return Promise.resolve();
         return new Promise((resolve) => {
           img.addEventListener("load", resolve, { once: true });
-          img.addEventListener("error", resolve, { once: true }); // fail holeo block na kore egiye jai
+          img.addEventListener("error", resolve, { once: true });
         });
       }),
     );
   };
 
-  // ── PDF generate — Preview iframe-e jeta dekhacche (perfect A4/A5
-  // print layout) hubohu SEI content thekei capture kori.
-  // html2canvas-pro use kora hocche karon eta oklch()/lab() moto modern
-  // CSS color function support kore — vanilla html2canvas eigulo parse
-  // korte parena, tai WhatsApp/PDF generate korar somoy
-  // "unsupported color function" error dito ───────────────────────────
   const generatePdfBlob = async () => {
     const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
       import("html2canvas-pro"),
@@ -137,21 +160,15 @@ export default function PurchaseSummary({
       throw new Error("Preview not ready yet");
     }
 
-    // 1) Cross-origin image gulo ke base64 e convert kore niচ্ছি —
-    //    ei step ta CORS taint problem ta root theke fix kore dey
     await inlineImagesAsBase64(idoc);
-
-    // 2) Base64 e convert howar por abar load howa wait kori
     await waitForImagesToLoad(idoc);
-
-    // ei choto extra wait ta layout settle howar jonno rekhe dilam
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     const canvas = await html2canvas(idoc.body, {
       scale: 2,
       backgroundColor: "#ffffff",
       useCORS: true,
-      allowTaint: false, // base64 howar por eta ar dorkar hobe na, tai false e rakha safe
+      allowTaint: false,
       windowWidth: idoc.documentElement.scrollWidth,
       windowHeight: idoc.documentElement.scrollHeight,
     });
@@ -198,10 +215,21 @@ export default function PurchaseSummary({
     URL.revokeObjectURL(url);
   };
 
-  // ── WhatsApp: PDF automatic download hoy (kono dialog/click chara),
-  // mobile-e Web Share API thakle PDF sotti sotti WhatsApp share sheet-e
-  // attach hoye khule jay; desktop-e download hoye WhatsApp Web-er chat
-  // khule jay ──────────────────────────────────────────────────────────
+  const handleDownloadClick = async () => {
+    try {
+      setIsDownloading(true);
+      const blob = await generatePdfBlob();
+      const filename = `Purchase-${purchaseNumber}.pdf`;
+      downloadBlob(blob, filename);
+      toast.success("Purchase PDF download successfully");
+    } catch (err) {
+      console.error("Download error:", err);
+      toast.error("PDF download korte problem hoyeche");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   const handleWhatsAppShare = async () => {
     if (!cartItems?.length) return;
 
@@ -271,11 +299,11 @@ export default function PurchaseSummary({
         </Button>
 
         <Button
-          onClick={handleCreatePurchase}
-          disabled={disabled || isLoading}
+          onClick={handleCreateClick}
+          disabled={disabled || isLoading || isCreating}
           className="flex-1"
         >
-          {isLoading ? (
+          {isLoading || isCreating ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               {submitLabel === "Update Purchase" ? "Updating..." : "Creating..."}
@@ -289,11 +317,27 @@ export default function PurchaseSummary({
         </Button>
       </div>
 
-      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+      <Dialog open={previewOpen} onOpenChange={handleModalOpenChange}>
         <DialogContent className="max-w-3xl w-full h-[85vh] p-0 flex flex-col overflow-hidden">
           <DialogHeader className="px-4 py-2 border-b shrink-0 flex flex-row items-center justify-between pr-10 space-y-0">
-            <DialogTitle>Purchase Preview</DialogTitle>
+            <DialogTitle>
+              {isCreatedPurchase ? "Purchase Created" : "Purchase Preview"}
+            </DialogTitle>
             <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleDownloadClick}
+                disabled={isDownloading}
+                className="text-blue-600 border-blue-200 hover:bg-blue-50"
+              >
+                {isDownloading ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <Download className="w-3.5 h-3.5 mr-1.5" />
+                )}
+                Download
+              </Button>
               <Button
                 size="sm"
                 variant="outline"

@@ -20,6 +20,7 @@ import {
   Pencil,
   Printer,
   MessageCircle,
+  Download,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -83,6 +84,7 @@ export default function PurchaseListPage({
     grandTotal: 0,
   });
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false); // 👈 notun state
   const iframeRef = useRef(null);
 
   const pageFormat = storedata?.settings?.printMode === "a5" ? "a5" : "a4";
@@ -508,6 +510,23 @@ export default function PurchaseListPage({
     URL.revokeObjectURL(url);
   };
 
+  // ── Download button — direct PDF banaye download kore dey,
+  // WhatsApp share-er kono dependency nei (phone number lagbe na) ──────
+  const handleDownloadClick = async () => {
+    try {
+      setIsDownloading(true);
+      const blob = await generatePdfBlob();
+      const filename = `Purchase-${activePreviewNumber}.pdf`;
+      downloadBlob(blob, filename);
+      toast.success("Purchase PDF download successfully");
+    } catch (err) {
+      console.error("Download error:", err);
+      toast.error("PDF download korte problem hoyeche");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   // ── WhatsApp: PDF automatic download hoy (kono dialog/click chara),
   // mobile-e Web Share API thakle PDF sotti sotti WhatsApp share sheet-e
   // attach hoye khule jay; desktop-e download hoye WhatsApp Web-er chat
@@ -567,42 +586,42 @@ export default function PurchaseListPage({
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h1 className="text-lg md:text-xl font-bold text-slate-900">
+          <h1 className="text-xl md:text-2xl font-bold text-slate-900">
             Purchases
           </h1>
-          <p className="text-xs text-slate-400">Manage your vendor purchases</p>
+          <p className="text-sm text-slate-400">Manage your vendor purchases</p>
         </div>
-        <Button onClick={onCreateNew} size="sm">
-          <Plus className="w-3.5 h-3.5 mr-1.5" />
+        <Button onClick={onCreateNew} size="sm" className="text-sm h-9 px-4">
+          <Plus className="w-4 h-4 mr-1.5" />
           New Purchase
         </Button>
       </div>
 
       {/* Search + limit */}
-      <div className="flex gap-2 mb-2.5">
+      <div className="flex gap-2 mb-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
             placeholder="Search by name, phone, or invoice number…"
-            className="pl-9 h-8 text-sm rounded-lg"
+            className="pl-9 h-9 text-sm rounded-lg"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
           {searchTerm && (
             <X
               onClick={() => setSearchTerm("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 cursor-pointer text-gray-400"
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 cursor-pointer text-gray-400"
             />
           )}
         </div>
 
         <Select value={limit} onValueChange={(v) => setLimit(Number(v))}>
-          <SelectTrigger className="w-[100px] h-8 text-sm">
+          <SelectTrigger className="w-[110px] h-9 text-sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {[10, 25, 50, 100].map((x) => (
-              <SelectItem key={x} value={x}>
+              <SelectItem key={x} value={x} className="text-sm">
                 {x} / page
               </SelectItem>
             ))}
@@ -611,14 +630,14 @@ export default function PurchaseListPage({
       </div>
 
       {/* Filter chips */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1 mb-2.5 no-scrollbar">
+      <div className="flex gap-2 overflow-x-auto pb-1 mb-3 no-scrollbar">
         {chips.map((chip) => {
           const active = isChipActive(chip);
           return (
             <button
               key={`${chip.kind}-${chip.label}`}
               onClick={() => handleChipClick(chip)}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap border transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap border transition-colors ${
                 active
                   ? chip.kind === "status"
                     ? "bg-blue-50 text-blue-600 border-blue-200"
@@ -635,34 +654,34 @@ export default function PurchaseListPage({
 
       {/* Table */}
       <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-        <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-slate-50">
-          <span className="text-sm font-semibold text-slate-700">
+        <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-200 bg-slate-50">
+          <span className="text-base font-semibold text-slate-700">
             Purchases
           </span>
-          <span className="text-xs text-slate-400">
+          <span className="text-sm text-slate-400">
             Showing {pagedPurchases.length} of {filteredPurchases.length}
           </span>
         </div>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-14 text-slate-400 text-sm">
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
             Loading purchases...
           </div>
         ) : filteredPurchases.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-14 text-center">
-            <Truck className="w-10 h-10 text-slate-300 mb-2" />
-            <p className="text-sm font-semibold text-slate-700">
+            <Truck className="w-11 h-11 text-slate-300 mb-2" />
+            <p className="text-base font-semibold text-slate-700">
               No Purchases Found
             </p>
-            <p className="text-xs text-slate-400 max-w-xs mt-0.5 mb-3">
+            <p className="text-sm text-slate-400 max-w-xs mt-0.5 mb-3">
               {searchTerm
                 ? `No purchases match "${searchTerm}".`
                 : "Start by creating your first purchase."}
             </p>
             {!searchTerm && (
-              <Button onClick={onCreateNew} size="sm">
-                <Plus className="w-3.5 h-3.5 mr-1.5" />
+              <Button onClick={onCreateNew} size="sm" className="text-sm h-9">
+                <Plus className="w-4 h-4 mr-1.5" />
                 New Purchase
               </Button>
             )}
@@ -671,23 +690,23 @@ export default function PurchaseListPage({
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wide border-b border-slate-200">
-                  <th className="text-left font-semibold px-3 py-1.5 w-8">#</th>
-                  <th className="text-left font-semibold px-3 py-1.5">
+                <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide border-b border-slate-200">
+                  <th className="text-left font-semibold px-3 py-2 w-8">#</th>
+                  <th className="text-left font-semibold px-3 py-2">
                     Vendor
                   </th>
-                  <th className="text-left font-semibold px-3 py-1.5">Phone</th>
-                  <th className="text-left font-semibold px-3 py-1.5">
+                  <th className="text-left font-semibold px-3 py-2">Phone</th>
+                  <th className="text-left font-semibold px-3 py-2">
                     Invoice #
                   </th>
-                  <th className="text-left font-semibold px-3 py-1.5">Date</th>
-                  <th className="text-center font-semibold px-3 py-1.5">
+                  <th className="text-left font-semibold px-3 py-2">Date</th>
+                  <th className="text-center font-semibold px-3 py-2">
                     Status
                   </th>
-                  <th className="text-right font-semibold px-3 py-1.5">
+                  <th className="text-right font-semibold px-3 py-2">
                     Amount
                   </th>
-                  <th className="text-center font-semibold px-3 py-1.5 w-16">
+                  <th className="text-center font-semibold px-3 py-2 w-20">
                     Action
                   </th>
                 </tr>
@@ -701,38 +720,38 @@ export default function PurchaseListPage({
                       index % 2 === 1 ? "bg-slate-50/40" : "bg-white"
                     }`}
                   >
-                    <td className="px-3 py-1.5 text-slate-400 text-xs align-middle">
+                    <td className="px-3 py-2 text-slate-400 text-sm align-middle">
                       {(page - 1) * limit + index + 1}
                     </td>
 
-                    <td className="px-3 py-1.5 align-middle">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="font-medium text-slate-800 truncate">
+                    <td className="px-3 py-2 align-middle">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-medium text-slate-800 truncate text-sm">
                           {p.vendorName || "No Vendor"}
                         </span>
                         <Badge
                           variant="outline"
-                          className="text-[9px] px-1 py-0 shrink-0"
+                          className="text-[10px] px-1.5 py-0.5 shrink-0"
                         >
                           {p.vendorGstNumber ? "GST" : "Non-GST"}
                         </Badge>
                       </div>
                     </td>
 
-                    <td className="px-3 py-1.5 text-slate-500 text-xs align-middle whitespace-nowrap">
-                      <span className="flex items-center gap-1">
-                        <Phone className="w-2.5 h-2.5" />
+                    <td className="px-3 py-2 text-slate-500 text-sm align-middle whitespace-nowrap">
+                      <span className="flex items-center gap-1.5">
+                        <Phone className="w-3.5 h-3.5" />
                         {p.vendorMobile || "-"}
                       </span>
                     </td>
 
-                    <td className="px-3 py-1.5 text-blue-600 italic font-medium text-xs align-middle whitespace-nowrap">
+                    <td className="px-3 py-2 text-blue-600 italic font-medium text-sm align-middle whitespace-nowrap">
                       #{p.invoiceNumber}
                     </td>
 
-                    <td className="px-3 py-1.5 text-slate-500 text-xs align-middle whitespace-nowrap">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
+                    <td className="px-3 py-2 text-slate-500 text-sm align-middle whitespace-nowrap">
+                      <span className="flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5" />
                         {format(
                           new Date(p.createdAt || p.date),
                           "dd MMM yyyy, hh:mm a",
@@ -740,9 +759,9 @@ export default function PurchaseListPage({
                       </span>
                     </td>
 
-                    <td className="px-3 py-1.5 text-center align-middle">
+                    <td className="px-3 py-2 text-center align-middle">
                       <Badge
-                        className={`text-[10px] capitalize ${
+                        className={`text-[11px] capitalize ${
                           statusStyles[p.paymentStatus] || statusStyles.unpaid
                         }`}
                       >
@@ -750,27 +769,27 @@ export default function PurchaseListPage({
                       </Badge>
                     </td>
 
-                    <td className="px-3 py-1.5 text-right align-middle whitespace-nowrap">
-                      <span className="text-blue-600 font-semibold text-xs">
+                    <td className="px-3 py-2 text-right align-middle whitespace-nowrap">
+                      <span className="text-blue-600 font-semibold text-sm">
                         ₹{Number(p.grandTotal || 0).toLocaleString("en-IN")}
                       </span>
                     </td>
 
                     <td
-                      className="px-3 py-1.5 text-center align-middle whitespace-nowrap"
+                      className="px-3 py-2 text-center align-middle whitespace-nowrap"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-7 px-2.5 text-xs"
+                        className="h-8 px-3 text-sm"
                         onClick={() => onEditPurchase(p._id)}
                       >
                         {previewLoadingId === p._id ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         ) : (
                           <>
-                            <Pencil className="w-3 h-3 mr-1" />
+                            <Pencil className="w-3.5 h-3.5 mr-1" />
                             Edit
                           </>
                         )}
@@ -790,17 +809,19 @@ export default function PurchaseListPage({
           <Button
             variant="outline"
             size="sm"
+            className="text-sm h-9"
             disabled={page === 1}
             onClick={() => setPage((p) => p - 1)}
           >
             Previous
           </Button>
-          <p className="text-xs text-slate-500">
+          <p className="text-sm text-slate-500">
             Page {page} of {totalPages}
           </p>
           <Button
             variant="outline"
             size="sm"
+            className="text-sm h-9"
             disabled={page === totalPages}
             onClick={() => setPage((p) => p + 1)}
           >
@@ -818,6 +839,20 @@ export default function PurchaseListPage({
               {activePreviewNumber ? `#${activePreviewNumber}` : ""}
             </DialogTitle>
             <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleDownloadClick}
+                disabled={isDownloading}
+                className="text-blue-600 border-blue-200 hover:bg-blue-50"
+              >
+                {isDownloading ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <Download className="w-3.5 h-3.5 mr-1.5" />
+                )}
+                Download
+              </Button>
               <Button
                 size="sm"
                 variant="outline"

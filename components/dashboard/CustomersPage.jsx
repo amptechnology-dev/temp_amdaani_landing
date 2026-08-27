@@ -401,13 +401,13 @@ export default function CustomersPage() {
 
   return (
     <div className={`min-h-screen p-3 md:p-4 ${currentTheme.background}`}>
-      {/* Header — compact, Items-page style */}
+      {/* Header — compact */}
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h1 className={`text-lg md:text-xl font-bold ${currentTheme.text}`}>
+          <h1 className={`text-xl md:text-2xl font-bold ${currentTheme.text}`}>
             Customers
           </h1>
-          <p className={`text-xs ${currentTheme.textSecondary}`}>
+          <p className={`text-sm ${currentTheme.textSecondary}`}>
             Manage your customers and track outstanding payments
           </p>
         </div>
@@ -415,50 +415,51 @@ export default function CustomersPage() {
           <Button
             variant="outline"
             size="sm"
+            className="text-sm h-9"
             onClick={refreshData}
             disabled={isRefreshing}
           >
             <RefreshCw
-              className={`w-3.5 h-3.5 mr-1.5 ${isRefreshing ? "animate-spin" : ""}`}
+              className={`w-4 h-4 mr-1.5 ${isRefreshing ? "animate-spin" : ""}`}
             />
             Refresh
           </Button>
           <Button
             onClick={handleAddCustomer}
             size="sm"
-            className={currentTheme.buttonPrimary}
+            className={`text-sm h-9 px-4 ${currentTheme.buttonPrimary}`}
           >
-            <Plus className="w-3.5 h-3.5 mr-1.5" />
+            <Plus className="w-4 h-4 mr-1.5" />
             Add Customer
           </Button>
         </div>
       </div>
 
       {/* Search + limit — compact single row */}
-      <div className="flex gap-2 mb-2.5">
+      <div className="flex gap-2 mb-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
             placeholder="Search by name or phone number…"
-            className="pl-9 h-8 text-sm rounded-lg"
+            className="pl-9 h-9 text-sm rounded-lg"
             value={searchTerm}
             onChange={handleSearchChange}
           />
           {searchTerm && (
             <X
               onClick={handleClearSearch}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 cursor-pointer text-gray-400"
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 cursor-pointer text-gray-400"
             />
           )}
         </div>
 
         <Select value={pageSize} onValueChange={(v) => setPageSize(Number(v))}>
-          <SelectTrigger className="w-[100px] h-8 text-sm">
+          <SelectTrigger className="w-[110px] h-9 text-sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {[10, 25, 50, 100].map((x) => (
-              <SelectItem key={x} value={x}>
+              <SelectItem key={x} value={x} className="text-sm">
                 {x} / page
               </SelectItem>
             ))}
@@ -466,8 +467,8 @@ export default function CustomersPage() {
         </Select>
       </div>
 
-      {/* Filter chips — compact, Items-page style */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1 mb-2.5 no-scrollbar">
+      {/* Filter chips — compact */}
+      <div className="flex gap-2 overflow-x-auto pb-1 mb-3 no-scrollbar">
         {chips.map((chip) => {
           const active = activeFilter === chip.key;
           const Icon = chip.icon;
@@ -476,7 +477,7 @@ export default function CustomersPage() {
             <button
               key={chip.key}
               onClick={() => setActiveFilter(chip.key)}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap border transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap border transition-colors ${
                 active
                   ? chip.danger
                     ? "bg-rose-50 text-rose-600 border-rose-200"
@@ -484,10 +485,10 @@ export default function CustomersPage() {
                   : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
               }`}
             >
-              <Icon className="w-3 h-3" />
+              <Icon className="w-3.5 h-3.5" />
               {chip.label}
               <span
-                className={`ml-0.5 px-1.5 rounded-full text-[10px] font-bold ${
+                className={`ml-0.5 px-1.5 rounded-full text-xs font-bold ${
                   active ? "bg-white/70" : "bg-slate-100"
                 }`}
               >
@@ -500,29 +501,29 @@ export default function CustomersPage() {
 
       {/* ===== Excel-style dense table ===== */}
       <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-        <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-slate-50">
-          <span className="text-sm font-semibold text-slate-700">
+        <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-200 bg-slate-50">
+          <span className="text-base font-semibold text-slate-700">
             Customers
           </span>
-          <span className="text-xs text-slate-400">
+          <span className="text-sm text-slate-400">
             Showing {filteredCustomers.length} of {total}
           </span>
         </div>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-14 text-slate-400 text-sm">
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
             Loading customers...
           </div>
         ) : filteredCustomers.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-14 text-center">
             {activeFilter === "due" ? (
               <>
-                <CheckCircle className="w-10 h-10 text-blue-400 mb-2" />
-                <p className="text-sm font-semibold text-slate-700">
+                <CheckCircle className="w-11 h-11 text-blue-400 mb-2" />
+                <p className="text-base font-semibold text-slate-700">
                   {searchTerm ? "No Customers Found" : "All Clear! 🎉"}
                 </p>
-                <p className="text-xs text-slate-400 max-w-xs mt-0.5">
+                <p className="text-sm text-slate-400 max-w-xs mt-0.5">
                   {searchTerm
                     ? `No customers match "${searchTerm}".`
                     : "All your customers have cleared their outstanding payments."}
@@ -530,11 +531,11 @@ export default function CustomersPage() {
               </>
             ) : (
               <>
-                <User className="w-10 h-10 text-slate-300 mb-2" />
-                <p className="text-sm font-semibold text-slate-700">
+                <User className="w-11 h-11 text-slate-300 mb-2" />
+                <p className="text-base font-semibold text-slate-700">
                   {searchTerm ? "No Customers Found" : "No Customers Yet"}
                 </p>
-                <p className="text-xs text-slate-400 max-w-xs mt-0.5">
+                <p className="text-sm text-slate-400 max-w-xs mt-0.5">
                   {searchTerm
                     ? `No customers match "${searchTerm}".`
                     : "Add your first customer to begin tracking sales and payments."}
@@ -546,24 +547,24 @@ export default function CustomersPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wide border-b border-slate-200">
-                  <th className="text-left font-semibold px-3 py-1.5 w-8">#</th>
-                  <th className="text-left font-semibold px-3 py-1.5">
+                <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide border-b border-slate-200">
+                  <th className="text-left font-semibold px-3 py-2 w-8">#</th>
+                  <th className="text-left font-semibold px-3 py-2">
                     Customer
                   </th>
-                  <th className="text-left font-semibold px-3 py-1.5">
+                  <th className="text-left font-semibold px-3 py-2">
                     Contact
                   </th>
-                  <th className="text-left font-semibold px-3 py-1.5">
+                  <th className="text-left font-semibold px-3 py-2">
                     Location
                   </th>
-                  <th className="text-right font-semibold px-3 py-1.5">
+                  <th className="text-right font-semibold px-3 py-2">
                     Invoices
                   </th>
-                  <th className="text-right font-semibold px-3 py-1.5">
+                  <th className="text-right font-semibold px-3 py-2">
                     {activeFilter === "due" ? "Outstanding" : "Due"}
                   </th>
-                  <th className="text-center font-semibold px-3 py-1.5 w-20">
+                  <th className="text-center font-semibold px-3 py-2 w-20">
                     Actions
                   </th>
                 </tr>
@@ -594,75 +595,75 @@ export default function CustomersPage() {
                         index % 2 === 1 ? "bg-slate-50/40" : "bg-white"
                       }`}
                     >
-                      <td className="px-3 py-1.5 text-slate-400 text-xs align-middle">
+                      <td className="px-3 py-2 text-slate-400 text-sm align-middle">
                         {(page - 1) * pageSize + index + 1}
                       </td>
 
-                      <td className="px-3 py-1.5 align-middle">
-                        <div className="flex items-center gap-1.5 min-w-0">
+                      <td className="px-3 py-2 align-middle">
+                        <div className="flex items-center gap-2 min-w-0">
                           {rank > 0 && (
                             <span
                               title="Top customer"
-                              className="shrink-0 flex items-center gap-0.5 bg-amber-50 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                              className="shrink-0 flex items-center gap-0.5 bg-amber-50 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
                             >
-                              <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
+                              <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
                               #{rank}
                             </span>
                           )}
-                          <span className="font-medium text-slate-800 capitalize truncate">
+                          <span className="font-medium text-slate-800 capitalize truncate text-sm">
                             {customer.name || "No Name"}
                           </span>
                         </div>
                       </td>
 
-                      <td className="px-3 py-1.5 text-slate-500 text-xs align-middle whitespace-nowrap">
-                        <span className="flex items-center gap-1">
-                          <Phone className="w-3 h-3" />
+                      <td className="px-3 py-2 text-slate-500 text-sm align-middle whitespace-nowrap">
+                        <span className="flex items-center gap-1.5">
+                          <Phone className="w-3.5 h-3.5" />
                           {customer.mobile || "-"}
                         </span>
                       </td>
 
-                      <td className="px-3 py-1.5 text-slate-500 text-xs align-middle max-w-[180px] truncate">
-                        <span className="flex items-center gap-1">
-                          <MapPin className="w-3 h-3 shrink-0" />
+                      <td className="px-3 py-2 text-slate-500 text-sm align-middle max-w-[180px] truncate">
+                        <span className="flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 shrink-0" />
                           <span className="truncate">
                             {customer.address || "-"}
                           </span>
                         </span>
                       </td>
 
-                      <td className="px-3 py-1.5 text-right align-middle">
-                        <span className="flex items-center justify-end gap-1 text-slate-500 text-xs">
-                          <Hash className="w-3 h-3" />
+                      <td className="px-3 py-2 text-right align-middle">
+                        <span className="flex items-center justify-end gap-1 text-slate-500 text-sm">
+                          <Hash className="w-3.5 h-3.5" />
                           {customer.totalInvoices || 0}
                         </span>
                       </td>
 
-                      <td className="px-3 py-1.5 text-right align-middle whitespace-nowrap">
+                      <td className="px-3 py-2 text-right align-middle whitespace-nowrap">
                         {dueAmount > 0 ? (
                           <span
-                            className="font-bold text-xs"
+                            className="font-bold text-sm"
                             style={{ color: dColor }}
                           >
                             ₹{dueAmount.toLocaleString("en-IN")}
                           </span>
                         ) : (
-                          <span className="text-slate-300 text-xs">—</span>
+                          <span className="text-slate-300 text-sm">—</span>
                         )}
                       </td>
 
                       <td
-                        className="px-3 py-1.5 align-middle"
+                        className="px-3 py-2 align-middle"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <div className="flex items-center justify-center gap-1">
+                        <div className="flex items-center justify-center gap-1.5">
                           {customer.mobile && (
                             <button
                               onClick={() => handleCall(customer.mobile)}
                               title="Call customer"
-                              className="flex items-center justify-center w-6 h-6 rounded-md bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                              className="flex items-center justify-center w-7 h-7 rounded-md bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
                             >
-                              <PhoneCall className="w-3 h-3" />
+                              <PhoneCall className="w-3.5 h-3.5" />
                             </button>
                           )}
                           <DropdownMenu>
@@ -670,14 +671,15 @@ export default function CustomersPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-6 w-6 p-0"
+                                className="h-7 w-7 p-0"
                               >
-                                <MoreVertical className="w-3.5 h-3.5" />
+                                <MoreVertical className="w-4 h-4" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem
                                 onClick={() => handleEditCustomer(customer)}
+                                className="text-sm"
                               >
                                 <Edit className="w-4 h-4 mr-2" />
                                 Edit
@@ -685,7 +687,7 @@ export default function CustomersPage() {
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
                                 onClick={() => handleDeleteCustomer(customer)}
-                                className="text-red-600"
+                                className="text-red-600 text-sm"
                               >
                                 <Trash className="w-4 h-4 mr-2" />
                                 Delete
@@ -703,22 +705,24 @@ export default function CustomersPage() {
         )}
       </div>
 
-      {/* Pagination — compact, Items-page style */}
+      {/* Pagination — compact */}
       <div className="flex justify-between items-center mt-3">
         <Button
           variant="outline"
           size="sm"
+          className="text-sm h-9"
           disabled={page === 1}
           onClick={() => setPage((p) => p - 1)}
         >
           Previous
         </Button>
-        <p className="text-xs text-slate-500">
+        <p className="text-sm text-slate-500">
           Page {page} of {totalPages}
         </p>
         <Button
           variant="outline"
           size="sm"
+          className="text-sm h-9"
           disabled={page === totalPages}
           onClick={() => setPage((p) => p + 1)}
         >

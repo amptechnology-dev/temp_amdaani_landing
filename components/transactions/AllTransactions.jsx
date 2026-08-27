@@ -666,13 +666,13 @@ export default function AllTransactionsPage() {
 
   return (
     <div className={`min-h-screen p-3 md:p-4 ${currentTheme.background}`}>
-      {/* Header — compact, Expenses-page style */}
+      {/* Header — compact */}
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h1 className={`text-lg md:text-xl font-bold ${currentTheme.text}`}>
+          <h1 className={`text-xl md:text-2xl font-bold ${currentTheme.text}`}>
             All Transactions
           </h1>
-          <p className={`text-xs ${currentTheme.textSecondary}`}>
+          <p className={`text-sm ${currentTheme.textSecondary}`}>
             Payments received from customers & paid to vendors
           </p>
         </div>
@@ -680,11 +680,12 @@ export default function AllTransactionsPage() {
           <Button
             variant="outline"
             size="sm"
+            className="text-sm h-9"
             onClick={refreshData}
             disabled={isRefreshing}
           >
             <RefreshCw
-              className={`w-3.5 h-3.5 mr-1.5 ${isRefreshing ? "animate-spin" : ""}`}
+              className={`w-4 h-4 mr-1.5 ${isRefreshing ? "animate-spin" : ""}`}
             />
             Refresh
           </Button>
@@ -692,29 +693,29 @@ export default function AllTransactionsPage() {
       </div>
 
       {/* Summary strip — compact single row */}
-      <div className="grid grid-cols-2 gap-2 mb-2.5">
-        <div className="bg-white rounded-lg border border-slate-200 px-3 py-2 flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-            <ArrowDownCircle className="w-3.5 h-3.5 text-blue-600" />
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <div className="bg-white rounded-lg border border-slate-200 px-3 py-2.5 flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+            <ArrowDownCircle className="w-4 h-4 text-blue-600" />
           </div>
           <div className="min-w-0">
-            <p className="text-[10px] text-slate-400 leading-tight">
+            <p className="text-xs text-slate-400 leading-tight">
               Received ({customerCount})
             </p>
-            <p className="text-sm font-bold text-blue-600 leading-tight">
+            <p className="text-base font-bold text-blue-600 leading-tight">
               {customerLoading ? "…" : formatAmount(customerTotal)}
             </p>
           </div>
         </div>
-        <div className="bg-white rounded-lg border border-slate-200 px-3 py-2 flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
-            <ArrowUpCircle className="w-3.5 h-3.5 text-red-600" />
+        <div className="bg-white rounded-lg border border-slate-200 px-3 py-2.5 flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
+            <ArrowUpCircle className="w-4 h-4 text-red-600" />
           </div>
           <div className="min-w-0">
-            <p className="text-[10px] text-slate-400 leading-tight">
+            <p className="text-xs text-slate-400 leading-tight">
               Paid ({vendorCount})
             </p>
-            <p className="text-sm font-bold text-red-600 leading-tight">
+            <p className="text-base font-bold text-red-600 leading-tight">
               {vendorLoading ? "…" : formatAmount(vendorTotal)}
             </p>
           </div>
@@ -722,21 +723,21 @@ export default function AllTransactionsPage() {
       </div>
 
       {/* Search + limit — compact single row */}
-      <div className="flex gap-2 mb-2.5">
+      <div className="flex gap-2 mb-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
             placeholder={
               isVendorTab ? "Search vendor / invoice…" : "Search invoices…"
             }
-            className="pl-9 h-8 text-sm rounded-lg"
+            className="pl-9 h-9 text-sm rounded-lg"
             value={search}
             onChange={handleSearchChange}
           />
           {search && (
             <X
               onClick={handleClearSearch}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 cursor-pointer text-gray-400"
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 cursor-pointer text-gray-400"
             />
           )}
         </div>
@@ -748,12 +749,12 @@ export default function AllTransactionsPage() {
             setPage(1);
           }}
         >
-          <SelectTrigger className="w-[100px] h-8 text-sm">
+          <SelectTrigger className="w-[110px] h-9 text-sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {[10, 25, 50, 100].map((x) => (
-              <SelectItem key={x} value={x}>
+              <SelectItem key={x} value={x} className="text-sm">
                 {x} / page
               </SelectItem>
             ))}
@@ -761,8 +762,8 @@ export default function AllTransactionsPage() {
         </Select>
       </div>
 
-      {/* Filter chips — tab + date combined, Expenses-page style */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1 mb-2.5 no-scrollbar">
+      {/* Filter chips — tab + date combined */}
+      <div className="flex gap-2 overflow-x-auto pb-1 mb-3 no-scrollbar">
         {chips.map((chip) => {
           const active = isChipActive(chip);
           const isTabChip = TAB_FILTERS.some((f) => f.key === chip.key);
@@ -771,7 +772,7 @@ export default function AllTransactionsPage() {
               key={chip.key}
               disabled={loading && !isTabChip}
               onClick={() => handleChipClick(chip)}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap border transition-colors disabled:opacity-60 ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap border transition-colors disabled:opacity-60 ${
                 active
                   ? isTabChip
                     ? "bg-slate-800 text-white border-slate-800"
@@ -787,27 +788,27 @@ export default function AllTransactionsPage() {
 
       {/* ===== Excel-style dense table ===== */}
       <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-        <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-slate-50">
-          <span className="text-sm font-semibold text-slate-700">
+        <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-200 bg-slate-50">
+          <span className="text-base font-semibold text-slate-700">
             {isVendorTab ? "Vendor Payments" : "Customer Payments"}
           </span>
-          <span className="text-xs text-slate-400">
+          <span className="text-sm text-slate-400">
             Showing {pagedList.length} of {list.length}
           </span>
         </div>
 
         {loading ? (
           <div className="flex items-center justify-center py-14 text-slate-400 text-sm">
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
             Loading transactions...
           </div>
         ) : list.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-14 text-center">
-            <Receipt className="w-10 h-10 text-slate-300 mb-2" />
-            <p className="text-sm font-semibold text-slate-700">
+            <Receipt className="w-11 h-11 text-slate-300 mb-2" />
+            <p className="text-base font-semibold text-slate-700">
               No {isVendorTab ? "payments" : "receipts"} found
             </p>
-            <p className="text-xs text-slate-400 max-w-xs mt-0.5">
+            <p className="text-sm text-slate-400 max-w-xs mt-0.5">
               {search
                 ? `No results match "${search}".`
                 : `No ${isVendorTab ? "payments made" : "payments received"} in the selected period.`}
@@ -817,19 +818,19 @@ export default function AllTransactionsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wide border-b border-slate-200">
-                  <th className="text-left font-semibold px-3 py-1.5 w-8">#</th>
-                  <th className="text-left font-semibold px-3 py-1.5">
+                <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide border-b border-slate-200">
+                  <th className="text-left font-semibold px-3 py-2 w-8">#</th>
+                  <th className="text-left font-semibold px-3 py-2">
                     {isVendorTab ? "Vendor" : "Invoice #"}
                   </th>
                   {isVendorTab && (
-                    <th className="text-left font-semibold px-3 py-1.5">Invoice Ref</th>
+                    <th className="text-left font-semibold px-3 py-2">Invoice Ref</th>
                   )}
-                  <th className="text-left font-semibold px-3 py-1.5">Method</th>
-                  <th className="text-left font-semibold px-3 py-1.5">Status</th>
-                  <th className="text-left font-semibold px-3 py-1.5">When</th>
-                  <th className="text-right font-semibold px-3 py-1.5">Amount</th>
-                  <th className="text-center font-semibold px-3 py-1.5 w-14">View</th>
+                  <th className="text-left font-semibold px-3 py-2">Method</th>
+                  <th className="text-left font-semibold px-3 py-2">Status</th>
+                  <th className="text-left font-semibold px-3 py-2">When</th>
+                  <th className="text-right font-semibold px-3 py-2">Amount</th>
+                  <th className="text-center font-semibold px-3 py-2 w-16">View</th>
                 </tr>
               </thead>
               <tbody>
@@ -854,35 +855,35 @@ export default function AllTransactionsPage() {
                         index % 2 === 1 ? "bg-slate-50/40" : "bg-white"
                       }`}
                     >
-                      <td className="px-3 py-1.5 text-slate-400 text-xs align-middle">
+                      <td className="px-3 py-2 text-slate-400 text-sm align-middle">
                         {(page - 1) * limit + index + 1}
                       </td>
 
-                      <td className="px-3 py-1.5 align-middle">
-                        <span className="font-medium text-slate-800 truncate">
+                      <td className="px-3 py-2 align-middle">
+                        <span className="font-medium text-slate-800 truncate text-sm">
                           {primaryLabel}
                         </span>
                       </td>
 
                       {isVendorTab && (
-                        <td className="px-3 py-1.5 text-slate-500 text-xs align-middle whitespace-nowrap">
+                        <td className="px-3 py-2 text-slate-500 text-sm align-middle whitespace-nowrap">
                           {secondaryLabel}
                         </td>
                       )}
 
-                      <td className="px-3 py-1.5 align-middle whitespace-nowrap">
+                      <td className="px-3 py-2 align-middle whitespace-nowrap">
                         <Badge
                           variant="outline"
-                          className="text-[10px] flex items-center gap-1 w-fit capitalize"
+                          className="text-[11px] flex items-center gap-1 w-fit capitalize"
                         >
-                          <PayIcon className="w-3 h-3" />
+                          <PayIcon className="w-3.5 h-3.5" />
                           {item.paymentMethod || "—"}
                         </Badge>
                       </td>
 
-                      <td className="px-3 py-1.5 align-middle whitespace-nowrap">
+                      <td className="px-3 py-2 align-middle whitespace-nowrap">
                         <span
-                          className="text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase"
+                          className="text-[11px] font-bold px-2 py-0.5 rounded-full border uppercase"
                           style={{
                             backgroundColor: status.bg,
                             color: status.text,
@@ -893,7 +894,7 @@ export default function AllTransactionsPage() {
                         </span>
                       </td>
 
-                      <td className="px-3 py-1.5 text-slate-400 text-xs align-middle whitespace-nowrap">
+                      <td className="px-3 py-2 text-slate-400 text-sm align-middle whitespace-nowrap">
                         {item.createdAt
                           ? formatDistanceToNow(new Date(item.createdAt), {
                               addSuffix: true,
@@ -901,9 +902,9 @@ export default function AllTransactionsPage() {
                           : "—"}
                       </td>
 
-                      <td className="px-3 py-1.5 text-right align-middle whitespace-nowrap">
+                      <td className="px-3 py-2 text-right align-middle whitespace-nowrap">
                         <span
-                          className="font-semibold text-xs"
+                          className="font-semibold text-sm"
                           style={{ color: isVendorTab ? "#DC2626" : "#2563EB" }}
                         >
                           {formatAmount(item.amount)}
@@ -911,17 +912,17 @@ export default function AllTransactionsPage() {
                       </td>
 
                       <td
-                        className="px-3 py-1.5 align-middle"
+                        className="px-3 py-2 align-middle"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <div className="flex items-center justify-center">
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-6 w-6 p-0"
+                            className="h-7 w-7 p-0"
                             onClick={() => handleRowClick(item)}
                           >
-                            <Eye className="w-3.5 h-3.5" />
+                            <Eye className="w-4 h-4" />
                           </Button>
                         </div>
                       </td>
@@ -934,23 +935,25 @@ export default function AllTransactionsPage() {
         )}
       </div>
 
-      {/* Pagination — compact, Expenses-page style */}
+      {/* Pagination — compact */}
       {!loading && list.length > 0 && (
         <div className="flex justify-between items-center mt-3">
           <Button
             variant="outline"
             size="sm"
+            className="text-sm h-9"
             disabled={page === 1}
             onClick={() => setPage((p) => p - 1)}
           >
             Previous
           </Button>
-          <p className="text-xs text-slate-500">
+          <p className="text-sm text-slate-500">
             Page {page} of {totalPages}
           </p>
           <Button
             variant="outline"
             size="sm"
+            className="text-sm h-9"
             disabled={page === totalPages}
             onClick={() => setPage((p) => p + 1)}
           >
