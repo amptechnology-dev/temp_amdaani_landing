@@ -305,8 +305,55 @@ export default function InvoiceListPage({
       const roundOff = Number(
         doc.invoiceCalculations?.roundOff ?? doc.roundOff ?? 0,
       );
-      const gstBreakdown =
+
+      // ✅ FIX: Backend invoice document e kokhonoi per-rate `gstBreakdown`
+      // save hoy na (SalesFlow.js-er handleCreateInvoice shudhu `gstTotal`
+      // pathay, breakdown pathay na). Tai `doc.gstBreakdown` shomoy e {}
+      // thake ar Tax Summary section template-e silently disappear kore
+      // jay. Mobile app (InvoiceDetail.js) ei problem-e pore na karon
+      // sheta stored field-er upor bhorosa na kore proti cart item-er
+      // gstRate/gstAmount theke nijei breakdown calculate kore. Ekhane
+      // thik shei jinis-i kori — cartItems (upore already computed,
+      // taxableValue o gstAmount soho) theke local-e gstBreakdown build
+      // kori, backend-er stored field-er upor nirbhor na kore.
+      const isIgstDoc = Boolean(doc.isIgst);
+      const computedGstBreakdown = {};
+
+      cartItems.forEach((item) => {
+        const rate = item.gstRate || 0;
+        if (rate <= 0) return; // 0% GST items breakdown-e count hoy na
+
+        if (!computedGstBreakdown[rate]) {
+          computedGstBreakdown[rate] = {
+            taxableAmount: 0,
+            cgstAmount: 0,
+            sgstAmount: 0,
+            igstAmount: 0,
+            totalGst: 0,
+          };
+        }
+
+        computedGstBreakdown[rate].taxableAmount += item.taxableValue;
+        computedGstBreakdown[rate].cgstAmount += isIgstDoc
+          ? 0
+          : item.gstAmount / 2;
+        computedGstBreakdown[rate].sgstAmount += isIgstDoc
+          ? 0
+          : item.gstAmount / 2;
+        computedGstBreakdown[rate].igstAmount += isIgstDoc
+          ? item.gstAmount
+          : 0;
+        computedGstBreakdown[rate].totalGst += item.gstAmount;
+      });
+
+      // Backend-e future-e eta store hote shuru korle sheta-o kaje lagbe
+      // (fallback hisebe), na thakle amader locally computed version use hobe
+      const storedGstBreakdown =
         doc.invoiceCalculations?.gstBreakdown || doc.gstBreakdown || {};
+      const gstBreakdown =
+        Object.keys(storedGstBreakdown).length > 0
+          ? storedGstBreakdown
+          : computedGstBreakdown;
 
       const invoiceCalculations = {
         subtotal: subTotal,

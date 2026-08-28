@@ -1,13 +1,14 @@
-import { format } from 'date-fns';
-import numberToWords from 'number-to-words';
-
+import { format } from "date-fns";
+import numberToWords from "number-to-words";
 
 function resolveItemDiscountInRupees(item) {
-  const discountType = item.discountType || 'amount';
+  const discountType = item.discountType || "amount";
   const rawDiscountInput = Number(item.discount || 0);
-  const sellingPriceRaw = Number(item.price ?? item.sellingPrice ?? item.baseRate ?? 0);
+  const sellingPriceRaw = Number(
+    item.price ?? item.sellingPrice ?? item.baseRate ?? 0,
+  );
 
-  return discountType === 'percent'
+  return discountType === "percent"
     ? (sellingPriceRaw * rawDiscountInput) / 100
     : rawDiscountInput;
 }
@@ -27,9 +28,9 @@ export const generateInvoiceHTML = ({
   isGstInvoice,
   isMrpEnabled = false,
   isFreePlan = true,
-  appBrand = { name: 'AMDAANI', logoUrl: '' },
-  pageFormat = 'a4',
-  payment = { paid: 0, due: 0, status: 'unpaid' },
+  appBrand = { name: "AMDAANI", logoUrl: "" },
+  pageFormat = "a4",
+  payment = { paid: 0, due: 0, status: "unpaid" },
 }) => {
   let totalQty = 0;
   let totalDiscount = 0;
@@ -37,7 +38,7 @@ export const generateInvoiceHTML = ({
   let totalGST = 0;
   let totalAmount = 0;
 
-  cartItems.forEach(item => {
+  cartItems.forEach((item) => {
     const qty = item.qty || item.quantity || 0;
     const gstRate = item.gstRate || 0;
     const gstAmount = item.gstAmount || 0;
@@ -86,25 +87,25 @@ export const generateInvoiceHTML = ({
         <td class="sr-no">${index + 1}</td>
         <td class="description">
           <div class="item-name">${item.name}</div>
-          ${item.hsn ? `<div class="item-code">HSN: ${item.hsn}</div>` : ''}
+          ${item.hsn ? `<div class="item-code">HSN: ${item.hsn}</div>` : ""}
         </td>
         <td class="qty">${qty}</td>
-        <td class="unit">${item.unit || 'PCS'}</td>
+        <td class="unit">${item.unit || "PCS"}</td>
         ${
           isMrpEnabled
             ? `<td class="mrp" style="text-align:right;">&#8377;${Number(
                 item.mrp || 0,
               ).toFixed(2)}</td>`
-            : ''
+            : ""
         }
         <td class="rate">&#8377;${baseRate.toFixed(2)}</td>
         <td class="discount">
           ${
             totalDiscount > 0
               ? `&#8377;${totalDiscount.toFixed(2)}${
-                  discountPercent ? ` (${discountPercent}%)` : ''
+                  discountPercent ? ` (${discountPercent}%)` : ""
                 }`
-              : '&#8377;0.00 (0.00%)'
+              : "&#8377;0.00 (0.00%)"
           }
         </td>
         ${
@@ -122,20 +123,20 @@ export const generateInvoiceHTML = ({
                 : `&#8212;`
             }
           </td>`
-            : ''
+            : ""
         }
         <td class="total-amount">&#8377;${totalAmount.toFixed(2)}</td>
       </tr>
     `;
     })
-    .join('');
+    .join("");
 
   let gstTotals = { taxableValue: 0, cgst: 0, sgst: 0, igst: 0 };
-  let gstBreakdownHTML = '';
+  let gstBreakdownHTML = "";
 
-  const isA5 = pageFormat === 'a5';
-  const pageSize = isA5 ? 'A5' : 'A4';
-  const invoiceContainerWidth = isA5 ? '520px' : '800px';
+  const isA5 = pageFormat === "a5";
+  const pageSize = isA5 ? "A5" : "A4";
+  const invoiceContainerWidth = isA5 ? "520px" : "800px";
   const showPaymentSummary = !isA5;
   const showTaxSummary = !isA5;
   const showPaymentDetails = !isA5;
@@ -189,7 +190,7 @@ export const generateInvoiceHTML = ({
             (invoiceCalculations?.discountTotal || 0),
         ).toFixed(2),
       )
-      .replace(/\b\w/g, c => c.toUpperCase()) + ' Rupees Only';
+      .replace(/\b\w/g, (c) => c.toUpperCase()) + " Rupees Only";
 
   const hasCustomerDetails =
     formValues.contactNumber ||
@@ -212,25 +213,42 @@ export const generateInvoiceHTML = ({
     invoiceCalculations.grandTotal - (invoiceCalculations?.discountTotal || 0);
   const roundOffValue = (roundedGrandTotal - rawGrandTotal).toFixed(2);
 
-  let qrURL = '';
+  let qrURL = "";
   if (storedata?.bankDetails?.upiId) {
     const upiString = `upi://pay?pa=${
       storedata.bankDetails.upiId
     }&pn=${encodeURIComponent(
-      storedata?.name || 'Merchant',
+      storedata?.name || "Merchant",
     )}&am=${roundedGrandTotal}&cu=INR`;
     qrURL = `https://quickchart.io/qr?text=${encodeURIComponent(upiString)}`;
   }
 
-  const totalsRowCount =
-    2 +
-    (isGstInvoice ? 2 : 1) +
-    ((invoiceCalculations?.discountTotal ?? 0) > 0 ? 1 : 0) +
-    (roundOffValue ?? 0 > 0 ? 1 : 0);
+  let totalsRowCount = 2;
+
+  if (isGstInvoice) totalsRowCount += 1;
+  if ((invoiceCalculations?.discountTotal ?? 0) > 0) totalsRowCount += 1;
+  if (roundOffValue != 0) totalsRowCount += 1;
+  if (showPaymentDetails && (payment.status !== "paid" || payment.due > 0)) {
+    totalsRowCount += 2;
+  }
 
   const nonZeroTransactions = (invoiceData?.transactions || []).filter(
-    t => Number(t.amount || 0) > 0,
+    (t) => Number(t.amount || 0) > 0,
   );
+
+  // ✅ FIX: `amount-words-cell` ke koyta totals-row (Subtotal/Tax/Net
+  // Total/Paid/Due) er height jure rowspan kora hoy — kintu preview mode-e
+  // (createdInvoice: false) transactions[] empty thake tai Payment Summary
+  // table render-i hoy na. Fole cell-er content ("Amount in Words" text-tuku)
+  // upore chepe thake ar niche onek boro blank white gap thekei jay
+  // (screenshot-e exactly eita dekha jacche — text ar "Partially Paid"
+  // badge-er majhe boro ফাঁকা jayga). `hasPaymentSummaryBlock` diye check
+  // kori shei table-ta actually render hobe kina; na hole content-ke
+  // flexbox diye vertically CENTER kore di (justify-content:center),
+  // tai available height-e content evenly boshe, upore-nichey blank gap
+  // ekshathe distribute hoye jay — clean, professional dekhay.
+  const hasPaymentSummaryBlock =
+    showPaymentSummary && nonZeroTransactions.length > 0;
 
   const colspanCount = (isGstInvoice ? 7 : 5) + (isMrpEnabled ? 1 : 0);
 
@@ -295,7 +313,8 @@ export const generateInvoiceHTML = ({
       .payment-status.partial { background-color: #fb8c00; }
       .payment-status.unpaid { background-color: #e53935; }
       .items-table .totals-row td, .items-table .grand-total-row td { border: 1px solid #000; font-size: 10px; padding: 6px 8px; }
-      .amount-words-cell { font-size: 10px; background: #fafafa; color: #000; }
+      .amount-words-cell { font-size: 10px; background: #fafafa; color: #000; padding: 0 !important; }
+      .amount-words-inner { height: 100%; display: flex; flex-direction: column; justify-content: center; padding: 10px; }
       .items-table .label { text-align: left; font-weight: 600; background: #f8f8f8; }
       .items-table .amount { text-align: right; font-weight: 600; }
       .grand-total-row .label, .grand-total-row .amount { background: #2c5aa0; color: #fff; font-weight: bold; }
@@ -341,19 +360,19 @@ export const generateInvoiceHTML = ({
                       ? `<img class="brand-app-logo" src="${
                           appBrand.logoUrl
                         }" alt="${
-                          appBrand?.name || 'Brand'
+                          appBrand?.name || "Brand"
                         }" onerror="this.style.display='none'">`
-                      : ''
+                      : ""
                   }
-                  <span>Powered by ${appBrand?.name || 'AMDAANI'}</span>
+                  <span>Powered by ${appBrand?.name || "AMDAANI"}</span>
                 </div>
                 <div></div>
               </div>`
-                  : ''
+                  : ""
               }
               ${
                 preview
-                  ? ''
+                  ? ""
                   : `
               <header class="header-grid">
                 <div class="header-left">
@@ -362,43 +381,43 @@ export const generateInvoiceHTML = ({
                       ? `<div class="logo-wrap">
                     <img class="company-logo" src="${storedata.logoUrl}" alt="Logo" onerror="this.style.display='none'">
                   </div>`
-                      : ''
+                      : ""
                   }
                   <div class="company-block">
-  <div class="company-name">${storedata?.name || 'YOUR COMPANY NAME'}</div>
+  <div class="company-name">${storedata?.name || "YOUR COMPANY NAME"}</div>
   ${
     storedata?.tagline
       ? `<div class="company-tagline">${storedata.tagline}</div>`
-      : ''
+      : ""
   }
   <div class="company-details">
-    ${storedata?.address?.street ? `${storedata.address.street}<br>` : ''}
+    ${storedata?.address?.street ? `${storedata.address.street}<br>` : ""}
     ${
       storedata?.address?.city || storedata?.address?.postalCode
-        ? `${storedata?.address?.city || ''}${
+        ? `${storedata?.address?.city || ""}${
             storedata?.address?.city && storedata?.address?.postalCode
-              ? ' - '
-              : ''
-          }${storedata?.address?.postalCode || ''}<br>`
-        : ''
+              ? " - "
+              : ""
+          }${storedata?.address?.postalCode || ""}<br>`
+        : ""
     }
-    ${storedata?.address?.state ? `${storedata.address.state}<br>` : ''}
+    ${storedata?.address?.state ? `${storedata.address.state}<br>` : ""}
     ${
       storedata?.contactNo
         ? `<strong>Contact No:</strong> ${storedata.contactNo}<br>`
-        : ''
+        : ""
     }
     ${
       isGstInvoice
-        ? `<strong>GSTIN:</strong> ${storedata?.gstNumber || 'N/A'}`
-        : ''
+        ? `<strong>GSTIN:</strong> ${storedata?.gstNumber || "N/A"}`
+        : ""
     }
   </div>
 </div>
                 </div>
                 <div class="meta-block">
                   <div class="invoice-badge">${
-                    isGstInvoice ? 'Tax Invoice' : 'Invoice'
+                    isGstInvoice ? "Tax Invoice" : "Invoice"
                   }</div>
                 </div>
               </header>`
@@ -410,20 +429,20 @@ export const generateInvoiceHTML = ({
                     ? `
                 <div class="invoice-info-right">
                   <div class="customer-title">Bill To:</div>
-                  <div>Mobile: ${formValues.contactNumber || ''}</div>
+                  <div>Mobile: ${formValues.contactNumber || ""}</div>
                   ${
                     formValues.customerName || formValues.partyName
                       ? `<div>Name: ${
                           formValues.customerName || formValues.partyName
                         }</div>`
-                      : ''
+                      : ""
                   }
                   ${
                     formValues.customerAddress || formValues.address
                       ? `<div>Address: ${
                           formValues.customerAddress || formValues.address
                         }</div>`
-                      : ''
+                      : ""
                   }
                   ${
                     formValues.customerState || formValues.state
@@ -435,29 +454,29 @@ export const generateInvoiceHTML = ({
                                 formValues.customerPostalCode ||
                                 formValues.postalCode
                               }`
-                            : ''
+                            : ""
                         }</div>`
-                      : ''
+                      : ""
                   }
                   ${
                     formValues.customerGstNumber || formValues.gstNumber
                       ? `<div>GSTIN: ${
                           formValues.customerGstNumber || formValues.gstNumber
                         }</div>`
-                      : ''
+                      : ""
                   }
                 </div>`
-                    : ''
+                    : ""
                 }
                 <div class="invoice-info-left">
                   <div class="info-row"><span class="info-label">Invoice No:</span><span>${invoiceNumber}</span></div>
                   <div class="info-row"><span class="info-label">Invoice Date:</span><span>${format(
                     invoiceDate,
-                    'dd-MMM-yyyy',
+                    "dd-MMM-yyyy",
                   )}</span></div>
                   <div class="info-row"><span class="info-label">Invoice Time:</span><span>${format(
                     invoiceDate,
-                    'hh:mm a',
+                    "hh:mm a",
                   )}</span></div>
                 </div>
               </div>
@@ -470,9 +489,9 @@ export const generateInvoiceHTML = ({
             <td>
               <div class="items-table-wrap">
                 ${
-                  invoiceData?.status?.toLowerCase() === 'cancelled'
+                  invoiceData?.status?.toLowerCase() === "cancelled"
                     ? `<div class="items-table-watermark"><div class="text">CANCELLED</div></div>`
-                    : ''
+                    : ""
                 }
 
                 <table class="items-table">
@@ -482,13 +501,13 @@ export const generateInvoiceHTML = ({
                       <th>Item Description</th>
                       <th>Qty</th>
                       <th>Unit</th>
-                      ${isMrpEnabled ? `<th>MRP(&#8377;)</th>` : ''}
+                      ${isMrpEnabled ? `<th>MRP(&#8377;)</th>` : ""}
                       <th>Price/Unit(&#8377;)</th>
                       <th>Discount(&#8377;)</th>
                       ${
                         isGstInvoice
                           ? `<th>Taxable Value(&#8377;)</th><th>GST Amt.(%)</th>`
-                          : ''
+                          : ""
                       }
                       <th>Amount(&#8377;)</th>
                     </tr>
@@ -501,7 +520,7 @@ export const generateInvoiceHTML = ({
                       <td style="text-align:left;">Total</td>
                       <td>${totalQty}</td>
                       <td></td>
-                      ${isMrpEnabled ? `<td></td>` : ''}
+                      ${isMrpEnabled ? `<td></td>` : ""}
                       <td></td>
                       <td class="discount">&#8377;${totalDiscount.toFixed(
                         2,
@@ -514,7 +533,7 @@ export const generateInvoiceHTML = ({
                              <td class="gst-amount" style="text-align:right;">&#8377;${totalGST.toFixed(
                                2,
                              )}</td>`
-                          : ''
+                          : ""
                       }
                       <td class="total-amount">&#8377;${totalAmount.toFixed(
                         2,
@@ -524,12 +543,13 @@ export const generateInvoiceHTML = ({
                     <tr class="totals-row no-break">
                       <td colspan="${colspanCount}" rowspan="${totalsRowCount}"
                         class="amount-words-cell"
-                        style="text-align:left; vertical-align:top; border-right:1px solid #000; padding:10px;">
+                        style="text-align:left; vertical-align:top; border-right:1px solid #000;">
+                        <div class="amount-words-inner">
                         <div style="font-weight:bold; color:#2c5aa0;">Amount in Words:</div>
                         <div style="font-size:11px; font-weight:bold; color:#2c5aa0; margin-top:2px;">${amountInWords}</div>
 
                         ${
-                          showPaymentSummary && nonZeroTransactions.length > 0
+                          hasPaymentSummaryBlock
                             ? `
                         <div style="margin-top:15px;">
                           <div style="font-weight:bold; color:#2c5aa0; padding:4px 0; font-size:12px; text-align:center; background:#f0f4ff;">Payment Summary</div>
@@ -544,11 +564,11 @@ export const generateInvoiceHTML = ({
                             <tbody>
                               ${nonZeroTransactions
                                 .map(
-                                  t => `
+                                  (t) => `
                               <tr>
                                 <td style="border:1px solid #ddd; padding:6px; text-align:left;">${format(
                                   new Date(t.createdAt),
-                                  'dd-MMM-yyyy hh:mm a',
+                                  "dd-MMM-yyyy hh:mm a",
                                 )}</td>
                                 <td style="border:1px solid #ddd; padding:6px; text-align:right;">&#8377;${t.amount.toFixed(
                                   2,
@@ -556,12 +576,13 @@ export const generateInvoiceHTML = ({
                                 <td style="border:1px solid #ddd; padding:6px; text-align:center;">${t.paymentMethod.toUpperCase()}</td>
                               </tr>`,
                                 )
-                                .join('')}
+                                .join("")}
                             </tbody>
                           </table>
                         </div>`
-                            : ''
+                            : ""
                         }
+                        </div>
                       </td>
                       <td class="label">Subtotal</td>
                       <td class="amount">&#8377;${
@@ -580,7 +601,7 @@ export const generateInvoiceHTML = ({
                         2,
                       )}</td>
                     </tr>`
-                        : ''
+                        : ""
                     }
 
                     ${
@@ -594,7 +615,7 @@ export const generateInvoiceHTML = ({
                           : Number(invoiceCalculations.discountTotal).toFixed(2)
                       }</td>
                     </tr>`
-                        : ''
+                        : ""
                     }
 
                     ${
@@ -603,22 +624,22 @@ export const generateInvoiceHTML = ({
                     <tr class="totals-row no-break">
                       <td class="label">Round Off</td>
                       <td class="amount" style="color:${
-                        roundOffValue < 0 ? '#e53935' : '#43a047'
+                        roundOffValue < 0 ? "#e53935" : "#43a047"
                       };">
                         ${
                           createdInvoice
                             ? `${
                                 Number(invoiceData?.roundOff || 0) >= 0
-                                  ? '+'
-                                  : ''
+                                  ? "+"
+                                  : ""
                               }${Number(invoiceData?.roundOff || 0).toFixed(2)}`
                             : `${
-                                roundOffValue < 0 ? '&minus;' : '+'
+                                roundOffValue < 0 ? "&minus;" : "+"
                               }&#8377;${Math.abs(roundOffValue).toFixed(2)}`
                         }
                       </td>
                     </tr>`
-                        : ''
+                        : ""
                     }
 
                     <tr class="grand-total-row no-break">
@@ -635,7 +656,7 @@ export const generateInvoiceHTML = ({
 
                     ${
                       showPaymentDetails &&
-                      (payment.status !== 'paid' || payment.due > 0)
+                      (payment.status !== "paid" || payment.due > 0)
                         ? `
                     <tr class="payment-row no-break">
                       <td class="label">Paid Amount</td>
@@ -644,12 +665,12 @@ export const generateInvoiceHTML = ({
                     <tr class="payment-row no-break">
                       <td class="label">Due Amount</td>
                       <td class="amount" style="color:${
-                        payment.due > 0 ? '#e53935' : '#000'
+                        payment.due > 0 ? "#e53935" : "#000"
                       };">
                         &#8377;${Math.round(payment.due).toFixed(2)}
                       </td>
                     </tr>`
-                        : ''
+                        : ""
                     }
                   </tbody>
                 </table>
@@ -660,11 +681,11 @@ export const generateInvoiceHTML = ({
                 <div class="payment-status-container">
                   <span class="payment-status ${payment.status?.toLowerCase()}">
                     ${
-                      payment.status === 'paid'
-                        ? 'Amount is Fully Paid'
-                        : payment.status === 'partial'
-                        ? 'Amount is Partially Paid'
-                        : 'Amount is Unpaid'
+                      payment.status === "paid"
+                        ? "Amount is Fully Paid"
+                        : payment.status === "partial"
+                          ? "Amount is Partially Paid"
+                          : "Amount is Unpaid"
                     }
                   </span>
                 </div>
@@ -680,25 +701,25 @@ export const generateInvoiceHTML = ({
                             invoiceData?.paymentNote) &&
                           payment.paid > 0
                             ? `Payment Method:`
-                            : ''
+                            : ""
                         }</span><span style="color:#000; font-weight:600; margin-left:6px;">${
                           (invoiceData?.paymentMethod ||
                             invoiceData?.paymentNote) &&
                           payment.paid > 0
                             ? `${invoiceData.paymentMethod.toUpperCase()}`
-                            : ''
+                            : ""
                         }</span></div>`
-                      : ''
+                      : ""
                   }
                   ${
                     invoiceData.paymentNote
                       ? `<div><span style="color:#666;">Note:</span><span style="color:#000; margin-left:6px;">${invoiceData.paymentNote}</span></div>`
-                      : ''
+                      : ""
                   }
                 </div>`
-                    : ''
+                    : ""
                 }`
-                    : ''
+                    : ""
                 }
               </div>
 
@@ -707,7 +728,7 @@ export const generateInvoiceHTML = ({
                 isGstInvoice &&
                 showTaxSummary &&
                 Object.keys(invoiceCalculations.gstBreakdown).some(
-                  r => parseFloat(r) > 0,
+                  (r) => parseFloat(r) > 0,
                 )
                   ? `
               <div class="gst-breakdown">
@@ -725,7 +746,7 @@ export const generateInvoiceHTML = ({
                   <tbody>${gstBreakdownHTML}</tbody>
                 </table>
               </div>`
-                  : ''
+                  : ""
               }
             </td>
           </tr>
@@ -733,7 +754,7 @@ export const generateInvoiceHTML = ({
 
         ${
           preview
-            ? ''
+            ? ""
             : `
         <tfoot>
           <tr>
@@ -748,22 +769,22 @@ export const generateInvoiceHTML = ({
                       ${
                         storedata.bankDetails.bankName
                           ? `Bank: ${storedata.bankDetails.bankName}<br>`
-                          : ''
+                          : ""
                       }
                       ${
                         storedata.bankDetails.accountNo
                           ? `A/C No: ${storedata.bankDetails.accountNo}<br>`
-                          : ''
+                          : ""
                       }
                       ${
                         storedata.bankDetails.ifsc
                           ? `IFSC: ${storedata.bankDetails.ifsc}<br>`
-                          : ''
+                          : ""
                       }
                       ${
                         storedata.bankDetails.upiId
                           ? `UPI: ${storedata.bankDetails.upiId}<br>`
-                          : ''
+                          : ""
                       }
                     </div>
                     ${
@@ -775,19 +796,19 @@ export const generateInvoiceHTML = ({
                         <div style="font-size:10px; margin-top:4px;">UPI ID: ${storedata.bankDetails.upiId}</div>
                         <div style="font-size:10px;">Amount: &#8377;${roundedGrandTotal}</div>
                       </div>`
-                        : ''
+                        : ""
                     }
                   </div>`
-                    : ''
+                    : ""
                 }
                 <div class="signature-section">
                   <div class="section-title">For ${
-                    storedata?.name || 'YOUR COMPANY NAME'
+                    storedata?.name || "YOUR COMPANY NAME"
                   }</div>
                   ${
                     storedata?.signatureUrl
                       ? `<img src="${storedata.signatureUrl}" class="signature-image"><br>`
-                      : ''
+                      : ""
                   }
                   <div class="signature-line">Authorized Signatory</div>
                 </div>
@@ -801,7 +822,7 @@ export const generateInvoiceHTML = ({
     ${
       invoiceData?.remarks
         ? `<pre style="font-size:8px; color:#666; margin-top:8px;">Remarks : ${invoiceData.remarks}</pre>`
-        : ''
+        : ""
     }
     ${
       !preview && storedata?.settings?.invoiceTerms
@@ -809,12 +830,12 @@ export const generateInvoiceHTML = ({
     <div style="font-size:8px; color:#666; margin-top:8px; padding-left:10px; padding-right:10px; text-align:left;">
       <div style="padding-left:10px; font-size:8px;">${storedata.settings.invoiceTerms}</div>
     </div>`
-        : ''
+        : ""
     }
 
     ${
       preview
-        ? ''
+        ? ""
         : `<div class="page-footer-text">Invoice generated using amdaani billing app</div>`
     }
   </body>

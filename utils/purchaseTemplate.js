@@ -150,9 +150,55 @@ export const generatePurchaseHTML = ({
   let gstBreakdownHTML = "";
   const isIgst = invoiceData?.isIgst === true;
 
-  for (const [rate, breakdown] of Object.entries(
-    invoiceCalculations.gstBreakdown || {},
-  )) {
+  // ✅ FIX: Backend purchase document e kokhonoi per-rate `gstBreakdown`
+  // save nao hote pare (list page-o backend-er stored field-er upor
+  // bhorosa kore boshe thake — `doc.gstBreakdown || {}`). Add/Edit time-e
+  // (PurchaseSummary.js theke) o `invoiceCalculations` parent form theke
+  // ashe, jeta guarantee kora jay na sob shomoy sothik breakdown pathabe
+  // kina. Tai template-er nijer moddhei ekta self-healing fallback rakhi:
+  // jodi passed-in `gstBreakdown` khali/missing thake, cartItems-er
+  // proti item-er gstRate/gstAmount/taxableValue theke nijei local-e
+  // build kore feli — mobile app (InvoiceDetail.js) je approach follow
+  // kore, exactly shei-i. Ei ekta jaygay fix korlei list-view ar
+  // add/edit-view — duijaygatei Tax Summary sothik dekhabe, caller
+  // ki pathacche tar upor nirbhor na kore.
+  const passedGstBreakdown = invoiceCalculations.gstBreakdown || {};
+  const hasUsableBreakdown =
+    Object.keys(passedGstBreakdown).length > 0 &&
+    Object.values(passedGstBreakdown).some(
+      (b) => Number(b?.taxableAmount || 0) > 0 || Number(b?.totalGst || 0) > 0,
+    );
+
+  let effectiveGstBreakdown = passedGstBreakdown;
+  if (!hasUsableBreakdown) {
+    const computedGstBreakdown = {};
+    cartItems.forEach((item) => {
+      const rate = item.gstRate || 0;
+      if (rate <= 0) return; // 0% GST items breakdown-e count hoy na
+
+      const itemTaxable = Number(item.taxableValue || 0);
+      const itemGstAmount = Number(item.gstAmount || 0);
+
+      if (!computedGstBreakdown[rate]) {
+        computedGstBreakdown[rate] = {
+          taxableAmount: 0,
+          cgstAmount: 0,
+          sgstAmount: 0,
+          igstAmount: 0,
+          totalGst: 0,
+        };
+      }
+
+      computedGstBreakdown[rate].taxableAmount += itemTaxable;
+      computedGstBreakdown[rate].cgstAmount += isIgst ? 0 : itemGstAmount / 2;
+      computedGstBreakdown[rate].sgstAmount += isIgst ? 0 : itemGstAmount / 2;
+      computedGstBreakdown[rate].igstAmount += isIgst ? itemGstAmount : 0;
+      computedGstBreakdown[rate].totalGst += itemGstAmount;
+    });
+    effectiveGstBreakdown = computedGstBreakdown;
+  }
+
+  for (const [rate, breakdown] of Object.entries(effectiveGstBreakdown)) {
     if (parseFloat(rate) === 0) continue;
 
     const taxable = breakdown.taxableAmount || 0;
@@ -307,7 +353,8 @@ export const generatePurchaseHTML = ({
       .gst-table th { background: #2c5aa0; color: white; }
 
       .items-table .totals-row td, .items-table .grand-total-row td { border: 1px solid #000; font-size: 10px; padding: 6px 8px; }
-      .amount-words-cell { font-size: 10px; background: #fafafa; color: #000; }
+      .amount-words-cell { font-size: 10px; background: #fafafa; color: #000; padding: 0 !important; }
+      .amount-words-inner { height: 100%; display: flex; flex-direction: column; justify-content: center; padding: 10px; }
       .items-table .label { text-align: left; font-weight: 600; background: #f8f8f8; }
       .items-table .amount { text-align: right; font-weight: 600; }
       .grand-total-row .label, .grand-total-row .amount { background: #2c5aa0; color: #fff; font-weight: bold; }
@@ -499,7 +546,8 @@ export const generatePurchaseHTML = ({
                     <tr class="totals-row no-break">
                       <td colspan="${colspanCount}" rowspan="${totalsRowCount}"
                         class="amount-words-cell"
-                        style="text-align:left; vertical-align:top; border-right:1px solid #000; padding:10px;">
+                        style="text-align:left; vertical-align:top; border-right:1px solid #000;">
+                        <div class="amount-words-inner">
                         <div style="font-weight:bold; color:#2c5aa0;">Amount in Words:</div>
                         <div style="font-size:11px; font-weight:bold; color:#2c5aa0; margin-top:2px;">${amountInWords}</div>
 
@@ -537,6 +585,7 @@ export const generatePurchaseHTML = ({
                         </div>`
                             : ""
                         }
+                        </div>
                       </td>
                       <td class="label">Subtotal</td>
                       <td class="amount">&#8377;${
@@ -662,7 +711,7 @@ export const generatePurchaseHTML = ({
               ${
                 !preview &&
                 showTaxSummary &&
-                Object.keys(invoiceCalculations.gstBreakdown || {}).some(
+                Object.keys(effectiveGstBreakdown || {}).some(
                   (r) => parseFloat(r) > 0,
                 )
                   ? `

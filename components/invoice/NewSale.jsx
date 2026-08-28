@@ -61,6 +61,22 @@ function determineGstType(storeGst, customerGst, storeState, customerState) {
   return isIgst;
 }
 
+// -------------------------------------------------------------
+// ⚠️ IMPORTANT — DISCOUNT PERSISTENCE STRATEGY
+// -------------------------------------------------------------
+// Backend Invoice schema-te item-er `discountType` field save hoy na
+// (schema-te define kora nei, ar backend access nei tai oi dik theke
+// fix kora jacche na). Mobile app kokhono percent-discount UI support
+// kore na — always rupee-amount discount pathay. Fole mobile-er kono
+// mismatch hoy na, karon save-hoye-jawa "amount" fallback always thik.
+//
+// Web-e percent-discount UI ache (user-friendliness-er jonno), kintu
+// backend-e pathanor thik age eta rupee-amount-e convert kore dei —
+// exactly mobile-er moto. Fole edit/view korar somoy discountType
+// fallback ("amount") always thik thakbe, karon stored value already
+// rupee-e — kokhono percent-mismatch hobe na.
+// -------------------------------------------------------------
+
 // -------------------------------
 // MAIN — orchestrates step navigation: list -> form -> items -> back to form
 // -------------------------------
@@ -69,7 +85,6 @@ export default function SalesFlow() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // step: "list" | "form" | "items"
   const [step, setStep] = useState("list");
   const [invoiceRefreshKey, setInvoiceRefreshKey] = useState(0);
 
@@ -98,9 +113,6 @@ export default function SalesFlow() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // -------------------------------
-  // isIgst
-  // -------------------------------
   const isIgst = useMemo(() => {
     return determineGstType(
       storedata?.gstNumber,
@@ -124,7 +136,6 @@ export default function SalesFlow() {
       const sellingPriceRaw = Number(item.sellingPrice ?? item.price ?? 0);
       const discountType = item.discountType || "amount";
 
-      // ✅ clamp percent discount to 0-100 so it can never push price negative
       let rawDiscountInput = Number(item.discount || 0);
       if (discountType === "percent") {
         rawDiscountInput = Math.min(Math.max(rawDiscountInput, 0), 100);
@@ -132,6 +143,7 @@ export default function SalesFlow() {
         rawDiscountInput = Math.max(rawDiscountInput, 0);
       }
 
+      // per-unit discount, converted to rupees regardless of discountType
       const itemDiscount =
         discountType === "percent"
           ? (sellingPriceRaw * rawDiscountInput) / 100
@@ -189,6 +201,9 @@ export default function SalesFlow() {
         baseRate,
         discount: rawDiscountInput,
         discountType,
+        // ✅ NEW FIELD — always in rupees per unit. This is what gets
+        // persisted to backend regardless of the UI discountType toggle.
+        discountInRupees: Number(itemDiscount.toFixed(2)),
         mrp: Number(item.mrp || 0),
         taxableValue,
         gstAmount,
@@ -331,7 +346,6 @@ export default function SalesFlow() {
     fetchAllProducts();
   }, []);
 
-  // ✅ Reconcile cart item IDs with actual product IDs after products load (edit mode)
   useEffect(() => {
     if (!isEditMode || allProducts.length === 0 || cartItems.length === 0)
       return;
@@ -353,9 +367,6 @@ export default function SalesFlow() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allProducts, isEditMode]);
 
-  // -------------------------------
-  // Reset form to blank state (for a brand-new invoice)
-  // -------------------------------
   const resetFormState = async () => {
     setSelectedCustomer(null);
     setCartItems([]);
@@ -371,9 +382,6 @@ export default function SalesFlow() {
     await fetchLastInvoice(store);
   };
 
-  // -------------------------------
-  // Navigation handlers (step transitions)
-  // -------------------------------
   const handleStartNewInvoice = async () => {
     setIsFormLoading(true);
     await resetFormState();
@@ -381,11 +389,6 @@ export default function SalesFlow() {
     setStep("form");
   };
 
-  // ✅ NEW — dashboard theke "?new=true" query param diye asle,
-  // list page skip kore direct notun invoice form khule jabe.
-  // Ekbar-i trigger hoy (ref diye guard kora), tarpor URL theke
-  // query param clean kore dey jate refresh/back button e abar
-  // trigger na hoy.
   const autoStartHandledRef = useRef(false);
 
   useEffect(() => {
@@ -399,7 +402,6 @@ export default function SalesFlow() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  // ✅ targetStep: "form" (default, full invoice edit) | "items" (jump straight to item picker)
   const handleEditInvoice = async (invoiceId, targetStep = "form") => {
     setIsFormLoading(true);
     setStep(targetStep);
@@ -413,6 +415,11 @@ export default function SalesFlow() {
         return;
       }
 
+      // ✅ DB-te discountType kokhono save hoy na, kintu discount value
+      // shomoyi rupee-amount-e save kora thake (creation-er shomoy ei
+      // file-e amra oitai kori). Tai edit-e load korar shomoy discountType
+      // shomoy "amount" dhora — eta CORRECT, karon stored discount shomoy
+      // amount-i, kokhono percent na.
       const normalizedItems = (fullInvoice.items || []).map((item) => ({
         _id: item.productId || item._id || `${item.name}-${Math.random()}`,
         name: item.name,
@@ -420,7 +427,7 @@ export default function SalesFlow() {
         gstRate: Number(item.gstRate ?? 0),
         isTaxInclusive: item.isTaxInclusive ?? false,
         discount: Number(item.discount ?? 0),
-        discountType: item.discountType || "amount",
+        discountType: "amount", // stored discount always in rupees
         hsn: item.hsn ?? "",
         unit: item.unit ?? "pcs",
         mrp: Number(item.mrp ?? 0),
@@ -460,11 +467,6 @@ export default function SalesFlow() {
 
   const handleBackToList = () => setStep("list");
 
-  // -------------------------------
-  // Cart handlers (used inside AddItemsPage)
-  // -------------------------------
-
-  // ✅ Product select korle discount + GST product er nijer settings theke bose jabe
   const addToCart = (product) => {
     setCartItems((prev) => {
       const existing = prev.find((p) => p._id === product._id);
@@ -473,7 +475,6 @@ export default function SalesFlow() {
           p._id === product._id ? { ...p, qty: p.qty + 1 } : p,
         );
 
-      // Product schema-r discountType "amount" | "percentage" — cart e "amount" | "percent" use hoy
       const productDiscountType =
         product.discountType === "percentage" ? "percent" : "amount";
       const productDiscountValue =
@@ -551,10 +552,21 @@ export default function SalesFlow() {
     if (!selectedCustomer || cartItems.length === 0) return null;
     setIsSubmitting(true);
     try {
+      const finalGrandTotal = Number(invoiceCalculations.netTotal || 0);
+
+      // ✅ race-condition fix — submit-er thik muhurte netTotal/paidAmount
+      // shorasori use koro, stale `payment` memoized object er upor bhorosa
+      // na kore (item/discount ekhoni edit kore turant Create Invoice
+      // click korle useEffect tokhono paidAmount sync kore ni thakte pare).
+      const finalPaid = hasUserEditedPaid.current
+        ? Math.min(Math.max(0, Number(paidAmount) || 0), finalGrandTotal)
+        : finalGrandTotal;
+      const finalDue = Math.max(0, finalGrandTotal - finalPaid);
+
       const paymentStatus =
-        payment.paid === 0 && payment.grandTotal > 0
+        finalPaid === 0 && finalGrandTotal > 0
           ? "unpaid"
-          : payment.due === 0 && payment.grandTotal > 0
+          : finalDue === 0 && finalGrandTotal > 0
             ? "paid"
             : "partial";
 
@@ -576,8 +588,12 @@ export default function SalesFlow() {
           gstRate: item.gstRate,
           isTaxInclusive: !!item.isTaxInclusive,
           quantity: item.qty,
-          discount: item.discount,
-          discountType: item.discountType || "amount",
+          // ✅ FIX: shomoyi RUPEE-AMOUNT pathao, percent hok ba amount UI-te
+          // — exactly mobile-er moto. Backend discountType save kore na
+          // (access nei fix korar), tai eituku frontend-e resolve kore
+          // dile edit/view korar shomoy r kokhono mismatch hobe na.
+          discount: item.discountInRupees,
+          discountType: "amount",
           mrp: item.mrp > 0 ? item.mrp : null,
           total: Number(item.total.toFixed(2)),
         })),
@@ -587,9 +603,9 @@ export default function SalesFlow() {
         ),
         discountTotal: invoiceCalculations.discountTotal,
         roundOff: invoiceCalculations.roundOff,
-        grandTotal: Number(invoiceCalculations.netTotal.toFixed(2)),
-        amountPaid: Number(payment.paid.toFixed(2)),
-        amountDue: Number(payment.due.toFixed(2)),
+        grandTotal: Number(finalGrandTotal.toFixed(2)),
+        amountPaid: Number(finalPaid.toFixed(2)),
+        amountDue: Number(finalDue.toFixed(2)),
         paymentStatus,
         paymentMethod,
         paymentNote: paymentNote || "",
@@ -614,8 +630,8 @@ export default function SalesFlow() {
         isGstInvoice,
         isMrpEnabled,
         payment: {
-          paid: payment.paid,
-          due: payment.due,
+          paid: finalPaid,
+          due: finalDue,
           status: paymentStatus,
         },
       });
@@ -639,9 +655,6 @@ export default function SalesFlow() {
     setStep("list");
   };
 
-  // -------------------------------
-  // Render — step switch
-  // -------------------------------
   if (step === "list") {
     return (
       <InvoiceListPage
@@ -669,7 +682,6 @@ export default function SalesFlow() {
     );
   }
 
-  // step === "form"
   return (
     <NewInvoiceFormPage
       isLoading={isFormLoading}
