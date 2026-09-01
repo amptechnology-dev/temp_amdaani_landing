@@ -38,7 +38,7 @@ export default function PurchaseFlow() {
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [cartItems, setCartItems] = useState([]);
 
-  const [discount] = useState({ type: "flat", value: 0 });
+  const [discount, setDiscount] = useState({ type: "flat", value: 0 });
   const [paymentMethod] = useState("cash");
   const [paymentNote] = useState("");
   const [paidAmount, setPaidAmount] = useState(0);
@@ -139,7 +139,14 @@ export default function PurchaseFlow() {
     });
 
     const grandTotalRaw = subtotal + totalTax;
-    const invoiceDiscountTotal = Number(discount?.value || 0);
+    let invoiceDiscountTotal = 0;
+    if (discount?.type === "percent") {
+      invoiceDiscountTotal =
+        grandTotalRaw * (Number(discount?.value || 0) / 100);
+    } else {
+      invoiceDiscountTotal = Number(discount?.value || 0);
+    }
+
     const netTotal = grandTotalRaw - invoiceDiscountTotal;
     const roundedTotal = Math.round(netTotal);
     const roundOff = Number((roundedTotal - netTotal).toFixed(2));
@@ -612,6 +619,8 @@ export default function PurchaseFlow() {
       handleRemoveItem={handleRemoveItem}
       handleClearCart={handleClearCart}
       onRefreshProducts={fetchAllProducts}
+      discount={discount}
+      setDiscount={setDiscount}
     />
   );
 }

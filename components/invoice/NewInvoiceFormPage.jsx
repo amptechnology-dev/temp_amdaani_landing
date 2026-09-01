@@ -357,7 +357,7 @@ export default function NewInvoiceFormPage({
     setSelectedCustomer(
       hasData
         ? { _id: selectedCustomerId || undefined, ...customerForm }
-        : { _id: undefined, name: "Walk-in Customer", mobile: "" },
+        : { _id: undefined, name: "", mobile: "" },
     );
   }, [customerForm, selectedCustomerId]);
 
@@ -531,6 +531,27 @@ export default function NewInvoiceFormPage({
     if (isNaN(n) || n < 0) n = 0;
     if (discountType === "percent" && n > 100) n = 100;
     handleUpdateItemField(id, "discount", n);
+  };
+
+  const handleOrderDiscountChange = (e) => {
+    let v = e.target.value.replace(/[^\d.]/g, "");
+    const parts = v.split(".");
+    if (parts.length > 2) v = parts[0] + "." + parts.slice(1).join("");
+    setDiscount((prev) => ({ ...prev, value: v }));
+  };
+
+  const handleOrderDiscountBlur = (e) => {
+    let n = parseFloat(e.target.value);
+    if (isNaN(n) || n < 0) n = 0;
+    if (discount.type === "percent" && n > 100) n = 100;
+    setDiscount((prev) => ({ ...prev, value: n }));
+  };
+
+  const toggleOrderDiscountType = () => {
+    setDiscount((prev) => ({
+      ...prev,
+      type: prev.type === "flat" ? "percent" : "flat",
+    }));
   };
 
   if (isLoading) {
@@ -949,14 +970,67 @@ export default function NewInvoiceFormPage({
             )}
 
             {cartItems.length > 0 && (
-              <div className="flex justify-end px-3 py-2 border-t border-slate-100">
-                <button
-                  onClick={handleClearCart}
-                  className="text-xs font-medium text-rose-500 hover:text-rose-600"
-                >
-                  Clear all items
-                </button>
-              </div>
+              <>
+                {/* ✅ NEW — Order-level discount + running total summary */}
+                <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-2">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-xs text-slate-500">
+                        Current Total:
+                      </span>
+                      <span className="text-sm font-semibold text-slate-700">
+                        ₹{Number(invoiceCalculations.subtotal || 0).toFixed(2)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-slate-500">Discount:</span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={discount?.value ?? 0}
+                        onChange={handleOrderDiscountChange}
+                        onBlur={handleOrderDiscountBlur}
+                        className="w-20 h-8 text-right px-2 text-sm border border-slate-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={toggleOrderDiscountType}
+                        title="Toggle discount type"
+                        className="w-8 h-8 shrink-0 flex items-center justify-center rounded-md border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                      >
+                        {discount?.type === "percent" ? (
+                          <Percent className="w-3.5 h-3.5" />
+                        ) : (
+                          "₹"
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-xs text-slate-500">
+                        Grand Total:
+                      </span>
+                      <span className="text-base font-bold text-blue-600">
+                        ₹
+                        {(
+                          Number(invoiceCalculations.subtotal || 0) -
+                          Number(invoiceCalculations.discountTotal || 0)
+                        ).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end px-3 py-2 border-t border-slate-100">
+                  <button
+                    onClick={handleClearCart}
+                    className="text-xs font-medium text-rose-500 hover:text-rose-600"
+                  >
+                    Clear all items
+                  </button>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>

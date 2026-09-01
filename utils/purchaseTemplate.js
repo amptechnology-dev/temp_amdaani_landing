@@ -795,9 +795,9 @@ export const generatePurchaseHTML = ({
         : `${
             storedata?.settings?.invoiceTerms
               ? `
-    <div style="font-size: 8px; color: #666; margin-top: 8px; padding-left: 10px; padding-right: 10px; text-align: left;">
-      <div style="padding-left: 10px; font-size: 8px;">${storedata.settings.invoiceTerms}</div>
-    </div>`
+<div style="font-size: 8px; color: #666; margin-top: 8px; padding-left: 10px; padding-right: 10px; text-align: left;">
+  <div class="invoice-terms-content">${storedata.settings.invoiceTerms}</div>
+</div>`
               : ""
           }`
     }

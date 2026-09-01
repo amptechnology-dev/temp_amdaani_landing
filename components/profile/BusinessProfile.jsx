@@ -24,11 +24,10 @@ import {
   Save,
   Loader2,
 } from "lucide-react";
-
+import dynamic from "next/dynamic";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -48,6 +47,16 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 
 import api from "../../utils/api";
+
+const TermsEditor = dynamic(
+  () => import("../../components/dashboard/TermsEditor"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-32 w-full rounded-lg border border-slate-200 bg-slate-50 animate-pulse" />
+    ),
+  },
+);
 
 // =========================
 // Static data
@@ -951,17 +960,23 @@ export default function BusinessProfile() {
                   <Label className="mb-1.5 block text-slate-700 text-[12.5px]">
                     Invoice Terms &amp; Conditions
                   </Label>
-                  <Textarea
-                    value={values.invoiceTerms}
-                    onChange={handleChange("invoiceTerms")}
-                    onBlur={handleBlur("invoiceTerms")}
-                    rows={4}
-                    placeholder="Enter invoice terms and conditions"
-                    className="resize-none text-[13px]"
-                  />
+                  <div
+                    className="rounded-lg border border-slate-200 overflow-hidden
+                      [&_.ck-editor__editable]:min-h-[120px]
+                      [&_.ck-editor__editable]:text-[13px]
+                      [&_.ck-editor__editable]:px-3
+                      [&_.ck-toolbar]:rounded-t-lg
+                      [&_.ck-toolbar]:border-0
+                      [&_.ck-editor__editable]:border-0"
+                  >
+                    <TermsEditor
+                      value={values.invoiceTerms}
+                      onChange={(html) => setFieldValue("invoiceTerms", html)}
+                    />
+                  </div>
                   <p className="text-[11px] text-slate-400 mt-1">
-                    Plain text supported for now — rich formatting can be added
-                    later.
+                    Use the toolbar to add bold, lists, or line breaks —
+                    formatting will reflect exactly on your printed invoices.
                   </p>
                 </div>
               </CardContent>

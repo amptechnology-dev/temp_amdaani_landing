@@ -268,6 +268,21 @@ export const generateInvoiceHTML = ({
         text-align: center; font-size: 9px; color: #999;
         font-style: italic; padding: 6px 8px; margin-top: 8px;
       }
+      .invoice-terms-content {
+  font-size: 8px;
+  color: #666;
+  line-height: 1.5;
+  white-space: pre-line;      /* purono plain-text data-o line-break dekhabe */
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.invoice-terms-content p { margin: 0 0 4px 0; }
+.invoice-terms-content ul,
+.invoice-terms-content ol { margin: 0 0 4px 16px; padding: 0; }
+.invoice-terms-content strong, .invoice-terms-content b { font-weight: 700; }
+.invoice-terms-content em, .invoice-terms-content i { font-style: italic; }
+.invoice-terms-content u { text-decoration: underline; }
+.invoice-terms-content a { color: #2c5aa0; }
       .invoice-info { display: flex; border-bottom: 1px solid #000; }
       .invoice-info-left, .invoice-info-right { flex: 1; padding: 10px; }
       .invoice-info-left { border-right: 1px solid #000; }
@@ -827,16 +842,16 @@ export const generateInvoiceHTML = ({
     ${
       !preview && storedata?.settings?.invoiceTerms
         ? `
-    <div style="font-size:8px; color:#666; margin-top:8px; padding-left:10px; padding-right:10px; text-align:left;">
-      <div style="padding-left:10px; font-size:8px;">${storedata.settings.invoiceTerms}</div>
-    </div>`
+<div style="margin-top:8px; padding-left:10px; padding-right:10px; text-align:left;">
+  <div class="invoice-terms-content">${storedata.settings.invoiceTerms}</div>
+</div>`
         : ""
     }
 
     ${
       preview
         ? ""
-        : `<div class="page-footer-text">Invoice generated using amdaani billing app</div>`
+        : `<div class="page-footer-text">Invoice generated using amdaani billing software</div>`
     }
   </body>
   </html>`;
