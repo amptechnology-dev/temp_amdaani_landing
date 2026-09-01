@@ -2,17 +2,14 @@
 import { useTheme } from "../context/ThemeContext";
 import { themeConfig } from "../utils/ThemeConfig";
 import { motion } from "framer-motion";
+import { Mail, Phone, MapPin, ArrowUp } from "lucide-react";
 import {
-  Mail,
-  Phone,
-  MapPin,
-  Facebook,
-  Twitter,
-  Linkedin,
-  Instagram,
-  Youtube,
-  ArrowUp,
-} from "lucide-react";
+  FaFacebook,
+  FaTwitter,
+  FaLinkedin,
+  FaInstagram,
+  FaYoutube,
+} from "react-icons/fa";
 import { useState, useEffect } from "react";
 
 const HELPLINE_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/helpline`;
@@ -169,7 +166,7 @@ export default function Footer() {
         { name: "Testimonial", href: "#testimonials" },
         { name: "Pricing", href: "#pricing" },
         { name: "Contact Us", href: "#contact" },
-        {name:"FAQs", href:"#faq" }
+        { name: "FAQs", href: "#faq" },
       ],
     },
   ];
@@ -177,28 +174,28 @@ export default function Footer() {
   const socialLinks = [
     {
       name: "Facebook",
-      icon: Facebook,
+      icon: FaFacebook,
       raw: helpline?.socialLinks?.facebook,
       href: buildSocialUrl("facebook", helpline?.socialLinks?.facebook),
       color: "hover:text-blue-600",
     },
     {
       name: "Instagram",
-      icon: Instagram,
+      icon: FaInstagram,
       raw: helpline?.socialLinks?.instagram,
       href: buildSocialUrl("instagram", helpline?.socialLinks?.instagram),
       color: "hover:text-pink-600",
     },
     {
       name: "YouTube",
-      icon: Youtube,
+      icon: FaYoutube,
       raw: helpline?.socialLinks?.youtube,
       href: buildSocialUrl("youtube", helpline?.socialLinks?.youtube),
       color: "hover:text-red-600",
     },
     {
       name: "LinkedIn",
-      icon: Linkedin,
+      icon: FaLinkedin,
       raw: helpline?.socialLinks?.linkedin,
       href: buildSocialUrl("linkedin", helpline?.socialLinks?.linkedin),
       color: "hover:text-blue-700",
