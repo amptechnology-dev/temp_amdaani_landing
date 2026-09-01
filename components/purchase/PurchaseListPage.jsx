@@ -21,6 +21,7 @@ import {
   Printer,
   MessageCircle,
   Download,
+  Ban,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -38,6 +39,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 import api from "../../utils/api";
 import { useAuth } from "../../context/AuthContext";
 
@@ -47,6 +58,8 @@ const statusStyles = {
   paid: "bg-green-600 hover:bg-green-600 text-white",
   partial: "bg-orange-500 hover:bg-orange-500 text-white",
   unpaid: "bg-red-500 hover:bg-red-500 text-white",
+  // ✅ NEW — cancelled purchases get their own neutral badge color
+  cancelled: "bg-slate-500 hover:bg-slate-500 text-white",
 };
 
 const DATE_FILTERS = ["All", "Today", "Yesterday", "This Week"];
@@ -57,8 +70,6 @@ export default function PurchaseListPage({
   onCreateNew,
   onEditPurchase,
 }) {
-  // ⚠️ ADJUST: change `storedata` below to whatever key your AuthContext
-  // actually exposes (e.g. `store`, `storeData`, `currentStore`).
   const auth = useAuth();
   const contextStoredata =
     auth?.storedata || auth?.store || auth?.storeData || null;
@@ -77,14 +88,22 @@ export default function PurchaseListPage({
   const [previewHtml, setPreviewHtml] = useState("");
   const [previewLoadingId, setPreviewLoadingId] = useState(null);
   const [activePreviewNumber, setActivePreviewNumber] = useState("");
-  // ✅ WhatsApp-er jonno dorkari info — row click korar shomoy save kore rakhi
   const [activePreviewMeta, setActivePreviewMeta] = useState({
     vendorName: "",
     vendorMobile: "",
     grandTotal: 0,
   });
+
+  // ✅ NEW — track which purchase is currently open in preview, and its
+  // current status, so the Edit/Cancel buttons in the dialog know what
+  // to act on.
+  const [activePreviewId, setActivePreviewId] = useState(null);
+  const [activePreviewStatus, setActivePreviewStatus] = useState("active");
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false); // 👈 notun state
+  const [isDownloading, setIsDownloading] = useState(false);
   const iframeRef = useRef(null);
 
   const pageFormat = storedata?.settings?.printMode === "a5" ? "a5" : "a4";
@@ -94,7 +113,6 @@ export default function PurchaseListPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
 
-  // ✅ Keep in sync if AuthContext resolves store data after mount
   useEffect(() => {
     if (contextStoredata && Object.keys(contextStoredata).length > 0) {
       setStoredata(contextStoredata);
@@ -103,15 +121,12 @@ export default function PurchaseListPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contextStoredata]);
 
-  // ✅ Fallback — only fetches if AuthContext didn't already provide store data.
   useEffect(() => {
     if (contextStoredata && Object.keys(contextStoredata).length > 0) return;
 
     const fetchStore = async () => {
       setStoreLoading(true);
       try {
-        // ⚠️ ADJUST: confirm this matches the exact endpoint that returns
-        // your store JSON (name, logoUrl, bankDetails, gstNumber, etc.)
         const res = await api.get("/store");
         const doc = res?.data?.data || res?.data;
         if (doc && typeof doc === "object") {
@@ -142,6 +157,13 @@ export default function PurchaseListPage({
       setIsLoading(false);
     }
   };
+
+  // ✅ NEW — cancelled purchases show "cancelled" in the status column
+  // regardless of their paymentStatus (paid/partial/unpaid).
+  const getDisplayStatus = (p) =>
+    (p.status || "").toLowerCase() === "cancelled"
+      ? "cancelled"
+      : (p.paymentStatus || "unpaid").toLowerCase();
 
   const filteredPurchases = useMemo(() => {
     let list = [...purchases];
@@ -221,15 +243,16 @@ export default function PurchaseListPage({
 
     try {
       setPreviewLoadingId(p._id);
+      setActivePreviewId(p._id); // ✅ NEW
 
-      // ⚠️ ADJUST: replace with your real "get single purchase" endpoint if different
       const res = await api.get(`/purchase/id/${p._id}`);
       const doc = res?.data?.data || res?.data || p;
 
+      // ✅ NEW — remember current status for the Edit/Cancel buttons
+      setActivePreviewStatus((doc.status || "active").toLowerCase());
+
       const rawItems = doc.items || doc.cartItems || [];
 
-      // ⚠️ ADJUST: widen/rename these fallbacks to match your exact backend
-      // field names if qty/rate still show as 0 after this fix.
       const cartItems = rawItems.map((it) => {
         const qty = Number(it.qty ?? it.quantity ?? 0);
         const costPrice = Number(
@@ -284,8 +307,6 @@ export default function PurchaseListPage({
         };
       });
 
-      // ⚠️ ADJUST: if your purchase doc stores these under different top-level
-      // keys, point them here. gstBreakdown MUST always resolve to an object.
       const subTotal = Number(
         doc.invoiceCalculations?.subTotal ?? doc.subTotal ?? 0,
       );
@@ -310,7 +331,7 @@ export default function PurchaseListPage({
         discountTotal,
         grandTotal,
         roundOff,
-        gstBreakdown, // never undefined — prevents the crash that blocked the modal
+        gstBreakdown,
         totalQuantity:
           doc.invoiceCalculations?.totalQuantity ??
           doc.totalQuantity ??
@@ -339,7 +360,6 @@ export default function PurchaseListPage({
           remarks: doc.remarks || "",
           status: doc.status,
           isIgst: Boolean(doc.isIgst),
-          // ✅ the fields that were missing and caused NaN / "Zero Rupees Only"
           subTotal,
           discountTotal,
           roundOff,
@@ -351,7 +371,7 @@ export default function PurchaseListPage({
         invoiceNumber: doc.invoiceNumber,
         currentDate: format(dateObj, "dd-MMM-yyyy"),
         currentTime: format(dateObj, "hh:mm a"),
-        storedata, // ✅ now guaranteed to be populated (context or fallback fetch)
+        storedata,
         invoiceDate: dateObj,
         isGstInvoice: Boolean(doc.vendorGstNumber),
         isMrpEnabled: Boolean(doc.isMrpEnabled),
@@ -364,7 +384,6 @@ export default function PurchaseListPage({
       });
 
       setActivePreviewNumber(doc.invoiceNumber);
-      // ✅ WhatsApp button-er jonno vendor info save kore rakhi
       setActivePreviewMeta({
         vendorName: doc.vendorName || "",
         vendorMobile: doc.vendorMobile || "",
@@ -410,15 +429,13 @@ export default function PurchaseListPage({
     await Promise.all(
       imgs.map(async (img) => {
         const src = img.getAttribute("src");
-        if (!src || src.startsWith("data:")) return; // already base64
+        if (!src || src.startsWith("data:")) return;
         const dataUrl = await toDataURL(src);
         if (dataUrl) img.src = dataUrl;
       }),
     );
   };
 
-  // ── Shob img.onload/onerror complete howa porjonto wait kori,
-  // fixed timeout er upor bhorosa na kore ────────────────────────
   const waitForImagesToLoad = (doc) => {
     const imgs = Array.from(doc.querySelectorAll("img"));
     return Promise.all(
@@ -426,18 +443,12 @@ export default function PurchaseListPage({
         if (img.complete) return Promise.resolve();
         return new Promise((resolve) => {
           img.addEventListener("load", resolve, { once: true });
-          img.addEventListener("error", resolve, { once: true }); // fail holeo block na kore egiye jai
+          img.addEventListener("error", resolve, { once: true });
         });
       }),
     );
   };
 
-  // ── PDF generate — Preview iframe-e jeta dekhacche (perfect A4/A5
-  // print layout) hubohu SEI content thekei capture kori.
-  // html2canvas-pro use kora hocche karon eta oklch()/lab() moto modern
-  // CSS color function support kore — vanilla html2canvas eigulo parse
-  // korte parena, tai WhatsApp/PDF generate korar somoy
-  // "unsupported color function" error dito ───────────────────────────
   const generatePdfBlob = async () => {
     const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
       import("html2canvas-pro"),
@@ -449,14 +460,8 @@ export default function PurchaseListPage({
       throw new Error("Preview not ready yet");
     }
 
-    // 1) Cross-origin image gulo ke base64 e convert kore niচ্ছি —
-    //    ei step ta CORS taint problem ta root theke fix kore dey
     await inlineImagesAsBase64(idoc);
-
-    // 2) Base64 e convert howar por abar load howa wait kori
     await waitForImagesToLoad(idoc);
-
-    // ei choto extra wait ta layout settle howar jonno rekhe dilam
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     const canvas = await html2canvas(idoc.body, {
@@ -510,8 +515,6 @@ export default function PurchaseListPage({
     URL.revokeObjectURL(url);
   };
 
-  // ── Download button — direct PDF banaye download kore dey,
-  // WhatsApp share-er kono dependency nei (phone number lagbe na) ──────
   const handleDownloadClick = async () => {
     try {
       setIsDownloading(true);
@@ -527,10 +530,6 @@ export default function PurchaseListPage({
     }
   };
 
-  // ── WhatsApp: PDF automatic download hoy (kono dialog/click chara),
-  // mobile-e Web Share API thakle PDF sotti sotti WhatsApp share sheet-e
-  // attach hoye khule jay; desktop-e download hoye WhatsApp Web-er chat
-  // khule jay ──────────────────────────────────────────────────────────
   const handleWhatsAppShare = async () => {
     const phoneDigits = (activePreviewMeta.vendorMobile || "").replace(
       /\D/g,
@@ -578,6 +577,41 @@ export default function PurchaseListPage({
       }
     } finally {
       setSendingWhatsApp(false);
+    }
+  };
+
+  // ✅ NEW — jump straight into the edit form (same flow as the row's
+  // "Edit" button) directly from inside the preview dialog.
+  const handleEditFromPreview = () => {
+    if (!activePreviewId) return;
+    setPreviewOpen(false);
+    onEditPurchase(activePreviewId);
+  };
+
+  // ✅ NEW — Cancel purchase. Opens a confirmation dialog first; the actual
+  // API call happens in handleConfirmCancelPurchase.
+  const handleCancelClick = () => {
+    setShowCancelConfirm(true);
+  };
+
+  const handleConfirmCancelPurchase = async () => {
+    if (!activePreviewId) return;
+    try {
+      setIsCancelling(true);
+      // ⚠️ ADJUST: if your purchase status-change schema expects a different
+      // body field name than `status`, update the key below to match.
+      await api.put(`/purchase/status/${activePreviewId}`, {
+        status: "cancelled",
+      });
+      toast.success("Purchase cancelled successfully");
+      setShowCancelConfirm(false);
+      setPreviewOpen(false);
+      await fetchPurchases();
+    } catch (err) {
+      console.error("Cancel purchase failed:", err);
+      toast.error("Failed to cancel purchase");
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -762,10 +796,11 @@ export default function PurchaseListPage({
                     <td className="px-3 py-2 text-center align-middle">
                       <Badge
                         className={`text-[11px] capitalize ${
-                          statusStyles[p.paymentStatus] || statusStyles.unpaid
+                          statusStyles[getDisplayStatus(p)] ||
+                          statusStyles.unpaid
                         }`}
                       >
-                        {p.paymentStatus || "unpaid"}
+                        {getDisplayStatus(p)}
                       </Badge>
                     </td>
 
@@ -834,11 +869,41 @@ export default function PurchaseListPage({
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-3xl w-full h-[85vh] p-0 flex flex-col overflow-hidden">
           <DialogHeader className="px-4 py-2 border-b shrink-0 flex flex-row items-center justify-between pr-10 space-y-0">
-            <DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
               Purchase Preview{" "}
               {activePreviewNumber ? `#${activePreviewNumber}` : ""}
+              {activePreviewStatus === "cancelled" && (
+                <Badge className="text-[10px] bg-slate-500 text-white">
+                  Cancelled
+                </Badge>
+              )}
             </DialogTitle>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap justify-end">
+              {/* ✅ NEW — Edit button: closes preview, opens NewPurchaseFormPage in edit mode */}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleEditFromPreview}
+                className="text-slate-700 border-slate-200 hover:bg-slate-50"
+              >
+                <Pencil className="w-3.5 h-3.5 mr-1.5" />
+                Edit
+              </Button>
+
+              {/* ✅ NEW — Cancel purchase button */}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleCancelClick}
+                disabled={activePreviewStatus === "cancelled"}
+                className="text-red-600 border-red-200 hover:bg-red-50 disabled:opacity-50"
+              >
+                <Ban className="w-3.5 h-3.5 mr-1.5" />
+                {activePreviewStatus === "cancelled"
+                  ? "Cancelled"
+                  : "Cancel Purchase"}
+              </Button>
+
               <Button
                 size="sm"
                 variant="outline"
@@ -881,6 +946,34 @@ export default function PurchaseListPage({
           />
         </DialogContent>
       </Dialog>
+
+      {/* ✅ NEW — Cancel confirmation dialog */}
+      <AlertDialog open={showCancelConfirm} onOpenChange={setShowCancelConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Purchase?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Purchase #{activePreviewNumber} will be marked as cancelled.
+              This action can affect reports and cannot be easily undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isCancelling}>
+              Keep Purchase
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmCancelPurchase}
+              disabled={isCancelling}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isCancelling ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : null}
+              Yes, Cancel Purchase
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -21,6 +21,7 @@ import {
   Printer,
   MessageCircle,
   Download,
+  Ban,
 } from "lucide-react";
 
 import api from "../../utils/api";
@@ -41,6 +42,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 
 import { generateInvoiceHTML } from "../../utils/invoiceTemplate";
 
@@ -48,6 +59,8 @@ const statusStyles = {
   paid: "bg-green-600 text-white",
   partial: "bg-orange-500 text-white",
   unpaid: "bg-red-500 text-white",
+  // ✅ NEW — cancelled invoices get their own neutral badge color
+  cancelled: "bg-slate-500 text-white",
 };
 
 const DATE_FILTERS = [
@@ -68,10 +81,6 @@ export default function InvoiceListPage({
   onCreateNew,
   onEditInvoice,
 }) {
-  // ⚠️ ADJUST: change `storedata` below to whatever key your AuthContext
-  // actually exposes (e.g. `store`, `storeData`, `currentStore`). Check
-  // AuthContext.js — AddItemFormModal.js already pulls `isMrpEnabled` from
-  // this same context, so the full store object is very likely here too.
   const auth = useAuth();
   const contextStoredata =
     auth?.storedata || auth?.store || auth?.storeData || null;
@@ -90,14 +99,22 @@ export default function InvoiceListPage({
   const [previewHtml, setPreviewHtml] = useState("");
   const [previewLoadingId, setPreviewLoadingId] = useState(null);
   const [activePreviewNumber, setActivePreviewNumber] = useState("");
-  // ✅ WhatsApp-er jonno dorkari info — row click korar shomoy save kore rakhi
   const [activePreviewMeta, setActivePreviewMeta] = useState({
     customerName: "",
     customerMobile: "",
     grandTotal: 0,
   });
+
+  // ✅ NEW — track which invoice is currently open in preview, and its
+  // current status, so the Edit/Cancel buttons in the dialog know what
+  // to act on.
+  const [activePreviewId, setActivePreviewId] = useState(null);
+  const [activePreviewStatus, setActivePreviewStatus] = useState("active");
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false); // 👈 notun state
+  const [isDownloading, setIsDownloading] = useState(false);
   const iframeRef = useRef(null);
 
   const pageFormat = storedata?.settings?.printMode === "a5" ? "a5" : "a4";
@@ -107,8 +124,6 @@ export default function InvoiceListPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
 
-  // ✅ Keep in sync if AuthContext resolves store data after mount (e.g.
-  // context itself was still loading on first render)
   useEffect(() => {
     if (contextStoredata && Object.keys(contextStoredata).length > 0) {
       setStoredata(contextStoredata);
@@ -117,17 +132,12 @@ export default function InvoiceListPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contextStoredata]);
 
-  // ✅ Fallback — only fetches if AuthContext didn't already provide store data.
-  // Errors are now surfaced (not silently swallowed) so a broken endpoint
-  // is obvious instead of just showing a blank invoice header again.
   useEffect(() => {
     if (contextStoredata && Object.keys(contextStoredata).length > 0) return;
 
     const fetchStore = async () => {
       setStoreLoading(true);
       try {
-        // ⚠️ ADJUST: confirm this matches the exact endpoint that returns
-        // the JSON you shared (name, logoUrl, bankDetails, gstNumber, etc.)
         const res = await api.get("/store");
         const doc = res?.data?.data || res?.data;
         if (doc && typeof doc === "object") {
@@ -158,6 +168,13 @@ export default function InvoiceListPage({
       setIsLoading(false);
     }
   };
+
+  // ✅ NEW — cancelled invoices show "cancelled" in the status column
+  // regardless of their paymentStatus (paid/partial/unpaid).
+  const getDisplayStatus = (inv) =>
+    (inv.status || "").toLowerCase() === "cancelled"
+      ? "cancelled"
+      : inv.paymentStatus;
 
   const filteredInvoices = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -222,15 +239,16 @@ export default function InvoiceListPage({
 
     try {
       setPreviewLoadingId(inv._id);
+      setActivePreviewId(inv._id); // ✅ NEW
 
-      // ⚠️ ADJUST: replace with your real "get single invoice" endpoint if different
       const res = await api.get(`/invoice/id/${inv._id}`);
       const doc = res?.data?.data || res?.data || inv;
 
+      // ✅ NEW — remember current status for the Edit/Cancel buttons
+      setActivePreviewStatus((doc.status || "active").toLowerCase());
+
       const rawItems = doc.items || doc.cartItems || [];
 
-      // ⚠️ ADJUST: widen/rename these fallbacks to match your exact backend
-      // field names if qty/rate still show as 0 after this fix.
       const cartItems = rawItems.map((it) => {
         const qty = Number(it.qty ?? it.quantity ?? 0);
         const baseRate = Number(
@@ -306,22 +324,12 @@ export default function InvoiceListPage({
         doc.invoiceCalculations?.roundOff ?? doc.roundOff ?? 0,
       );
 
-      // ✅ FIX: Backend invoice document e kokhonoi per-rate `gstBreakdown`
-      // save hoy na (SalesFlow.js-er handleCreateInvoice shudhu `gstTotal`
-      // pathay, breakdown pathay na). Tai `doc.gstBreakdown` shomoy e {}
-      // thake ar Tax Summary section template-e silently disappear kore
-      // jay. Mobile app (InvoiceDetail.js) ei problem-e pore na karon
-      // sheta stored field-er upor bhorosa na kore proti cart item-er
-      // gstRate/gstAmount theke nijei breakdown calculate kore. Ekhane
-      // thik shei jinis-i kori — cartItems (upore already computed,
-      // taxableValue o gstAmount soho) theke local-e gstBreakdown build
-      // kori, backend-er stored field-er upor nirbhor na kore.
       const isIgstDoc = Boolean(doc.isIgst);
       const computedGstBreakdown = {};
 
       cartItems.forEach((item) => {
         const rate = item.gstRate || 0;
-        if (rate <= 0) return; // 0% GST items breakdown-e count hoy na
+        if (rate <= 0) return;
 
         if (!computedGstBreakdown[rate]) {
           computedGstBreakdown[rate] = {
@@ -346,8 +354,6 @@ export default function InvoiceListPage({
         computedGstBreakdown[rate].totalGst += item.gstAmount;
       });
 
-      // Backend-e future-e eta store hote shuru korle sheta-o kaje lagbe
-      // (fallback hisebe), na thakle amader locally computed version use hobe
       const storedGstBreakdown =
         doc.invoiceCalculations?.gstBreakdown || doc.gstBreakdown || {};
       const gstBreakdown =
@@ -400,7 +406,7 @@ export default function InvoiceListPage({
         invoiceNumber: doc.invoiceNumber,
         currentDate: format(dateObj, "dd-MMM-yyyy"),
         currentTime: format(dateObj, "hh:mm a"),
-        storedata, // ✅ now guaranteed to be populated (context or fallback fetch)
+        storedata,
         invoiceDate: dateObj,
         isGstInvoice: doc.type === "gst",
         isMrpEnabled: Boolean(doc.isMrpEnabled),
@@ -413,7 +419,6 @@ export default function InvoiceListPage({
       });
 
       setActivePreviewNumber(doc.invoiceNumber);
-      // ✅ WhatsApp button-er jonno customer info save kore rakhi
       setActivePreviewMeta({
         customerName: doc.customerName || "",
         customerMobile: doc.customerMobile || "",
@@ -459,15 +464,13 @@ export default function InvoiceListPage({
     await Promise.all(
       imgs.map(async (img) => {
         const src = img.getAttribute("src");
-        if (!src || src.startsWith("data:")) return; // already base64
+        if (!src || src.startsWith("data:")) return;
         const dataUrl = await toDataURL(src);
         if (dataUrl) img.src = dataUrl;
       }),
     );
   };
 
-  // ── Shob img.onload/onerror complete howa porjonto wait kori,
-  // fixed timeout er upor bhorosa na kore ────────────────────────
   const waitForImagesToLoad = (doc) => {
     const imgs = Array.from(doc.querySelectorAll("img"));
     return Promise.all(
@@ -475,14 +478,12 @@ export default function InvoiceListPage({
         if (img.complete) return Promise.resolve();
         return new Promise((resolve) => {
           img.addEventListener("load", resolve, { once: true });
-          img.addEventListener("error", resolve, { once: true }); // fail holeo block na kore egiye jai
+          img.addEventListener("error", resolve, { once: true });
         });
       }),
     );
   };
 
-  // ── PDF generate — Preview iframe-e jeta dekhacche (perfect A4/A5
-  // print layout) hubohu SEI content thekei capture kori.
   const generatePdfBlob = async () => {
     const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
       import("html2canvas-pro"),
@@ -494,14 +495,8 @@ export default function InvoiceListPage({
       throw new Error("Preview not ready yet");
     }
 
-    // 1) Cross-origin image gulo ke base64 e convert kore niচ্ছি —
-    //    ei step ta CORS taint problem ta root theke fix kore dey
     await inlineImagesAsBase64(idoc);
-
-    // 2) Base64 e convert howar por abar load howa wait kori
     await waitForImagesToLoad(idoc);
-
-    // ei choto extra wait ta layout settle howar jonno rekhe dilam
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     const canvas = await html2canvas(idoc.body, {
@@ -555,8 +550,6 @@ export default function InvoiceListPage({
     URL.revokeObjectURL(url);
   };
 
-  // ── Download button — direct PDF banaye download kore dey,
-  // WhatsApp share-er kono dependency nei (phone number lagbe na) ──────
   const handleDownloadClick = async () => {
     try {
       setIsDownloading(true);
@@ -572,10 +565,6 @@ export default function InvoiceListPage({
     }
   };
 
-  // ── WhatsApp: PDF automatic download hoy (kono dialog/click chara),
-  // mobile-e Web Share API thakle PDF sotti sotti WhatsApp share sheet-e
-  // attach hoye khule jay; desktop-e download hoye WhatsApp Web-er chat
-  // khule jay ──────────────────────────────────────────────────────────
   const handleWhatsAppShare = async () => {
     const phoneDigits = (activePreviewMeta.customerMobile || "").replace(
       /\D/g,
@@ -623,6 +612,41 @@ export default function InvoiceListPage({
       }
     } finally {
       setSendingWhatsApp(false);
+    }
+  };
+
+  // ✅ NEW — jump straight into the edit form (same flow as the row's
+  // "Edit" button) directly from inside the preview dialog.
+  const handleEditFromPreview = () => {
+    if (!activePreviewId) return;
+    setPreviewOpen(false);
+    onEditInvoice(activePreviewId);
+  };
+
+  // ✅ NEW — Cancel invoice. Opens a confirmation dialog first; the actual
+  // API call happens in handleConfirmCancelInvoice.
+  const handleCancelClick = () => {
+    setShowCancelConfirm(true);
+  };
+
+  const handleConfirmCancelInvoice = async () => {
+    if (!activePreviewId) return;
+    try {
+      setIsCancelling(true);
+      // ⚠️ ADJUST: if invoiceSchema.changeInvoiceStatus expects a different
+      // body field name than `status`, update the key below to match.
+      await api.put(`/invoice/status/${activePreviewId}`, {
+        status: "cancelled",
+      });
+      toast.success("Invoice cancelled successfully");
+      setShowCancelConfirm(false);
+      setPreviewOpen(false);
+      await fetchInvoices();
+    } catch (err) {
+      console.error("Cancel invoice failed:", err);
+      toast.error("Failed to cancel invoice");
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -809,10 +833,11 @@ export default function InvoiceListPage({
                     <td className="px-3 py-2 text-center align-middle">
                       <Badge
                         className={`text-[11px] capitalize ${
-                          statusStyles[inv.paymentStatus] || statusStyles.unpaid
+                          statusStyles[getDisplayStatus(inv)] ||
+                          statusStyles.unpaid
                         }`}
                       >
-                        {inv.paymentStatus}
+                        {getDisplayStatus(inv)}
                       </Badge>
                     </td>
 
@@ -880,11 +905,41 @@ export default function InvoiceListPage({
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-3xl w-full h-[85vh] p-0 flex flex-col overflow-hidden">
           <DialogHeader className="px-4 py-2 border-b shrink-0 flex flex-row items-center justify-between pr-10 space-y-0">
-            <DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
               Invoice Preview{" "}
               {activePreviewNumber ? `#${activePreviewNumber}` : ""}
+              {activePreviewStatus === "cancelled" && (
+                <Badge className="text-[10px] bg-slate-500 text-white">
+                  Cancelled
+                </Badge>
+              )}
             </DialogTitle>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap justify-end">
+              {/* ✅ NEW — Edit button: closes preview, opens NewInvoiceFormPage in edit mode */}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleEditFromPreview}
+                className="text-slate-700 border-slate-200 hover:bg-slate-50"
+              >
+                <Pencil className="w-3.5 h-3.5 mr-1.5" />
+                Edit
+              </Button>
+
+              {/* ✅ NEW — Cancel invoice button */}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleCancelClick}
+                disabled={activePreviewStatus === "cancelled"}
+                className="text-red-600 border-red-200 hover:bg-red-50 disabled:opacity-50"
+              >
+                <Ban className="w-3.5 h-3.5 mr-1.5" />
+                {activePreviewStatus === "cancelled"
+                  ? "Cancelled"
+                  : "Cancel Invoice"}
+              </Button>
+
               <Button
                 size="sm"
                 variant="outline"
@@ -927,6 +982,34 @@ export default function InvoiceListPage({
           />
         </DialogContent>
       </Dialog>
+
+      {/* ✅ NEW — Cancel confirmation dialog */}
+      <AlertDialog open={showCancelConfirm} onOpenChange={setShowCancelConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Invoice?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Invoice #{activePreviewNumber} will be marked as cancelled. This
+              action can affect reports and cannot be easily undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isCancelling}>
+              Keep Invoice
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmCancelInvoice}
+              disabled={isCancelling}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isCancelling ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : null}
+              Yes, Cancel Invoice
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
