@@ -547,6 +547,12 @@ export default function NewInvoiceFormPage({
     setDiscount((prev) => ({ ...prev, value: n }));
   };
 
+  const productDiscountTotal = cartItems.reduce((sum, item) => {
+    const qty = Number(item.qty || 0);
+    const perUnitDiscount = Number(item.discountInRupees ?? 0);
+    return sum + perUnitDiscount * qty;
+  }, 0);
+
   const toggleOrderDiscountType = () => {
     setDiscount((prev) => ({
       ...prev,
@@ -971,53 +977,88 @@ export default function NewInvoiceFormPage({
 
             {cartItems.length > 0 && (
               <>
-                {/* ✅ NEW — Order-level discount + running total summary */}
-                <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-3">
-                  <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-2">
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-xs text-slate-500">
-                        Current Total:
-                      </span>
-                      <span className="text-sm font-semibold text-slate-700">
+                {/* ✅ Order Summary — Qty, Price, GST, Discount box, Grand Total */}
+                <div className="border-t border-slate-100 bg-gradient-to-br from-slate-50 to-blue-50/40 px-4 py-4">
+                  <div className="flex flex-wrap items-stretch gap-3">
+                    <div className="bg-white rounded-xl border border-slate-200 px-3 py-2.5 shadow-sm min-w-[110px] flex-1">
+                      <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium mb-1">
+                        <Hash className="w-3 h-3" />
+                        Total Quantity
+                      </div>
+                      <p className="text-sm font-bold text-slate-800">
+                        {invoiceCalculations.totalQuantity}
+                      </p>
+                    </div>
+
+                    <div className="bg-white rounded-xl border border-slate-200 px-3 py-2.5 shadow-sm min-w-[110px] flex-1">
+                      <div className="text-[11px] text-slate-400 font-medium mb-1">
+                        Total Price
+                      </div>
+                      <p className="text-sm font-bold text-slate-800">
                         ₹{Number(invoiceCalculations.subtotal || 0).toFixed(2)}
-                      </span>
+                      </p>
                     </div>
 
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs text-slate-500">Discount:</span>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={discount?.value ?? 0}
-                        onChange={handleOrderDiscountChange}
-                        onBlur={handleOrderDiscountBlur}
-                        className="w-20 h-8 text-right px-2 text-sm border border-slate-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={toggleOrderDiscountType}
-                        title="Toggle discount type"
-                        className="w-8 h-8 shrink-0 flex items-center justify-center rounded-md border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50"
-                      >
-                        {discount?.type === "percent" ? (
-                          <Percent className="w-3.5 h-3.5" />
-                        ) : (
-                          "₹"
-                        )}
-                      </button>
+                    <div className="bg-white rounded-xl border border-slate-200 px-3 py-2.5 shadow-sm min-w-[110px] flex-1">
+                      <div className="text-[11px] text-slate-400 font-medium mb-1">
+                        Total GST
+                      </div>
+                      <p className="text-sm font-bold text-slate-800">
+                        ₹{Number(invoiceCalculations.totalTax || 0).toFixed(2)}
+                      </p>
                     </div>
 
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-xs text-slate-500">
-                        Grand Total:
-                      </span>
-                      <span className="text-base font-bold text-blue-600">
+                    {/* Right side — square discount box */}
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm w-[150px] shrink-0 flex flex-col justify-between p-2.5">
+                      <div className="pb-2 border-b border-slate-100">
+                        <div className="text-[10px] text-slate-400 font-medium mb-0.5">
+                          Total Discount
+                        </div>
+                        <p className="text-sm font-bold text-slate-700">
+                          ₹{productDiscountTotal.toFixed(2)}
+                        </p>
+                      </div>
+                      <div className="pt-2">
+                        <div className="flex items-center gap-1 text-[10px] text-slate-400 font-medium mb-0.5">
+                          <Percent className="w-2.5 h-2.5" />
+                          Extra Discount
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={discount?.value ?? 0}
+                            onChange={handleOrderDiscountChange}
+                            onBlur={handleOrderDiscountBlur}
+                            className="w-full h-6 text-xs font-bold text-slate-800 px-1 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={toggleOrderDiscountType}
+                            title="Toggle discount type"
+                            className="w-6 h-6 shrink-0 flex items-center justify-center rounded border border-slate-200 text-[9px] font-bold text-slate-600 hover:bg-slate-50"
+                          >
+                            {discount?.type === "percent" ? (
+                              <Percent className="w-2.5 h-2.5" />
+                            ) : (
+                              "₹"
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-blue-600 rounded-xl px-3 py-2.5 shadow-sm shadow-blue-200 w-[150px] shrink-0 flex flex-col justify-center">
+                      <div className="text-[11px] text-blue-100 font-medium mb-1">
+                        Grand Total
+                      </div>
+                      <p className="text-base font-bold text-white">
                         ₹
                         {(
                           Number(invoiceCalculations.subtotal || 0) -
                           Number(invoiceCalculations.discountTotal || 0)
                         ).toFixed(2)}
-                      </span>
+                      </p>
                     </div>
                   </div>
                 </div>
