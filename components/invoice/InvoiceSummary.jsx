@@ -2,7 +2,14 @@
 
 import { useState, useRef } from "react";
 import { format } from "date-fns";
-import { FileText, Check, Loader2, Printer, MessageCircle, Download } from "lucide-react";
+import {
+  FileText,
+  Check,
+  Loader2,
+  Printer,
+  MessageCircle,
+  Download,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +20,13 @@ import {
 } from "@/components/ui/dialog";
 
 import { generateInvoiceHTML } from "../../utils/invoiceTemplate";
+import { printThermalInvoiceWeb } from "../../utils/printThermalWeb";
+import {
+  connectPrinter,
+  isPrinterConnected,
+  isWebBluetoothSupported,
+} from "../../utils/webBluetoothPrinter";
+import { Zap } from "lucide-react";
 
 export default function InvoiceSummary({
   invoiceCalculations,
@@ -43,6 +57,65 @@ export default function InvoiceSummary({
   const iframeRef = useRef(null);
 
   const pageFormat = storedata?.settings?.printMode === "a5" ? "a5" : "a4";
+
+  const [isBtPrinting, setIsBtPrinting] = useState(false);
+
+  const buildGstBreakdown = () => invoiceCalculations?.gstBreakdown || {};
+
+  const handleBluetoothPrint = async () => {
+    if (!isWebBluetoothSupported()) {
+      toast.error(
+        "Bluetooth printing is working only on Chrome/Edge desktop browsers.",
+      );
+      return;
+    }
+    try {
+      setIsBtPrinting(true);
+      if (!isPrinterConnected()) {
+        await connectPrinter();
+      }
+
+      const enrichedItems = cartItems.map((item) => ({
+        ...item,
+        qty: item.qty,
+        baseRate: item.baseRate ?? item.price ?? item.sellingPrice,
+        total: item.total,
+      }));
+
+      await printThermalInvoiceWeb({
+        invoice: {
+          invoiceNumber,
+          invoiceDate: new Date(),
+          customerMobile: formValues?.contactNumber,
+          customerName: formValues?.customerName,
+          type: isGstInvoice ? "gst" : "non-gst",
+          isIgst: false,
+          subTotal: invoiceCalculations?.subtotal,
+          discountTotal: invoiceCalculations?.discountTotal,
+          roundOff: invoiceCalculations?.roundOff,
+          grandTotal:
+            invoiceCalculations?.grandTotal -
+            (invoiceCalculations?.discountTotal || 0),
+          paymentMethod,
+          paymentNote,
+        },
+        paidAmount: payment?.paid ?? 0,
+        dueAmount: payment?.due ?? 0,
+        paymentStatus: payment?.status ?? "unpaid",
+        gstBreakdown: buildGstBreakdown(),
+        enrichedItems,
+        isFreePlan,
+        store: storedata,
+      });
+
+      toast.success("Print sent to Bluetooth printer");
+    } catch (err) {
+      console.error("Bluetooth print error:", err);
+      toast.error(err.message || "Bluetooth print failed");
+    } finally {
+      setIsBtPrinting(false);
+    }
+  };
 
   const buildPreviewHtml = () => {
     const now = new Date();
@@ -359,6 +432,20 @@ export default function InvoiceSummary({
               <Button size="sm" variant="outline" onClick={handlePrint}>
                 <Printer className="w-3.5 h-3.5 mr-1.5" />
                 Print
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleBluetoothPrint}
+                disabled={isBtPrinting}
+                className="text-purple-600 border-purple-200 hover:bg-purple-50"
+              >
+                {isBtPrinting ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <Zap className="w-3.5 h-3.5 mr-1.5" />
+                )}
+                Bluetooth Print
               </Button>
             </div>
           </DialogHeader>
