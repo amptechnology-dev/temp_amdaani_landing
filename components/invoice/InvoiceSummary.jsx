@@ -20,13 +20,7 @@ import {
 } from "@/components/ui/dialog";
 
 import { generateInvoiceHTML } from "../../utils/invoiceTemplate";
-import { printThermalInvoiceWeb } from "../../utils/printThermalWeb";
-import {
-  connectPrinter,
-  isPrinterConnected,
-  isWebBluetoothSupported,
-} from "../../utils/webBluetoothPrinter";
-import { Zap } from "lucide-react";
+import { generateThermalInvoiceHTML } from "../../utils/generateThermalInvoiceHTML";
 
 export default function InvoiceSummary({
   invoiceCalculations,
@@ -53,69 +47,11 @@ export default function InvoiceSummary({
   const [isCreatedInvoice, setIsCreatedInvoice] = useState(false);
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false); // 👈 notun state
+  const [isDownloading, setIsDownloading] = useState(false);
   const iframeRef = useRef(null);
+  const thermalIframeRef = useRef(null); // ✅ hidden iframe for thermal (USB) print
 
   const pageFormat = storedata?.settings?.printMode === "a5" ? "a5" : "a4";
-
-  const [isBtPrinting, setIsBtPrinting] = useState(false);
-
-  const buildGstBreakdown = () => invoiceCalculations?.gstBreakdown || {};
-
-  const handleBluetoothPrint = async () => {
-    if (!isWebBluetoothSupported()) {
-      toast.error(
-        "Bluetooth printing is working only on Chrome/Edge desktop browsers.",
-      );
-      return;
-    }
-    try {
-      setIsBtPrinting(true);
-      if (!isPrinterConnected()) {
-        await connectPrinter();
-      }
-
-      const enrichedItems = cartItems.map((item) => ({
-        ...item,
-        qty: item.qty,
-        baseRate: item.baseRate ?? item.price ?? item.sellingPrice,
-        total: item.total,
-      }));
-
-      await printThermalInvoiceWeb({
-        invoice: {
-          invoiceNumber,
-          invoiceDate: new Date(),
-          customerMobile: formValues?.contactNumber,
-          customerName: formValues?.customerName,
-          type: isGstInvoice ? "gst" : "non-gst",
-          isIgst: false,
-          subTotal: invoiceCalculations?.subtotal,
-          discountTotal: invoiceCalculations?.discountTotal,
-          roundOff: invoiceCalculations?.roundOff,
-          grandTotal:
-            invoiceCalculations?.grandTotal -
-            (invoiceCalculations?.discountTotal || 0),
-          paymentMethod,
-          paymentNote,
-        },
-        paidAmount: payment?.paid ?? 0,
-        dueAmount: payment?.due ?? 0,
-        paymentStatus: payment?.status ?? "unpaid",
-        gstBreakdown: buildGstBreakdown(),
-        enrichedItems,
-        isFreePlan,
-        store: storedata,
-      });
-
-      toast.success("Print sent to Bluetooth printer");
-    } catch (err) {
-      console.error("Bluetooth print error:", err);
-      toast.error(err.message || "Bluetooth print failed");
-    } finally {
-      setIsBtPrinting(false);
-    }
-  };
 
   const buildPreviewHtml = () => {
     const now = new Date();
@@ -182,6 +118,47 @@ export default function InvoiceSummary({
     if (!win) return;
     win.focus();
     win.print();
+  };
+
+  const handleThermalPrint = () => {
+    const now = new Date();
+
+    const html = generateThermalInvoiceHTML({
+      createdInvoice: isCreatedInvoice,
+      invoiceData: { transactions: [], remarks, paymentMethod, paymentNote },
+      formValues,
+      cartItems,
+      invoiceCalculations,
+      invoiceNumber,
+      currentDate: format(now, "dd-MMM-yyyy"),
+      currentTime: format(now, "hh:mm a"),
+      storedata,
+      invoiceDate: now,
+      isGstInvoice,
+      isFreePlan,
+      payment: {
+        paid: payment?.paid ?? 0,
+        due: payment?.due ?? 0,
+        status: payment?.status ?? "unpaid",
+      },
+      paperWidthMM: 80,
+    });
+
+    const iframe = thermalIframeRef.current;
+    if (!iframe) return;
+
+    const doc = iframe.contentDocument || iframe.contentWindow.document;
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    const triggerPrint = () => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    };
+
+    iframe.onload = () => setTimeout(triggerPrint, 150);
+    setTimeout(triggerPrint, 600);
   };
 
   const toDataURL = async (url) => {
@@ -293,8 +270,6 @@ export default function InvoiceSummary({
     URL.revokeObjectURL(url);
   };
 
-  // ── Download button — direct PDF banaye download kore dey,
-  // WhatsApp share-er kono dependency nei (phone number lagbe na) ──────
   const handleDownloadClick = async () => {
     try {
       setIsDownloading(true);
@@ -394,13 +369,17 @@ export default function InvoiceSummary({
         </Button>
       </div>
 
+      {/* ✅ REDESIGNED — bigger dialog, title on its own row, buttons
+          wrap cleanly below, content sits in a gray "viewer" frame like
+          a PDF opened from email/Drive */}
       <Dialog open={previewOpen} onOpenChange={handleModalOpenChange}>
-        <DialogContent className="max-w-3xl w-full h-[85vh] p-0 flex flex-col overflow-hidden">
-          <DialogHeader className="px-4 py-2 border-b shrink-0 flex flex-row items-center justify-between pr-10 space-y-0">
-            <DialogTitle>
+        <DialogContent className="max-w-5xl w-full h-[92vh] p-0 flex flex-col overflow-hidden gap-0">
+          <DialogHeader className="px-5 py-3 border-b shrink-0 space-y-2.5">
+            <DialogTitle className="text-base md:text-lg font-semibold text-slate-800">
               {isCreatedInvoice ? "Invoice Created" : "Invoice Preview"}
             </DialogTitle>
-            <div className="flex gap-2">
+
+            <div className="flex gap-2 flex-wrap">
               <Button
                 size="sm"
                 variant="outline"
@@ -436,24 +415,39 @@ export default function InvoiceSummary({
               <Button
                 size="sm"
                 variant="outline"
-                onClick={handleBluetoothPrint}
-                disabled={isBtPrinting}
+                onClick={handleThermalPrint}
                 className="text-purple-600 border-purple-200 hover:bg-purple-50"
               >
-                {isBtPrinting ? (
-                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                ) : (
-                  <Zap className="w-3.5 h-3.5 mr-1.5" />
-                )}
-                Bluetooth Print
+                <Printer className="w-3.5 h-3.5 mr-1.5" />
+                Thermal Print
               </Button>
             </div>
           </DialogHeader>
+
+          {/* ✅ gray "viewer" frame around the white invoice page */}
+          <div className="flex-1 overflow-auto bg-slate-100 p-4 md:p-6">
+            <div className="mx-auto h-full max-w-[850px] bg-white shadow-md rounded-md overflow-hidden">
+              <iframe
+                ref={iframeRef}
+                title="invoice-preview"
+                srcDoc={previewHtml}
+                className="w-full h-full border-0 bg-white"
+              />
+            </div>
+          </div>
+
+          {/* Hidden iframe — thermal HTML load hoye window.print() call hoy */}
           <iframe
-            ref={iframeRef}
-            title="invoice-preview"
-            srcDoc={previewHtml}
-            className="flex-1 w-full border-0 bg-white"
+            ref={thermalIframeRef}
+            title="thermal-print"
+            style={{
+              position: "fixed",
+              top: "-9999px",
+              left: "-9999px",
+              width: "265px",
+              height: "600px",
+              border: "0",
+            }}
           />
         </DialogContent>
       </Dialog>

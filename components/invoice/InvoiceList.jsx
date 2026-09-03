@@ -54,12 +54,12 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { generateInvoiceHTML } from "../../utils/invoiceTemplate";
+import { generateThermalInvoiceHTML } from "../../utils/generateThermalInvoiceHTML"; // ✅ NEW
 
 const statusStyles = {
   paid: "bg-green-600 text-white",
   partial: "bg-orange-500 text-white",
   unpaid: "bg-red-500 text-white",
-  // ✅ NEW — cancelled invoices get their own neutral badge color
   cancelled: "bg-slate-500 text-white",
 };
 
@@ -105,9 +105,6 @@ export default function InvoiceListPage({
     grandTotal: 0,
   });
 
-  // ✅ NEW — track which invoice is currently open in preview, and its
-  // current status, so the Edit/Cancel buttons in the dialog know what
-  // to act on.
   const [activePreviewId, setActivePreviewId] = useState(null);
   const [activePreviewStatus, setActivePreviewStatus] = useState("active");
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
@@ -116,6 +113,8 @@ export default function InvoiceListPage({
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const iframeRef = useRef(null);
+  const thermalIframeRef = useRef(null); // ✅ NEW — hidden iframe for thermal print
+  const thermalPayloadRef = useRef(null); // ✅ NEW — holds raw data needed to rebuild thermal HTML on demand
 
   const pageFormat = storedata?.settings?.printMode === "a5" ? "a5" : "a4";
 
@@ -169,8 +168,6 @@ export default function InvoiceListPage({
     }
   };
 
-  // ✅ NEW — cancelled invoices show "cancelled" in the status column
-  // regardless of their paymentStatus (paid/partial/unpaid).
   const getDisplayStatus = (inv) =>
     (inv.status || "").toLowerCase() === "cancelled"
       ? "cancelled"
@@ -239,12 +236,11 @@ export default function InvoiceListPage({
 
     try {
       setPreviewLoadingId(inv._id);
-      setActivePreviewId(inv._id); // ✅ NEW
+      setActivePreviewId(inv._id);
 
       const res = await api.get(`/invoice/id/${inv._id}`);
       const doc = res?.data?.data || res?.data || inv;
 
-      // ✅ NEW — remember current status for the Edit/Cancel buttons
       setActivePreviewStatus((doc.status || "active").toLowerCase());
 
       const rawItems = doc.items || doc.cartItems || [];
@@ -385,6 +381,16 @@ export default function InvoiceListPage({
 
       const dateObj = new Date(doc.createdAt || doc.invoiceDate);
 
+      // ✅ NEW — stash everything needed to build the thermal HTML later
+      // (Thermal Print button is clicked on-demand, after preview is open)
+      thermalPayloadRef.current = {
+        doc,
+        cartItems,
+        invoiceCalculations,
+        formValues,
+        dateObj,
+      };
+
       const html = generateInvoiceHTML({
         preview: false,
         createdInvoice: true,
@@ -439,6 +445,64 @@ export default function InvoiceListPage({
     if (!win) return;
     win.focus();
     win.print();
+  };
+
+  // ✅ NEW — Thermal (USB-connected) print, same pattern as InvoiceSummary.js
+  const handleThermalPrint = () => {
+    const payload = thermalPayloadRef.current;
+    if (!payload) {
+      toast.error("Invoice data not ready yet, try again");
+      return;
+    }
+    const { doc, cartItems, invoiceCalculations, formValues, dateObj } =
+      payload;
+
+    const html = generateThermalInvoiceHTML({
+      createdInvoice: true,
+      invoiceData: {
+        transactions: doc.transactions || [],
+        remarks: doc.remarks || "",
+        paymentMethod: doc.paymentMethod,
+        paymentNote: doc.paymentNote,
+        status: doc.status,
+        isIgst: Boolean(doc.isIgst),
+        subTotal: invoiceCalculations.subtotal,
+        discountTotal: invoiceCalculations.discountTotal,
+        roundOff: invoiceCalculations.roundOff,
+        grandTotal: invoiceCalculations.grandTotal,
+      },
+      formValues,
+      cartItems,
+      invoiceCalculations,
+      invoiceNumber: doc.invoiceNumber,
+      currentDate: format(dateObj, "dd-MMM-yyyy"),
+      currentTime: format(dateObj, "hh:mm a"),
+      storedata,
+      invoiceDate: dateObj,
+      isGstInvoice: doc.type === "gst",
+      // ⚠️ ADJUST: pull the real plan flag from storedata if you track it there
+      isFreePlan: storedata?.isFreePlan ?? true,
+      payment: {
+        paid: doc.paidAmount ?? 0,
+        due: doc.dueAmount ?? 0,
+        status: doc.paymentStatus ?? "unpaid",
+      },
+    });
+
+    const iframe = thermalIframeRef.current;
+    if (!iframe) return;
+
+    const idoc = iframe.contentDocument || iframe.contentWindow.document;
+    idoc.open();
+    idoc.write(html);
+    idoc.close();
+
+    const triggerPrint = () => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    };
+    iframe.onload = () => setTimeout(triggerPrint, 150);
+    setTimeout(triggerPrint, 600);
   };
 
   const toDataURL = async (url) => {
@@ -615,16 +679,12 @@ export default function InvoiceListPage({
     }
   };
 
-  // ✅ NEW — jump straight into the edit form (same flow as the row's
-  // "Edit" button) directly from inside the preview dialog.
   const handleEditFromPreview = () => {
     if (!activePreviewId) return;
     setPreviewOpen(false);
     onEditInvoice(activePreviewId);
   };
 
-  // ✅ NEW — Cancel invoice. Opens a confirmation dialog first; the actual
-  // API call happens in handleConfirmCancelInvoice.
   const handleCancelClick = () => {
     setShowCancelConfirm(true);
   };
@@ -633,8 +693,6 @@ export default function InvoiceListPage({
     if (!activePreviewId) return;
     try {
       setIsCancelling(true);
-      // ⚠️ ADJUST: if invoiceSchema.changeInvoiceStatus expects a different
-      // body field name than `status`, update the key below to match.
       await api.put(`/invoice/status/${activePreviewId}`, {
         status: "cancelled",
       });
@@ -902,20 +960,27 @@ export default function InvoiceListPage({
         </div>
       )}
 
+      {/* ✅ REDESIGNED — bigger dialog, title on its own row, buttons
+          wrap cleanly below, content sits in a gray "viewer" frame like
+          a PDF opened from email/Drive */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-3xl w-full h-[85vh] p-0 flex flex-col overflow-hidden">
-          <DialogHeader className="px-4 py-2 border-b shrink-0 flex flex-row items-center justify-between pr-10 space-y-0">
-            <DialogTitle className="flex items-center gap-2">
-              Invoice Preview{" "}
-              {activePreviewNumber ? `#${activePreviewNumber}` : ""}
+        <DialogContent className="max-w-5xl w-full h-[92vh] p-0 flex flex-col overflow-hidden gap-0">
+          <DialogHeader className="px-5 py-3 border-b shrink-0 space-y-2.5">
+            <DialogTitle className="flex items-center gap-2 text-base md:text-lg font-semibold text-slate-800">
+              <span>Invoice Number :</span>
+              {activePreviewNumber && (
+                <span className="text-slate-500 font-normal">
+                  #{activePreviewNumber}
+                </span>
+              )}
               {activePreviewStatus === "cancelled" && (
                 <Badge className="text-[10px] bg-slate-500 text-white">
                   Cancelled
                 </Badge>
               )}
             </DialogTitle>
-            <div className="flex gap-2 flex-wrap justify-end">
-              {/* ✅ NEW — Edit button: closes preview, opens NewInvoiceFormPage in edit mode */}
+
+            <div className="flex gap-2 flex-wrap">
               <Button
                 size="sm"
                 variant="outline"
@@ -926,7 +991,6 @@ export default function InvoiceListPage({
                 Edit
               </Button>
 
-              {/* ✅ NEW — Cancel invoice button */}
               <Button
                 size="sm"
                 variant="outline"
@@ -954,6 +1018,7 @@ export default function InvoiceListPage({
                 )}
                 Download
               </Button>
+
               <Button
                 size="sm"
                 variant="outline"
@@ -968,22 +1033,55 @@ export default function InvoiceListPage({
                 )}
                 WhatsApp
               </Button>
+
               <Button size="sm" variant="outline" onClick={handlePrint}>
                 <Printer className="w-3.5 h-3.5 mr-1.5" />
                 Print
               </Button>
+
+              {/* ✅ NEW — Thermal Print, same as InvoiceSummary.js */}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleThermalPrint}
+                className="text-purple-600 border-purple-200 hover:bg-purple-50"
+              >
+                <Printer className="w-3.5 h-3.5 mr-1.5" />
+                Thermal Print
+              </Button>
             </div>
           </DialogHeader>
+
+          {/* ✅ NEW — gray "viewer" frame around the white invoice page,
+              like a PDF opened from an email attachment */}
+          <div className="flex-1 overflow-auto bg-slate-100 p-4 md:p-6">
+            <div className="mx-auto h-full max-w-[850px] bg-white shadow-md rounded-md overflow-hidden">
+              <iframe
+                ref={iframeRef}
+                title="invoice-preview"
+                srcDoc={previewHtml}
+                className="w-full h-full border-0 bg-white"
+              />
+            </div>
+          </div>
+
+          {/* ✅ NEW — hidden iframe for thermal (USB) print */}
           <iframe
-            ref={iframeRef}
-            title="invoice-preview"
-            srcDoc={previewHtml}
-            className="flex-1 w-full border-0 bg-white"
+            ref={thermalIframeRef}
+            title="thermal-print"
+            style={{
+              position: "fixed",
+              top: "-9999px",
+              left: "-9999px",
+              width: "265px",
+              height: "600px",
+              border: "0",
+            }}
           />
         </DialogContent>
       </Dialog>
 
-      {/* ✅ NEW — Cancel confirmation dialog */}
+      {/* Cancel confirmation dialog */}
       <AlertDialog open={showCancelConfirm} onOpenChange={setShowCancelConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -36,7 +36,7 @@ export default function PurchaseSummary({
   const [isCreatedPurchase, setIsCreatedPurchase] = useState(false);
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false); // 👈 notun state
+  const [isDownloading, setIsDownloading] = useState(false);
   const iframeRef = useRef(null);
 
   const pageFormat = storedata?.settings?.printMode === "a5" ? "a5" : "a4";
@@ -317,13 +317,15 @@ export default function PurchaseSummary({
         </Button>
       </div>
 
+      {/* ✅ REDESIGNED — same larger dialog + gray viewer frame as Invoice */}
       <Dialog open={previewOpen} onOpenChange={handleModalOpenChange}>
-        <DialogContent className="max-w-3xl w-full h-[85vh] p-0 flex flex-col overflow-hidden">
-          <DialogHeader className="px-4 py-2 border-b shrink-0 flex flex-row items-center justify-between pr-10 space-y-0">
-            <DialogTitle>
+        <DialogContent className="max-w-5xl w-full h-[92vh] p-0 flex flex-col overflow-hidden gap-0">
+          <DialogHeader className="px-5 py-3 border-b shrink-0 space-y-2.5">
+            <DialogTitle className="text-base md:text-lg font-semibold text-slate-800">
               {isCreatedPurchase ? "Purchase Created" : "Purchase Preview"}
             </DialogTitle>
-            <div className="flex gap-2">
+
+            <div className="flex gap-2 flex-wrap">
               <Button
                 size="sm"
                 variant="outline"
@@ -358,12 +360,17 @@ export default function PurchaseSummary({
               </Button>
             </div>
           </DialogHeader>
-          <iframe
-            ref={iframeRef}
-            title="purchase-preview"
-            srcDoc={previewHtml}
-            className="flex-1 w-full border-0 bg-white"
-          />
+
+          <div className="flex-1 overflow-auto bg-slate-100 p-4 md:p-6">
+            <div className="mx-auto h-full max-w-[850px] bg-white shadow-md rounded-md overflow-hidden">
+              <iframe
+                ref={iframeRef}
+                title="purchase-preview"
+                srcDoc={previewHtml}
+                className="w-full h-full border-0 bg-white"
+              />
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

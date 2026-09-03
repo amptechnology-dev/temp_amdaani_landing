@@ -58,7 +58,6 @@ const statusStyles = {
   paid: "bg-green-600 hover:bg-green-600 text-white",
   partial: "bg-orange-500 hover:bg-orange-500 text-white",
   unpaid: "bg-red-500 hover:bg-red-500 text-white",
-  // ✅ NEW — cancelled purchases get their own neutral badge color
   cancelled: "bg-slate-500 hover:bg-slate-500 text-white",
 };
 
@@ -94,9 +93,6 @@ export default function PurchaseListPage({
     grandTotal: 0,
   });
 
-  // ✅ NEW — track which purchase is currently open in preview, and its
-  // current status, so the Edit/Cancel buttons in the dialog know what
-  // to act on.
   const [activePreviewId, setActivePreviewId] = useState(null);
   const [activePreviewStatus, setActivePreviewStatus] = useState("active");
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
@@ -158,8 +154,6 @@ export default function PurchaseListPage({
     }
   };
 
-  // ✅ NEW — cancelled purchases show "cancelled" in the status column
-  // regardless of their paymentStatus (paid/partial/unpaid).
   const getDisplayStatus = (p) =>
     (p.status || "").toLowerCase() === "cancelled"
       ? "cancelled"
@@ -243,12 +237,11 @@ export default function PurchaseListPage({
 
     try {
       setPreviewLoadingId(p._id);
-      setActivePreviewId(p._id); // ✅ NEW
+      setActivePreviewId(p._id);
 
       const res = await api.get(`/purchase/id/${p._id}`);
       const doc = res?.data?.data || res?.data || p;
 
-      // ✅ NEW — remember current status for the Edit/Cancel buttons
       setActivePreviewStatus((doc.status || "active").toLowerCase());
 
       const rawItems = doc.items || doc.cartItems || [];
@@ -580,16 +573,12 @@ export default function PurchaseListPage({
     }
   };
 
-  // ✅ NEW — jump straight into the edit form (same flow as the row's
-  // "Edit" button) directly from inside the preview dialog.
   const handleEditFromPreview = () => {
     if (!activePreviewId) return;
     setPreviewOpen(false);
     onEditPurchase(activePreviewId);
   };
 
-  // ✅ NEW — Cancel purchase. Opens a confirmation dialog first; the actual
-  // API call happens in handleConfirmCancelPurchase.
   const handleCancelClick = () => {
     setShowCancelConfirm(true);
   };
@@ -598,8 +587,6 @@ export default function PurchaseListPage({
     if (!activePreviewId) return;
     try {
       setIsCancelling(true);
-      // ⚠️ ADJUST: if your purchase status-change schema expects a different
-      // body field name than `status`, update the key below to match.
       await api.put(`/purchase/status/${activePreviewId}`, {
         status: "cancelled",
       });
@@ -865,21 +852,25 @@ export default function PurchaseListPage({
         </div>
       )}
 
-      {/* Preview Dialog */}
+      {/* ✅ REDESIGNED — same larger dialog + gray viewer frame as InvoiceListPage */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-3xl w-full h-[85vh] p-0 flex flex-col overflow-hidden">
-          <DialogHeader className="px-4 py-2 border-b shrink-0 flex flex-row items-center justify-between pr-10 space-y-0">
-            <DialogTitle className="flex items-center gap-2">
-              Purchase Preview{" "}
-              {activePreviewNumber ? `#${activePreviewNumber}` : ""}
+        <DialogContent className="max-w-5xl w-full h-[92vh] p-0 flex flex-col overflow-hidden gap-0">
+          <DialogHeader className="px-5 py-3 border-b shrink-0 space-y-2.5">
+            <DialogTitle className="flex items-center gap-2 text-base md:text-lg font-semibold text-slate-800">
+              <span>Purchase Number :</span>
+              {activePreviewNumber && (
+                <span className="text-slate-500 font-normal">
+                  #{activePreviewNumber}
+                </span>
+              )}
               {activePreviewStatus === "cancelled" && (
                 <Badge className="text-[10px] bg-slate-500 text-white">
                   Cancelled
                 </Badge>
               )}
             </DialogTitle>
-            <div className="flex gap-2 flex-wrap justify-end">
-              {/* ✅ NEW — Edit button: closes preview, opens NewPurchaseFormPage in edit mode */}
+
+            <div className="flex gap-2 flex-wrap">
               <Button
                 size="sm"
                 variant="outline"
@@ -890,7 +881,6 @@ export default function PurchaseListPage({
                 Edit
               </Button>
 
-              {/* ✅ NEW — Cancel purchase button */}
               <Button
                 size="sm"
                 variant="outline"
@@ -938,16 +928,21 @@ export default function PurchaseListPage({
               </Button>
             </div>
           </DialogHeader>
-          <iframe
-            ref={iframeRef}
-            title="purchase-preview"
-            srcDoc={previewHtml}
-            className="flex-1 w-full border-0 bg-white"
-          />
+
+          <div className="flex-1 overflow-auto bg-slate-100 p-4 md:p-6">
+            <div className="mx-auto h-full max-w-[850px] bg-white shadow-md rounded-md overflow-hidden">
+              <iframe
+                ref={iframeRef}
+                title="purchase-preview"
+                srcDoc={previewHtml}
+                className="w-full h-full border-0 bg-white"
+              />
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
-      {/* ✅ NEW — Cancel confirmation dialog */}
+      {/* Cancel confirmation dialog */}
       <AlertDialog open={showCancelConfirm} onOpenChange={setShowCancelConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
