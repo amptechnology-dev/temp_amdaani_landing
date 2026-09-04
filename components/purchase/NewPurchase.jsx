@@ -39,8 +39,8 @@ export default function PurchaseFlow() {
   const [cartItems, setCartItems] = useState([]);
 
   const [discount, setDiscount] = useState({ type: "flat", value: 0 });
-  const [paymentMethod] = useState("cash");
-  const [paymentNote] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [paymentNote, setPaymentNote] = useState("");
   const [paidAmount, setPaidAmount] = useState(0);
   const hasUserEditedPaid = useRef(false);
 
@@ -606,7 +606,11 @@ export default function PurchaseFlow() {
       onPurchaseModalClose={handlePurchaseModalClose}
       invoiceCalculations={invoiceCalculations}
       paymentMethod={paymentMethod}
+      setPaymentMethod={setPaymentMethod}
       paymentNote={paymentNote}
+      setPaymentNote={setPaymentNote}
+      paidAmount={paidAmount}
+      setPaidAmount={setPaidAmount}
       payment={payment}
       handleCreatePurchase={handleCreatePurchase}
       isSubmitting={isSubmitting}

@@ -21,6 +21,14 @@ import {
   Trash2,
   Pencil,
   PackageSearch,
+  Banknote,
+  QrCode,
+  CreditCard,
+  Landmark,
+  Receipt,
+  MessageSquareText,
+  ChevronRight,
+  Check,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,6 +37,331 @@ import { format } from "date-fns";
 
 import InvoiceSummary from "./InvoiceSummary";
 import AddItemFormModal from "./AddItemFormModal";
+
+// -------------------------------
+// Payment method options — mirrors the React Native PaymentMethodBottomSheet
+// -------------------------------
+const PAYMENT_OPTIONS = [
+  { label: "Cash", value: "cash", icon: Banknote },
+  { label: "UPI", value: "upi", icon: QrCode },
+  { label: "Card", value: "card", icon: CreditCard },
+  { label: "Bank Transfer", value: "bank_transfer", icon: Landmark },
+  { label: "Cheque", value: "cheque", icon: Receipt },
+];
+
+const getReferenceLabel = (method) => {
+  switch (method) {
+    case "upi":
+      return "UPI ID / Transaction Reference";
+    case "card":
+      return "Card Last 4 Digits / Transaction ID";
+    case "bank_transfer":
+      return "Bank Transaction / Reference No.";
+    case "cheque":
+      return "Cheque Number";
+    default:
+      return "Reference / Transaction ID";
+  }
+};
+
+const getReferencePlaceholder = (method) => {
+  switch (method) {
+    case "upi":
+      return "e.g., user@upi or TXN123456";
+    case "card":
+      return "e.g., 9876 or POS1234";
+    case "bank_transfer":
+      return "e.g., NEFT123456 or IMPS987654";
+    case "cheque":
+      return "e.g., CHQ123456";
+    default:
+      return "Enter reference number";
+  }
+};
+
+// -------------------------------
+// Payment method modal — web equivalent of the RN bottom sheet,
+// plus Full / Partial payment support baked in.
+// Partial payment is disabled when no customer is selected.
+// -------------------------------
+function PaymentMethodModal({
+  open,
+  onClose,
+  paymentMethod,
+  setPaymentMethod,
+  paymentNote,
+  setPaymentNote,
+  paidAmount,
+  setPaidAmount,
+  grandTotal,
+  hasCustomer,
+}) {
+  const [localMethod, setLocalMethod] = useState(paymentMethod || "cash");
+  const [localNote, setLocalNote] = useState(paymentNote || "");
+  const [localPaidType, setLocalPaidType] = useState("full");
+  const [localPaidAmount, setLocalPaidAmount] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    setLocalMethod(paymentMethod || "cash");
+    setLocalNote(paymentNote || "");
+    const isPartial =
+      Number(paidAmount || 0) > 0 && Number(paidAmount || 0) < grandTotal;
+    // Force Full when no customer is selected, even if it was partial before
+    setLocalPaidType(isPartial && hasCustomer ? "partial" : "full");
+    setLocalPaidAmount(isPartial && hasCustomer ? String(paidAmount) : "");
+  }, [open, paymentMethod, paymentNote, paidAmount, grandTotal, hasCustomer]);
+
+  if (!open) return null;
+
+  const handlePaidAmountChange = (e) => {
+    let v = e.target.value.replace(/[^\d.]/g, "");
+    const parts = v.split(".");
+    if (parts.length > 2) v = parts[0] + "." + parts.slice(1).join("");
+    setLocalPaidAmount(v);
+  };
+
+  const due = Math.max(
+    grandTotal -
+      (localPaidType === "full" ? grandTotal : Number(localPaidAmount || 0)),
+    0,
+  );
+
+  const handleDone = () => {
+    setPaymentMethod(localMethod);
+    setPaymentNote(localMethod === "cash" ? "" : localNote.trim());
+    const effectivePaidType = hasCustomer ? localPaidType : "full";
+    setPaidAmount(
+      effectivePaidType === "full"
+        ? grandTotal
+        : Math.min(Number(localPaidAmount || 0), grandTotal),
+    );
+    onClose();
+  };
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden max-h-[90vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 shrink-0">
+          <h3 className="text-sm font-semibold text-slate-800">
+            Select Payment Method
+          </h3>
+          <button
+            onClick={onClose}
+            className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-4 overflow-y-auto space-y-4">
+          <div className="space-y-1">
+            {PAYMENT_OPTIONS.map((opt) => {
+              const Icon = opt.icon;
+              const selected = localMethod === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    setLocalMethod(opt.value);
+                    if (opt.value === "cash") setLocalNote("");
+                  }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-colors text-left ${
+                    selected
+                      ? "border-blue-300 bg-blue-50"
+                      : "border-transparent hover:bg-slate-50"
+                  }`}
+                >
+                  <Icon
+                    className={`w-4 h-4 ${
+                      selected ? "text-blue-600" : "text-slate-400"
+                    }`}
+                  />
+                  <span
+                    className={`flex-1 text-sm ${
+                      selected
+                        ? "font-semibold text-blue-700"
+                        : "text-slate-700"
+                    }`}
+                  >
+                    {opt.label}
+                  </span>
+                  {selected && <Check className="w-4 h-4 text-blue-600" />}
+                </button>
+              );
+            })}
+          </div>
+
+          {localMethod !== "cash" && (
+            <div>
+              <label className="text-[11px] font-medium text-slate-500 mb-1 block">
+                {getReferenceLabel(localMethod)}
+              </label>
+              <input
+                value={localNote}
+                onChange={(e) => setLocalNote(e.target.value)}
+                placeholder={getReferencePlaceholder(localMethod)}
+                autoCapitalize="none"
+                autoCorrect="off"
+                className="w-full h-9 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-white"
+              />
+            </div>
+          )}
+
+          <div>
+            <label className="text-[11px] font-medium text-slate-500 mb-1.5 block">
+              Payment Status
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setLocalPaidType("full")}
+                className={`h-9 rounded-lg text-xs font-semibold border transition-colors ${
+                  localPaidType === "full"
+                    ? "bg-blue-600 border-blue-600 text-white"
+                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                Full Paid
+              </button>
+              <button
+                type="button"
+                disabled={!hasCustomer}
+                onClick={() => hasCustomer && setLocalPaidType("partial")}
+                title={
+                  !hasCustomer
+                    ? "Select a customer to enable partial payment"
+                    : undefined
+                }
+                className={`h-9 rounded-lg text-xs font-semibold border transition-colors ${
+                  !hasCustomer
+                    ? "border-slate-100 text-slate-300 bg-slate-50 cursor-not-allowed"
+                    : localPaidType === "partial"
+                      ? "bg-blue-600 border-blue-600 text-white"
+                      : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                Partial Payment
+              </button>
+            </div>
+
+            {!hasCustomer && (
+              <p className="text-[11px] text-amber-600 mt-1.5">
+                Select a customer to allow partial payment.
+              </p>
+            )}
+
+            {localPaidType === "partial" && hasCustomer && (
+              <div className="mt-3">
+                <label className="text-[11px] font-medium text-slate-500 mb-1 block">
+                  Amount Paid Now
+                </label>
+                <input
+                  value={localPaidAmount}
+                  onChange={handlePaidAmountChange}
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  className="w-full h-9 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-white"
+                />
+                <div className="flex items-center justify-between mt-2 text-[11px]">
+                  <span className="text-slate-400">
+                    Grand Total: ₹{grandTotal.toFixed(2)}
+                  </span>
+                  <span className="font-semibold text-rose-500">
+                    Due: ₹{due.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex gap-2 px-4 py-3 border-t border-slate-100 bg-slate-50 shrink-0">
+          <Button variant="outline" onClick={onClose} className="flex-1 rounded-lg">
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDone}
+            className="flex-1 rounded-lg bg-blue-600 hover:bg-blue-700"
+          >
+            Done
+          </Button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+// -------------------------------
+// Remarks modal — web equivalent of AddInvoiceRemarksBottomSheet
+// -------------------------------
+function RemarksModal({ open, onClose, remarks, setRemarks }) {
+  const [localRemarks, setLocalRemarks] = useState(remarks || "");
+
+  useEffect(() => {
+    if (open) setLocalRemarks(remarks || "");
+  }, [open, remarks]);
+
+  if (!open) return null;
+
+  const handleSave = () => {
+    setRemarks(localRemarks.trim());
+    onClose();
+  };
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+          <h3 className="text-sm font-semibold text-slate-800">Invoice Remarks</h3>
+          <button
+            onClick={onClose}
+            className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-4">
+          <textarea
+            value={localRemarks}
+            onChange={(e) => setLocalRemarks(e.target.value)}
+            rows={5}
+            placeholder="Add any notes for this invoice…"
+            className="w-full text-sm border border-slate-200 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-white resize-none"
+          />
+        </div>
+
+        <div className="flex gap-2 px-4 py-3 border-t border-slate-100 bg-slate-50">
+          <Button variant="outline" onClick={onClose} className="flex-1 rounded-lg">
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSave}
+            className="flex-1 rounded-lg bg-blue-600 hover:bg-blue-700"
+          >
+            Save Remarks
+          </Button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
 
 // -------------------------------
 // Inline product combobox for the "add row" — portal based dropdown,
@@ -311,6 +644,10 @@ export default function NewInvoiceFormPage({
   const customerGridRef = useRef(null);
   const [editingCartItem, setEditingCartItem] = useState(null);
 
+  // Payment / Remarks modals
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [remarksModalOpen, setRemarksModalOpen] = useState(false);
+
   useEffect(() => {
     const onClickOutside = (e) => {
       if (
@@ -552,6 +889,28 @@ export default function NewInvoiceFormPage({
     const perUnitDiscount = Number(item.discountInRupees ?? 0);
     return sum + perUnitDiscount * qty;
   }, 0);
+
+  const grandTotal =
+    Number(invoiceCalculations.subtotal || 0) -
+    Number(invoiceCalculations.discountTotal || 0);
+
+  // ✅ Whether a customer has actually been entered/selected
+  const hasCustomer = Boolean(
+    (customerForm.name && customerForm.name.trim()) ||
+      (customerForm.mobile && customerForm.mobile.trim()),
+  );
+
+  // ✅ If customer gets cleared while a partial payment was set, force it back to full
+  useEffect(() => {
+    if (!hasCustomer && Number(paidAmount) > 0 && Number(paidAmount) < grandTotal) {
+      setPaidAmount(grandTotal);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasCustomer]);
+
+  const selectedPaymentOption =
+    PAYMENT_OPTIONS.find((p) => p.value === paymentMethod) || PAYMENT_OPTIONS[0];
+  const SelectedPaymentIcon = selectedPaymentOption.icon;
 
   const toggleOrderDiscountType = () => {
     setDiscount((prev) => ({
@@ -977,99 +1336,154 @@ export default function NewInvoiceFormPage({
 
             {cartItems.length > 0 && (
               <>
-                {/* ✅ Order Summary — Qty, Price, GST, Discount box, Grand Total */}
+                {/* Payment / Remarks quick actions + compact totals card (right side) */}
                 <div className="border-t border-slate-100 bg-gradient-to-br from-slate-50 to-blue-50/40 px-4 py-4">
-                  <div className="flex flex-wrap items-stretch gap-3">
-                    <div className="bg-white rounded-xl border border-slate-200 px-3 py-2.5 shadow-sm min-w-[110px] flex-1">
-                      <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium mb-1">
-                        <Hash className="w-3 h-3" />
-                        Total Quantity
-                      </div>
-                      <p className="text-sm font-bold text-slate-800">
-                        {invoiceCalculations.totalQuantity}
-                      </p>
-                    </div>
-
-                    <div className="bg-white rounded-xl border border-slate-200 px-3 py-2.5 shadow-sm min-w-[110px] flex-1">
-                      <div className="text-[11px] text-slate-400 font-medium mb-1">
-                        Total Price
-                      </div>
-                      <p className="text-sm font-bold text-slate-800">
-                        ₹{Number(invoiceCalculations.subtotal || 0).toFixed(2)}
-                      </p>
-                    </div>
-
-                    <div className="bg-white rounded-xl border border-slate-200 px-3 py-2.5 shadow-sm min-w-[110px] flex-1">
-                      <div className="text-[11px] text-slate-400 font-medium mb-1">
-                        Total GST
-                      </div>
-                      <p className="text-sm font-bold text-slate-800">
-                        ₹{Number(invoiceCalculations.totalTax || 0).toFixed(2)}
-                      </p>
-                    </div>
-
-                    {/* Right side — square discount box */}
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm w-[150px] shrink-0 flex flex-col justify-between p-2.5">
-                      <div className="pb-2 border-b border-slate-100">
-                        <div className="text-[10px] text-slate-400 font-medium mb-0.5">
-                          Total Discount
+                  <div className="flex flex-col lg:flex-row lg:justify-end gap-3">
+                    {/* Left: Payment + Remarks quick actions */}
+                    <div className="flex-1 lg:max-w-sm space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => setPaymentModalOpen(true)}
+                        className="w-full flex items-center justify-between gap-2 bg-white rounded-xl border border-slate-200 shadow-sm px-3 py-2.5 hover:border-blue-300 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                            <SelectedPaymentIcon className="w-4 h-4 text-blue-600" />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-[11px] text-slate-400 font-medium">
+                              Payment Method
+                            </p>
+                            <p className="text-xs font-semibold text-slate-800 truncate">
+                              {selectedPaymentOption.label}
+                              {Number(paidAmount) > 0 &&
+                                Number(paidAmount) < grandTotal && (
+                                  <span className="ml-1 text-amber-600 font-medium">
+                                    · Partial
+                                  </span>
+                                )}
+                            </p>
+                          </div>
                         </div>
-                        <p className="text-sm font-bold text-slate-700">
-                          ₹{productDiscountTotal.toFixed(2)}
-                        </p>
-                      </div>
-                      <div className="pt-2">
-                        <div className="flex items-center gap-1 text-[10px] text-slate-400 font-medium mb-0.5">
-                          <Percent className="w-2.5 h-2.5" />
-                          Extra Discount
+                        <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setRemarksModalOpen(true)}
+                        className="w-full flex items-center justify-between gap-2 bg-white rounded-xl border border-slate-200 shadow-sm px-3 py-2.5 hover:border-blue-300 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                            <MessageSquareText className="w-4 h-4 text-blue-600" />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-[11px] text-slate-400 font-medium">
+                              Remarks
+                            </p>
+                            <p className="text-xs font-semibold text-slate-800 truncate">
+                              {remarks?.trim() ? remarks : "Add remarks (optional)"}
+                            </p>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            value={discount?.value ?? 0}
-                            onChange={handleOrderDiscountChange}
-                            onBlur={handleOrderDiscountBlur}
-                            className="w-full h-6 text-xs font-bold text-slate-800 px-1 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          />
-                          <button
-                            type="button"
-                            onClick={toggleOrderDiscountType}
-                            title="Toggle discount type"
-                            className="w-6 h-6 shrink-0 flex items-center justify-center rounded border border-slate-200 text-[9px] font-bold text-slate-600 hover:bg-slate-50"
-                          >
-                            {discount?.type === "percent" ? (
-                              <Percent className="w-2.5 h-2.5" />
-                            ) : (
-                              "₹"
-                            )}
-                          </button>
-                        </div>
-                      </div>
+                        <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
+                      </button>
                     </div>
 
-                    <div className="bg-blue-600 rounded-xl px-3 py-2.5 shadow-sm shadow-blue-200 w-[150px] shrink-0 flex flex-col justify-center">
-                      <div className="text-[11px] text-blue-100 font-medium mb-1">
-                        Grand Total
+                    {/* Right: compact totals card */}
+                    <div className="w-full lg:w-72 shrink-0 bg-white rounded-xl border border-slate-200 shadow-sm p-3.5">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-400">Total Qty</span>
+                          <span className="font-semibold text-slate-700">
+                            {invoiceCalculations.totalQuantity}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-400">Subtotal</span>
+                          <span className="font-semibold text-slate-700">
+                            ₹{Number(invoiceCalculations.subtotal || 0).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-400">GST</span>
+                          <span className="font-semibold text-slate-700">
+                            ₹{Number(invoiceCalculations.totalTax || 0).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-400">Item Discount</span>
+                          <span className="font-semibold text-slate-700">
+                            ₹{productDiscountTotal.toFixed(2)}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-100">
+                          <span className="text-slate-400 flex items-center gap-1">
+                            <Percent className="w-2.5 h-2.5" /> Extra Discount
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={discount?.value ?? 0}
+                              onChange={handleOrderDiscountChange}
+                              onBlur={handleOrderDiscountBlur}
+                              className="w-14 h-6 text-xs text-right font-semibold text-slate-800 px-1 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                            <button
+                              type="button"
+                              onClick={toggleOrderDiscountType}
+                              title="Toggle discount type"
+                              className="w-6 h-6 shrink-0 flex items-center justify-center rounded border border-slate-200 text-[9px] font-bold text-slate-600 hover:bg-slate-50"
+                            >
+                              {discount?.type === "percent" ? (
+                                <Percent className="w-2.5 h-2.5" />
+                              ) : (
+                                "₹"
+                              )}
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-base font-bold text-white">
-                        ₹
-                        {(
-                          Number(invoiceCalculations.subtotal || 0) -
-                          Number(invoiceCalculations.discountTotal || 0)
-                        ).toFixed(2)}
-                      </p>
+
+                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-dashed border-slate-200">
+                        <span className="text-xs font-semibold text-slate-500">
+                          Grand Total
+                        </span>
+                        <span className="text-base font-bold text-blue-600">
+                          ₹{grandTotal.toFixed(2)}
+                        </span>
+                      </div>
+
+                      {Number(paidAmount) > 0 && (
+                        <div className="flex items-center justify-between mt-1.5 text-[11px]">
+                          <span className="text-emerald-600 font-medium">Paid</span>
+                          <span className="font-semibold text-emerald-600">
+                            ₹{Number(paidAmount).toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+                      {Number(paidAmount) > 0 &&
+                        Number(paidAmount) < grandTotal && (
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-rose-500 font-medium">Due</span>
+                            <span className="font-semibold text-rose-500">
+                              ₹{(grandTotal - Number(paidAmount)).toFixed(2)}
+                            </span>
+                          </div>
+                        )}
                     </div>
                   </div>
-                </div>
 
-                <div className="flex justify-end px-3 py-2 border-t border-slate-100">
-                  <button
-                    onClick={handleClearCart}
-                    className="text-xs font-medium text-rose-500 hover:text-rose-600"
-                  >
-                    Clear all items
-                  </button>
+                  <div className="flex justify-end mt-3">
+                    <button
+                      onClick={handleClearCart}
+                      className="text-xs font-medium text-rose-500 hover:text-rose-600"
+                    >
+                      Clear all items
+                    </button>
+                  </div>
                 </div>
               </>
             )}
@@ -1124,6 +1538,26 @@ export default function NewInvoiceFormPage({
             handleNewProductCreated(savedItem);
           }
         }}
+      />
+
+      <PaymentMethodModal
+        open={paymentModalOpen}
+        onClose={() => setPaymentModalOpen(false)}
+        paymentMethod={paymentMethod}
+        setPaymentMethod={setPaymentMethod}
+        paymentNote={paymentNote}
+        setPaymentNote={setPaymentNote}
+        paidAmount={paidAmount}
+        setPaidAmount={setPaidAmount}
+        grandTotal={grandTotal}
+        hasCustomer={hasCustomer}
+      />
+
+      <RemarksModal
+        open={remarksModalOpen}
+        onClose={() => setRemarksModalOpen(false)}
+        remarks={remarks}
+        setRemarks={setRemarks}
       />
     </div>
   );
