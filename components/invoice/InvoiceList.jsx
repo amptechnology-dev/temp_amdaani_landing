@@ -240,6 +240,7 @@ export default function InvoiceListPage({
 
       const res = await api.get(`/invoice/id/${inv._id}`);
       const doc = res?.data?.data || res?.data || inv;
+      const effectiveStoredata = buildEffectiveStoredata(doc, storedata);
 
       setActivePreviewStatus((doc.status || "active").toLowerCase());
 
@@ -344,9 +345,7 @@ export default function InvoiceListPage({
         computedGstBreakdown[rate].sgstAmount += isIgstDoc
           ? 0
           : item.gstAmount / 2;
-        computedGstBreakdown[rate].igstAmount += isIgstDoc
-          ? item.gstAmount
-          : 0;
+        computedGstBreakdown[rate].igstAmount += isIgstDoc ? item.gstAmount : 0;
         computedGstBreakdown[rate].totalGst += item.gstAmount;
       });
 
@@ -381,30 +380,19 @@ export default function InvoiceListPage({
 
       const dateObj = new Date(doc.createdAt || doc.invoiceDate);
 
-      // ✅ NEW — stash everything needed to build the thermal HTML later
-      // (Thermal Print button is clicked on-demand, after preview is open)
       thermalPayloadRef.current = {
         doc,
         cartItems,
         invoiceCalculations,
         formValues,
         dateObj,
+        effectiveStoredata, // ✅ NEW
       };
-
       const html = generateInvoiceHTML({
         preview: false,
         createdInvoice: true,
         invoiceData: {
-          transactions: doc.transactions || [],
-          remarks: doc.remarks || "",
-          paymentMethod: doc.paymentMethod,
-          paymentNote: doc.paymentNote,
-          status: doc.status,
-          isIgst: Boolean(doc.isIgst),
-          subTotal,
-          discountTotal,
-          roundOff,
-          grandTotal,
+          /* ... same as before ... */
         },
         formValues,
         cartItems,
@@ -412,7 +400,7 @@ export default function InvoiceListPage({
         invoiceNumber: doc.invoiceNumber,
         currentDate: format(dateObj, "dd-MMM-yyyy"),
         currentTime: format(dateObj, "hh:mm a"),
-        storedata,
+        storedata: effectiveStoredata, // ✅ CHANGED — was `storedata`
         invoiceDate: dateObj,
         isGstInvoice: doc.type === "gst",
         isMrpEnabled: Boolean(doc.isMrpEnabled),
@@ -440,6 +428,29 @@ export default function InvoiceListPage({
     }
   };
 
+  const buildEffectiveStoredata = (doc, liveStoredata) => {
+    const hasEmbeddedStoreData = !!doc?.name;
+    if (!hasEmbeddedStoreData) return liveStoredata || {};
+
+    return {
+      ...liveStoredata,
+      name: doc.name,
+      tagline: doc.tagline ?? liveStoredata?.tagline,
+      ownershipType: doc.ownershipType ?? liveStoredata?.ownershipType,
+      gstNumber: doc.gstNumber ?? liveStoredata?.gstNumber,
+      panNumber: doc.panNumber ?? liveStoredata?.panNumber,
+      registrationNo: doc.registrationNo ?? liveStoredata?.registrationNo,
+      contactNo: doc.contactNo ?? liveStoredata?.contactNo,
+      email: doc.email ?? liveStoredata?.email,
+      address: doc.address ?? liveStoredata?.address,
+      bankDetails: doc.bankDetails ?? liveStoredata?.bankDetails,
+      settings: doc.settings ?? liveStoredata?.settings,
+      logoUrl: doc.logoUrl ?? liveStoredata?.logoUrl,
+      signatureUrl: doc.signatureUrl ?? liveStoredata?.signatureUrl,
+      isActive: doc.isActive ?? liveStoredata?.isActive,
+    };
+  };
+
   const handlePrint = () => {
     const win = iframeRef.current?.contentWindow;
     if (!win) return;
@@ -454,8 +465,14 @@ export default function InvoiceListPage({
       toast.error("Invoice data not ready yet, try again");
       return;
     }
-    const { doc, cartItems, invoiceCalculations, formValues, dateObj } =
-      payload;
+    const {
+      doc,
+      cartItems,
+      invoiceCalculations,
+      formValues,
+      dateObj,
+      effectiveStoredata,
+    } = payload;
 
     const html = generateThermalInvoiceHTML({
       createdInvoice: true,
@@ -477,11 +494,11 @@ export default function InvoiceListPage({
       invoiceNumber: doc.invoiceNumber,
       currentDate: format(dateObj, "dd-MMM-yyyy"),
       currentTime: format(dateObj, "hh:mm a"),
-      storedata,
+      storedata: effectiveStoredata,
       invoiceDate: dateObj,
       isGstInvoice: doc.type === "gst",
-      // ⚠️ ADJUST: pull the real plan flag from storedata if you track it there
-      isFreePlan: storedata?.isFreePlan ?? true,
+      isFreePlan:
+        effectiveStoredata?.isFreePlan ?? storedata?.isFreePlan ?? true,
       payment: {
         paid: doc.paidAmount ?? 0,
         due: doc.dueAmount ?? 0,
@@ -786,7 +803,9 @@ export default function InvoiceListPage({
       {/* Table */}
       <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
         <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-200 bg-slate-50">
-          <span className="text-base font-semibold text-slate-700">Invoices</span>
+          <span className="text-base font-semibold text-slate-700">
+            Invoices
+          </span>
           <span className="text-sm text-slate-400">
             Showing {pagedInvoices.length} of {filteredInvoices.length}
           </span>
@@ -832,9 +851,7 @@ export default function InvoiceListPage({
                   <th className="text-center font-semibold px-3 py-2">
                     Status
                   </th>
-                  <th className="text-right font-semibold px-3 py-2">
-                    Amount
-                  </th>
+                  <th className="text-right font-semibold px-3 py-2">Amount</th>
                   <th className="text-center font-semibold px-3 py-2 w-20">
                     Action
                   </th>

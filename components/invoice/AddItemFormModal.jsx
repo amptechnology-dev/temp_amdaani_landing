@@ -822,6 +822,100 @@ function HsnCodeSection({ value, gstRate, onHsnSelect }) {
   );
 }
 
+function UnitSection({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return UNITS;
+    const q = search.toLowerCase();
+    return UNITS.filter(
+      (u) =>
+        u.name.toLowerCase().includes(q) || u.symbol.toLowerCase().includes(q),
+    );
+  }, [search]);
+
+  const selectedUnit = UNITS.find((u) => u.name === value);
+
+  const handleSelect = (u) => {
+    onChange(u.name);
+    setOpen(false);
+    setSearch("");
+  };
+
+  return (
+    <div>
+      <Label>Unit *</Label>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="mt-0.5 w-full h-9 px-3 rounded-md border border-slate-200 bg-white flex items-center justify-between text-sm hover:bg-slate-50"
+          >
+            <span
+              className={`text-xs ${selectedUnit ? "text-slate-800" : "text-slate-400"}`}
+            >
+              {selectedUnit
+                ? `${selectedUnit.name} (${selectedUnit.symbol})`
+                : "Select unit"}
+            </span>
+            <ChevronDown className="w-4 h-4 text-slate-400" />
+          </button>
+        </PopoverTrigger>
+
+        <PopoverContent className="w-72 p-0" align="start">
+          <div className="p-2 border-b border-slate-100">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <Input
+                autoFocus
+                placeholder="Search unit..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-9 pl-8"
+              />
+            </div>
+          </div>
+
+          <div className="max-h-64 overflow-y-auto p-1">
+            {filtered.length === 0 ? (
+              <p className="text-center text-sm text-slate-400 py-6">
+                No unit found
+              </p>
+            ) : (
+              filtered.map((u) => {
+                const selected = value === u.name;
+                return (
+                  <div
+                    key={u.name}
+                    onClick={() => handleSelect(u)}
+                    className={`flex items-center justify-between rounded-md px-2.5 py-2 cursor-pointer ${
+                      selected ? "bg-blue-50" : "hover:bg-slate-50"
+                    }`}
+                  >
+                    <span
+                      className={`text-sm ${
+                        selected
+                          ? "text-blue-700 font-medium"
+                          : "text-slate-700"
+                      }`}
+                    >
+                      {u.name}
+                    </span>
+                    <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                      {u.symbol}
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
 // =========================================================
 // Tax Option toggle — simple click-to-switch, no popover
 // =========================================================
@@ -1378,22 +1472,10 @@ export default function AddItemFormModal({
                     </div>
 
                     <div>
-                      <Label>Unit *</Label>
-                      <Select
+                      <UnitSection
                         value={values.unit}
-                        onValueChange={(v) => setFieldValue("unit", v)}
-                      >
-                        <SelectTrigger className="mt-0.5 h-9">
-                          <SelectValue placeholder="Select unit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {UNITS.map((u) => (
-                            <SelectItem key={u.name} value={u.name}>
-                              {u.name} ({u.symbol})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        onChange={(v) => setFieldValue("unit", v)}
+                      />
                       {touched.unit && errors.unit && (
                         <p className="text-xs text-red-500 mt-1">
                           {errors.unit}
@@ -1480,7 +1562,7 @@ export default function AddItemFormModal({
                         onChange={setSelectedPurchaseTaxRate}
                       />
 
-                      <div>
+                      {/* <div>
                         <Label>Discount</Label>
                         <div className="flex gap-2 mt-0.5">
                           <Input
@@ -1533,14 +1615,14 @@ export default function AddItemFormModal({
                                 converted > 0 ? String(converted) : "",
                               );
                             }}
-                            className="flex items-center justify-center w-9 h-9 rounded-full text-[11px] font-semibold border shrink-0 bg-slate-100 text-slate-600 border-slate-200"
+                            className="flex items-center justify-center w-11 h-11 rounded-full text-lg font-bold border shrink-0 bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200 transition-colors"
                           >
                             {values.purchaseDiscountType === "percentage"
                               ? "%"
                               : "₹"}
                           </button>
                         </div>
-                      </div>
+                      </div> */}
                     </div>
 
                     {values.purchasePrice && values.purchaseDiscountPrice ? (
@@ -1637,7 +1719,7 @@ export default function AddItemFormModal({
                                 converted > 0 ? String(converted) : "",
                               );
                             }}
-                            className="flex items-center justify-center w-9 h-9 rounded-full text-[11px] font-semibold border shrink-0 bg-slate-100 text-slate-600 border-slate-200"
+                            className="flex items-center justify-center w-11 h-11 rounded-full text-lg font-bold border shrink-0 bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200 transition-colors"
                           >
                             {values.discountType === "percentage" ? "%" : "₹"}
                           </button>

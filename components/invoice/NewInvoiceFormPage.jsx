@@ -37,6 +37,7 @@ import { format } from "date-fns";
 
 import InvoiceSummary from "./InvoiceSummary";
 import AddItemFormModal from "./AddItemFormModal";
+import indianStatesData from "../../src/assets/data/states.json";
 
 // -------------------------------
 // Payment method options — mirrors the React Native PaymentMethodBottomSheet
@@ -48,6 +49,14 @@ const PAYMENT_OPTIONS = [
   { label: "Bank Transfer", value: "bank_transfer", icon: Landmark },
   { label: "Cheque", value: "cheque", icon: Receipt },
 ];
+
+const QUICK_PAYMENT_OPTIONS = [
+  { label: "Cash", value: "cash", Icon: Banknote },
+  { label: "Bank", value: "bank_transfer", Icon: Landmark },
+  { label: "UPI", value: "upi", Icon: QrCode },
+];
+
+const INDIAN_STATES = indianStatesData?.states || [];
 
 const getReferenceLabel = (method) => {
   switch (method) {
@@ -107,7 +116,6 @@ function PaymentMethodModal({
     setLocalNote(paymentNote || "");
     const isPartial =
       Number(paidAmount || 0) > 0 && Number(paidAmount || 0) < grandTotal;
-    // Force Full when no customer is selected, even if it was partial before
     setLocalPaidType(isPartial && hasCustomer ? "partial" : "full");
     setLocalPaidAmount(isPartial && hasCustomer ? String(paidAmount) : "");
   }, [open, paymentMethod, paymentNote, paidAmount, grandTotal, hasCustomer]);
@@ -284,7 +292,11 @@ function PaymentMethodModal({
         </div>
 
         <div className="flex gap-2 px-4 py-3 border-t border-slate-100 bg-slate-50 shrink-0">
-          <Button variant="outline" onClick={onClose} className="flex-1 rounded-lg">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            className="flex-1 rounded-lg"
+          >
             Cancel
           </Button>
           <Button
@@ -327,7 +339,9 @@ function RemarksModal({ open, onClose, remarks, setRemarks }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-          <h3 className="text-sm font-semibold text-slate-800">Invoice Remarks</h3>
+          <h3 className="text-sm font-semibold text-slate-800">
+            Invoice Remarks
+          </h3>
           <button
             onClick={onClose}
             className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400"
@@ -347,7 +361,11 @@ function RemarksModal({ open, onClose, remarks, setRemarks }) {
         </div>
 
         <div className="flex gap-2 px-4 py-3 border-t border-slate-100 bg-slate-50">
-          <Button variant="outline" onClick={onClose} className="flex-1 rounded-lg">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            className="flex-1 rounded-lg"
+          >
             Cancel
           </Button>
           <Button
@@ -565,6 +583,98 @@ function InlineProductCombobox({ products, onSelect, onCreateNew }) {
   );
 }
 
+// -------------------------------
+// Compact State selector — search + popover, matches Customer form sizing
+// -------------------------------
+function CustomerStateSelect({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    const onClickOutside = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  const filtered = (() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return INDIAN_STATES;
+    return INDIAN_STATES.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        s.code.toLowerCase().includes(q) ||
+        s.capital.toLowerCase().includes(q),
+    );
+  })();
+
+  const handleSelect = (s) => {
+    onChange(s.name);
+    setOpen(false);
+    setSearch("");
+  };
+
+  return (
+    <div className="relative" ref={wrapRef}>
+      <Landmark className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 z-10" />
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full h-8 pl-7 pr-2.5 text-xs text-left border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-slate-50/60 hover:bg-white transition-colors flex items-center"
+      >
+        <span className={value ? "text-slate-700" : "text-slate-400"}>
+          {value || "State"}
+        </span>
+      </button>
+
+      {open && (
+        <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-56 overflow-hidden flex flex-col">
+          <div className="p-1.5 border-b border-slate-100 shrink-0">
+            <input
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search state..."
+              className="w-full h-7 px-2 text-xs border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+          <div className="overflow-y-auto">
+            {filtered.length === 0 ? (
+              <p className="text-center text-xs text-slate-400 py-4">
+                No state found
+              </p>
+            ) : (
+              filtered.map((s) => {
+                const selected = value === s.name;
+                return (
+                  <div
+                    key={s.id}
+                    onClick={() => handleSelect(s)}
+                    className={`flex items-center justify-between px-2.5 py-1.5 text-xs cursor-pointer ${
+                      selected
+                        ? "bg-blue-50 text-blue-700 font-medium"
+                        : "text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span className="truncate">{s.name}</span>
+                    <span className="text-[10px] text-slate-400 shrink-0 ml-2">
+                      {s.code}
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const emptyCustomerForm = {
   name: "",
   mobile: "",
@@ -614,6 +724,11 @@ export default function NewInvoiceFormPage({
   handleUpdateItemField,
   handleRemoveItem,
   handleClearCart,
+  // ✅ এই তিনটা প্রপস SalesFlow.jsx থেকে আসছে — এখানে আর নতুন করে
+  // local state হিসেবে declare করা যাবে না, তাহলে duplicate error হবে
+  additionalCharges = [],
+  setAdditionalCharges,
+  handleSaveAndContinue,
 }) {
   // -------------------------------
   // Customer form state — mirrors DB schema exactly
@@ -647,6 +762,42 @@ export default function NewInvoiceFormPage({
   // Payment / Remarks modals
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [remarksModalOpen, setRemarksModalOpen] = useState(false);
+
+  // ---- Additional Charges (UI-only local state) + Quick Received Amount ----
+  const [addingCharge, setAddingCharge] = useState(false);
+  const [chargeName, setChargeName] = useState("");
+  const [chargeAmount, setChargeAmount] = useState("");
+  const [quickReceivedAmount, setQuickReceivedAmount] = useState("");
+
+  const handleAddCharge = () => {
+    if (!chargeName.trim() || !chargeAmount || Number(chargeAmount) <= 0)
+      return;
+    setAdditionalCharges?.((prev) => [
+      ...(prev || []),
+      { id: Date.now(), name: chargeName.trim(), amount: Number(chargeAmount) },
+    ]);
+    setChargeName("");
+    setChargeAmount("");
+    setAddingCharge(false);
+  };
+
+  const handleRemoveCharge = (id) => {
+    setAdditionalCharges?.((prev) => (prev || []).filter((c) => c.id !== id));
+  };
+
+  const handleQuickReceivedChange = (e) => {
+    let v = e.target.value.replace(/[^\d.]/g, "");
+    const parts = v.split(".");
+    if (parts.length > 2) v = parts[0] + "." + parts.slice(1).join("");
+    setQuickReceivedAmount(v);
+  };
+
+  const handleQuickReceivedBlur = () => {
+    const cap = invoiceCalculations.netTotal || 0;
+    const n = Math.min(Number(quickReceivedAmount) || 0, cap);
+    setPaidAmount(n);
+    setQuickReceivedAmount(n > 0 ? String(n) : "");
+  };
 
   useEffect(() => {
     const onClickOutside = (e) => {
@@ -890,26 +1041,46 @@ export default function NewInvoiceFormPage({
     return sum + perUnitDiscount * qty;
   }, 0);
 
-  const grandTotal =
-    Number(invoiceCalculations.subtotal || 0) -
-    Number(invoiceCalculations.discountTotal || 0);
+  // ✅ SalesFlow.jsx-এ যেই netTotal calculate হয় (discount + additional
+  // charges + round off সব ধরে) — সেটাই একমাত্র "সত্যি" গ্র্যান্ড টোটাল।
+  const displayGrandTotal = Number(invoiceCalculations.netTotal || 0);
+
+  // ✅ Real CGST/SGST/IGST — SalesFlow.jsx-এর gstBreakdown থেকে সরাসরি sum
+  const gstTotals = Object.values(
+    invoiceCalculations.gstBreakdown || {},
+  ).reduce(
+    (acc, g) => ({
+      cgst: acc.cgst + (g.cgstAmount || 0),
+      sgst: acc.sgst + (g.sgstAmount || 0),
+      igst: acc.igst + (g.igstAmount || 0),
+    }),
+    { cgst: 0, sgst: 0, igst: 0 },
+  );
+  const hasIgst = gstTotals.igst > 0;
+
+  const dueAmount = Math.max(displayGrandTotal - Number(paidAmount || 0), 0);
 
   // ✅ Whether a customer has actually been entered/selected
   const hasCustomer = Boolean(
     (customerForm.name && customerForm.name.trim()) ||
-      (customerForm.mobile && customerForm.mobile.trim()),
+    (customerForm.mobile && customerForm.mobile.trim()),
   );
 
   // ✅ If customer gets cleared while a partial payment was set, force it back to full
   useEffect(() => {
-    if (!hasCustomer && Number(paidAmount) > 0 && Number(paidAmount) < grandTotal) {
-      setPaidAmount(grandTotal);
+    if (
+      !hasCustomer &&
+      Number(paidAmount) > 0 &&
+      Number(paidAmount) < displayGrandTotal
+    ) {
+      setPaidAmount(displayGrandTotal);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasCustomer]);
 
   const selectedPaymentOption =
-    PAYMENT_OPTIONS.find((p) => p.value === paymentMethod) || PAYMENT_OPTIONS[0];
+    PAYMENT_OPTIONS.find((p) => p.value === paymentMethod) ||
+    PAYMENT_OPTIONS[0];
   const SelectedPaymentIcon = selectedPaymentOption.icon;
 
   const toggleOrderDiscountType = () => {
@@ -1113,11 +1284,18 @@ export default function NewInvoiceFormPage({
                 />
               </div>
 
-              <input
+              <CustomerStateSelect
                 value={customerForm.state}
-                onChange={updateField("state")}
-                placeholder="State"
-                className="w-full h-8 px-2.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-slate-50/60 focus:bg-white transition-colors"
+                onChange={(v) => {
+                  setCustomerForm((prev) => ({ ...prev, state: v }));
+                  if (selectedCustomerId) {
+                    const matched = customers.find(
+                      (c) => c._id === selectedCustomerId,
+                    );
+                    if (matched && matched.state !== v)
+                      setSelectedCustomerId("");
+                  }
+                }}
               />
 
               <div className="relative">
@@ -1335,162 +1513,312 @@ export default function NewInvoiceFormPage({
             )}
 
             {cartItems.length > 0 && (
-              <>
-                {/* Payment / Remarks quick actions + compact totals card (right side) */}
-                <div className="border-t border-slate-100 bg-gradient-to-br from-slate-50 to-blue-50/40 px-4 py-4">
-                  <div className="flex flex-col lg:flex-row lg:justify-end gap-3">
-                    {/* Left: Payment + Remarks quick actions */}
-                    <div className="flex-1 lg:max-w-sm space-y-2">
-                      <button
-                        type="button"
-                        onClick={() => setPaymentModalOpen(true)}
-                        className="w-full flex items-center justify-between gap-2 bg-white rounded-xl border border-slate-200 shadow-sm px-3 py-2.5 hover:border-blue-300 transition-colors text-left"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-                            <SelectedPaymentIcon className="w-4 h-4 text-blue-600" />
-                          </span>
-                          <div className="min-w-0">
-                            <p className="text-[11px] text-slate-400 font-medium">
-                              Payment Method
-                            </p>
-                            <p className="text-xs font-semibold text-slate-800 truncate">
-                              {selectedPaymentOption.label}
-                              {Number(paidAmount) > 0 &&
-                                Number(paidAmount) < grandTotal && (
-                                  <span className="ml-1 text-amber-600 font-medium">
-                                    · Partial
-                                  </span>
-                                )}
-                            </p>
-                          </div>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setRemarksModalOpen(true)}
-                        className="w-full flex items-center justify-between gap-2 bg-white rounded-xl border border-slate-200 shadow-sm px-3 py-2.5 hover:border-blue-300 transition-colors text-left"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-                            <MessageSquareText className="w-4 h-4 text-blue-600" />
-                          </span>
-                          <div className="min-w-0">
-                            <p className="text-[11px] text-slate-400 font-medium">
-                              Remarks
-                            </p>
-                            <p className="text-xs font-semibold text-slate-800 truncate">
-                              {remarks?.trim() ? remarks : "Add remarks (optional)"}
-                            </p>
-                          </div>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
-                      </button>
+              <div className="border-t border-slate-100 bg-gradient-to-br from-slate-50 to-blue-50/40 px-4 py-3">
+                {/* ================= ONE SINGLE ROW — everything inline ================= */}
+                <div className="w-full">
+                  <div className="flex flex-wrap items-stretch bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    {/* Subtotal */}
+                    <div className="px-3 py-2 flex flex-col justify-center min-w-[90px]">
+                      <span className="text-[10px] text-slate-400">
+                        Subtotal
+                      </span>
+                      <span className="text-xs font-semibold text-slate-700">
+                        ₹{Number(invoiceCalculations.subtotal || 0).toFixed(2)}
+                      </span>
                     </div>
 
-                    {/* Right: compact totals card */}
-                    <div className="w-full lg:w-72 shrink-0 bg-white rounded-xl border border-slate-200 shadow-sm p-3.5">
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-slate-400">Total Qty</span>
-                          <span className="font-semibold text-slate-700">
-                            {invoiceCalculations.totalQuantity}
+                    {/* GST */}
+                    {hasIgst ? (
+                      <div className="px-3 py-2 flex flex-col justify-center min-w-[90px]">
+                        <span className="text-[10px] text-slate-400">IGST</span>
+                        <span className="text-xs font-semibold text-slate-700">
+                          ₹{gstTotals.igst.toFixed(2)}
+                        </span>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="px-3 py-2 flex flex-col justify-center min-w-[80px]">
+                          <span className="text-[10px] text-slate-400">
+                            CGST
+                          </span>
+                          <span className="text-xs font-semibold text-slate-700">
+                            ₹{gstTotals.cgst.toFixed(2)}
                           </span>
                         </div>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-slate-400">Subtotal</span>
-                          <span className="font-semibold text-slate-700">
-                            ₹{Number(invoiceCalculations.subtotal || 0).toFixed(2)}
+                        <div className="px-3 py-2 flex flex-col justify-center min-w-[80px]">
+                          <span className="text-[10px] text-slate-400">
+                            SGST
+                          </span>
+                          <span className="text-xs font-semibold text-slate-700">
+                            ₹{gstTotals.sgst.toFixed(2)}
                           </span>
                         </div>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-slate-400">GST</span>
-                          <span className="font-semibold text-slate-700">
-                            ₹{Number(invoiceCalculations.totalTax || 0).toFixed(2)}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-slate-400">Item Discount</span>
-                          <span className="font-semibold text-slate-700">
-                            ₹{productDiscountTotal.toFixed(2)}
-                          </span>
-                        </div>
+                      </>
+                    )}
 
-                        <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-100">
-                          <span className="text-slate-400 flex items-center gap-1">
-                            <Percent className="w-2.5 h-2.5" /> Extra Discount
-                          </span>
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              value={discount?.value ?? 0}
-                              onChange={handleOrderDiscountChange}
-                              onBlur={handleOrderDiscountBlur}
-                              className="w-14 h-6 text-xs text-right font-semibold text-slate-800 px-1 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            />
+                    {/* Item Discount */}
+                    <div className="px-3 py-2 flex flex-col justify-center min-w-[100px]">
+                      <span className="text-[10px] text-slate-400">
+                        Item Disc.
+                      </span>
+                      <span className="text-xs font-semibold text-emerald-600">
+                        − ₹{productDiscountTotal.toFixed(2)}
+                      </span>
+                    </div>
+
+                    {/* Extra Discount (editable) */}
+                    <div className="px-3 py-2 flex flex-col justify-center min-w-[110px]">
+                      <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
+                        <Percent className="w-2.5 h-2.5" /> Extra Disc.
+                      </span>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={discount?.value ?? 0}
+                          onChange={handleOrderDiscountChange}
+                          onBlur={handleOrderDiscountBlur}
+                          className="w-12 h-6 text-xs text-right font-semibold text-slate-800 px-1 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={toggleOrderDiscountType}
+                          title="Toggle discount type"
+                          className="w-6 h-6 shrink-0 flex items-center justify-center rounded border border-slate-200 text-[9px] font-bold text-slate-600 hover:bg-slate-50"
+                        >
+                          {discount?.type === "percent" ? (
+                            <Percent className="w-2.5 h-2.5" />
+                          ) : (
+                            "₹"
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Round Off */}
+                    <div className="px-3 py-2 flex flex-col justify-center min-w-[90px]">
+                      <span className="text-[10px] text-slate-400">
+                        Round Off
+                      </span>
+                      <span
+                        className={`text-xs font-semibold ${
+                          invoiceCalculations.roundOff >= 0
+                            ? "text-emerald-600"
+                            : "text-rose-500"
+                        }`}
+                      >
+                        {invoiceCalculations.roundOff >= 0 ? "+" : ""}₹
+                        {Number(invoiceCalculations.roundOff || 0).toFixed(2)}
+                      </span>
+                    </div>
+
+                    {/* Additional Charges */}
+                    <div className="px-3 py-2 flex flex-col justify-center min-w-[120px]">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-[10px] text-slate-400">
+                          Charges
+                        </span>
+                        {(additionalCharges || []).length < 3 &&
+                          !addingCharge && (
                             <button
                               type="button"
-                              onClick={toggleOrderDiscountType}
-                              title="Toggle discount type"
-                              className="w-6 h-6 shrink-0 flex items-center justify-center rounded border border-slate-200 text-[9px] font-bold text-slate-600 hover:bg-slate-50"
+                              onClick={() => setAddingCharge(true)}
+                              className="text-[10px] font-medium text-blue-600 flex items-center gap-0.5"
                             >
-                              {discount?.type === "percent" ? (
-                                <Percent className="w-2.5 h-2.5" />
-                              ) : (
-                                "₹"
-                              )}
+                              <Plus className="w-2.5 h-2.5" /> Add
                             </button>
-                          </div>
-                        </div>
+                          )}
                       </div>
 
-                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-dashed border-slate-200">
-                        <span className="text-xs font-semibold text-slate-500">
-                          Grand Total
-                        </span>
-                        <span className="text-base font-bold text-blue-600">
-                          ₹{grandTotal.toFixed(2)}
-                        </span>
-                      </div>
-
-                      {Number(paidAmount) > 0 && (
-                        <div className="flex items-center justify-between mt-1.5 text-[11px]">
-                          <span className="text-emerald-600 font-medium">Paid</span>
-                          <span className="font-semibold text-emerald-600">
-                            ₹{Number(paidAmount).toFixed(2)}
-                          </span>
+                      {addingCharge ? (
+                        <div className="flex items-center gap-1 mt-1">
+                          <input
+                            autoFocus
+                            value={chargeName}
+                            onChange={(e) => setChargeName(e.target.value)}
+                            placeholder="Name"
+                            className="w-16 h-6 px-1.5 text-[10px] border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                          <input
+                            value={chargeAmount}
+                            onChange={(e) =>
+                              setChargeAmount(
+                                e.target.value.replace(/[^\d.]/g, ""),
+                              )
+                            }
+                            placeholder="₹"
+                            className="w-12 h-6 px-1.5 text-[10px] text-right border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAddCharge}
+                            className="w-6 h-6 shrink-0 flex items-center justify-center rounded bg-blue-600 text-white"
+                          >
+                            <Check className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAddingCharge(false);
+                              setChargeName("");
+                              setChargeAmount("");
+                            }}
+                            className="w-6 h-6 shrink-0 flex items-center justify-center rounded border border-slate-200 text-slate-400"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
                         </div>
-                      )}
-                      {Number(paidAmount) > 0 &&
-                        Number(paidAmount) < grandTotal && (
-                          <div className="flex items-center justify-between text-[11px]">
-                            <span className="text-rose-500 font-medium">Due</span>
-                            <span className="font-semibold text-rose-500">
-                              ₹{(grandTotal - Number(paidAmount)).toFixed(2)}
+                      ) : (additionalCharges || []).length > 0 ? (
+                        <div className="flex flex-wrap gap-1 mt-0.5">
+                          {additionalCharges.map((c) => (
+                            <span
+                              key={c.id}
+                              className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-[9px] font-medium px-1.5 py-0.5 rounded-full"
+                            >
+                              {c.name}: ₹{Number(c.amount).toFixed(2)}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveCharge(c.id)}
+                                className="hover:text-rose-500"
+                              >
+                                <X className="w-2 h-2" />
+                              </button>
                             </span>
-                          </div>
-                        )}
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs font-semibold text-slate-300">
+                          —
+                        </span>
+                      )}
                     </div>
-                  </div>
 
-                  <div className="flex justify-end mt-3">
+                    {/* Net Total */}
+                    <div className="px-3 py-2 flex flex-col justify-center min-w-[110px] bg-blue-50/50">
+                      <span className="text-[10px] text-slate-500 font-medium">
+                        Net Total
+                      </span>
+                      <span className="text-sm font-bold text-blue-600">
+                        ₹{displayGrandTotal.toFixed(2)}
+                      </span>
+                    </div>
+
+                    {/* Payment method chips */}
+                    <div className="px-3 py-2 flex flex-col justify-center min-w-[220px]">
+                      <span className="text-[10px] text-slate-400 mb-0.5">
+                        Payment
+                      </span>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {PAYMENT_OPTIONS.map(({ label, value, icon: Icon }) => (
+                          <button
+                            key={value}
+                            type="button"
+                            title={label}
+                            onClick={() => {
+                              setPaymentMethod(value);
+                              if (value === "cash") setPaymentNote("");
+                            }}
+                            className={`h-6 px-1.5 flex items-center gap-1 rounded border text-[9px] font-medium transition-colors ${
+                              paymentMethod === value
+                                ? "bg-blue-600 border-blue-600 text-white"
+                                : "border-slate-200 text-slate-500 hover:bg-slate-50"
+                            }`}
+                          >
+                            <Icon className="w-3 h-3" />
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Reference note — only for non-cash */}
+                    {paymentMethod !== "cash" && (
+                      <div className="px-3 py-2 flex flex-col justify-center min-w-[150px]">
+                        <span className="text-[10px] text-slate-400">
+                          Reference
+                        </span>
+                        <input
+                          value={paymentNote || ""}
+                          onChange={(e) => setPaymentNote(e.target.value)}
+                          placeholder={getReferencePlaceholder(paymentMethod)}
+                          autoCapitalize="none"
+                          autoCorrect="off"
+                          className="w-32 h-6 px-1.5 text-[10px] border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 mt-0.5"
+                        />
+                      </div>
+                    )}
+
+                    {/* Received amount */}
+                    <div className="px-3 py-2 flex flex-col justify-center min-w-[110px]">
+                      <span className="text-[10px] text-slate-400">
+                        Received ₹
+                      </span>
+                      <input
+                        value={
+                          hasCustomer
+                            ? quickReceivedAmount ||
+                              (paidAmount ? String(paidAmount) : "")
+                            : displayGrandTotal.toFixed(2)
+                        }
+                        onChange={handleQuickReceivedChange}
+                        onBlur={handleQuickReceivedBlur}
+                        disabled={!hasCustomer}
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        className={`w-24 h-6 px-1.5 text-xs border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 mt-0.5 ${
+                          !hasCustomer
+                            ? "bg-slate-50 text-slate-400 border-slate-100 cursor-not-allowed"
+                            : "border-slate-200"
+                        }`}
+                      />
+                    </div>
+
+                    {/* Due */}
+                    <div className="px-3 py-2 flex flex-col justify-center min-w-[90px] bg-rose-50/50">
+                      <span className="text-[10px] text-rose-400 font-medium">
+                        Due
+                      </span>
+                      <span className="text-sm font-bold text-rose-500">
+                        ₹{dueAmount.toFixed(2)}
+                      </span>
+                    </div>
+
+                    {/* Remarks */}
                     <button
-                      onClick={handleClearCart}
-                      className="text-xs font-medium text-rose-500 hover:text-rose-600"
+                      type="button"
+                      onClick={() => setRemarksModalOpen(true)}
+                      className="px-3 py-2 flex flex-col justify-center min-w-[130px] text-left hover:bg-slate-50"
                     >
-                      Clear all items
+                      <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                        <MessageSquareText className="w-2.5 h-2.5" /> Remarks
+                      </span>
+                      <span className="text-xs font-semibold text-slate-700 truncate max-w-[110px]">
+                        {remarks?.trim() ? remarks : "Add remarks"}
+                      </span>
                     </button>
                   </div>
                 </div>
-              </>
+
+                {!hasCustomer && (
+                  <p className="text-[10px] text-amber-600 mt-1.5">
+                    Select a customer to allow partial payment.
+                  </p>
+                )}
+
+                <div className="flex justify-end mt-2">
+                  <button
+                    onClick={handleClearCart}
+                    className="text-xs font-medium text-rose-500 hover:text-rose-600"
+                  >
+                    Clear all items
+                  </button>
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Invoice Summary — Preview + Create only */}
+        {/* Invoice Summary — Preview + Save & Continue + Create/Update, F6 shortcut */}
         <Card className="rounded-2xl border-slate-200 shadow-md overflow-hidden ring-1 ring-blue-100">
           <CardContent className="pt-4">
             <InvoiceSummary
@@ -1506,6 +1834,7 @@ export default function NewInvoiceFormPage({
               remarks={remarks}
               setRemarks={setRemarks}
               handleCreateInvoice={handleCreateInvoice}
+              handleSaveAndContinue={handleSaveAndContinue}
               onInvoiceModalClose={onInvoiceModalClose}
               isLoading={isSubmitting}
               disabled={cartItems.length === 0}
@@ -1538,19 +1867,6 @@ export default function NewInvoiceFormPage({
             handleNewProductCreated(savedItem);
           }
         }}
-      />
-
-      <PaymentMethodModal
-        open={paymentModalOpen}
-        onClose={() => setPaymentModalOpen(false)}
-        paymentMethod={paymentMethod}
-        setPaymentMethod={setPaymentMethod}
-        paymentNote={paymentNote}
-        setPaymentNote={setPaymentNote}
-        paidAmount={paidAmount}
-        setPaidAmount={setPaidAmount}
-        grandTotal={grandTotal}
-        hasCustomer={hasCustomer}
       />
 
       <RemarksModal

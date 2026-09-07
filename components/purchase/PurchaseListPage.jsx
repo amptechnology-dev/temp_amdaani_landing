@@ -341,7 +341,7 @@ export default function PurchaseListPage({
         vendorGstNumber: doc.vendorGstNumber,
       };
 
-      const dateObj = new Date(doc.createdAt || doc.date);
+      const dateObj = new Date(doc.date || doc.createdAt); 
 
       const html = generatePurchaseHTML({
         preview: false,

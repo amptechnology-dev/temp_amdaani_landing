@@ -27,6 +27,7 @@ export default function PurchaseSummary({
   formValues = {},
   storedata = {},
   purchaseNumber = "PREVIEW-0001",
+  purchaseDate,
   isGstInvoice = false,
   isMrpEnabled = true,
   submitLabel = "Create Purchase",
@@ -42,29 +43,37 @@ export default function PurchaseSummary({
   const pageFormat = storedata?.settings?.printMode === "a5" ? "a5" : "a4";
 
   const buildPreviewHtml = () => {
-    const now = new Date();
-    return generatePurchaseHTML({
-      preview: false,
-      createdInvoice: false,
-      invoiceData: { paymentMethod, paymentNote },
-      formValues,
-      cartItems,
-      invoiceCalculations,
-      invoiceNumber: purchaseNumber,
-      currentDate: format(now, "dd-MMM-yyyy"),
-      currentTime: format(now, "hh:mm a"),
-      storedata,
-      invoiceDate: now,
-      isGstInvoice,
-      isMrpEnabled,
-      pageFormat,
-      payment: {
-        paid: payment?.paid ?? 0,
-        due: payment?.due ?? 0,
-        status: payment?.status ?? "unpaid",
-      },
-    });
-  };
+  const now = new Date();
+  // ✅ FIX — use the user-selected purchaseDate for the printed date,
+  // keep "now" only for the printed time (matches invoice preview pattern)
+  const effectiveDate = purchaseDate ? new Date(purchaseDate) : now;
+  return generatePurchaseHTML({
+    // ✅ FIX (issue 1) — "Preview" ekhon `preview: true` pathay, tai
+    // store header (company logo/address/GSTIN), bank details + signature
+    // footer, ar invoice terms — kono kichui purchase create howar
+    // aage-r preview-e dekhabe na. Items, vendor details, totals ar
+    // Tax Summary thik moto dekhabe.
+    preview: true,
+    createdInvoice: false,
+    invoiceData: { paymentMethod, paymentNote },
+    formValues,
+    cartItems,
+    invoiceCalculations,
+    invoiceNumber: purchaseNumber,
+    currentDate: format(effectiveDate, "dd-MMM-yyyy"), // ✅ CHANGED — was format(now, ...)
+    currentTime: format(now, "hh:mm a"),
+    storedata,
+    invoiceDate: effectiveDate, // ✅ CHANGED — was: now
+    isGstInvoice,
+    isMrpEnabled,
+    pageFormat,
+    payment: {
+      paid: payment?.paid ?? 0,
+      due: payment?.due ?? 0,
+      status: payment?.status ?? "unpaid",
+    },
+  });
+};
 
   const handlePreview = () => {
     if (!cartItems?.length) return;

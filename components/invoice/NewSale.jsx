@@ -100,6 +100,7 @@ export default function SalesFlow() {
   const [paidAmount, setPaidAmount] = useState(0);
   const [paymentNote, setPaymentNote] = useState("");
   const [remarks, setRemarks] = useState("");
+  const [additionalCharges, setAdditionalCharges] = useState([]);
 
   const hasUserEditedPaid = useRef(false);
 
@@ -110,7 +111,7 @@ export default function SalesFlow() {
   const [customers, setCustomers] = useState([]);
   const [storedata, setStoredata] = useState({});
   const [afterStoredata, setAfterStoredata] = useState({});
-
+  const [editInvoiceStoredata, setEditInvoiceStoredata] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isIgst = useMemo(() => {
@@ -221,11 +222,17 @@ export default function SalesFlow() {
     else if (discount?.type === "percent")
       discountTotal = grandTotalRaw * (Number(discount?.value || 0) / 100);
 
-    const netTotal = Math.round(grandTotalRaw - discountTotal);
-    const rawDifference =
-      Math.round(grandTotalRaw - discountTotal) -
-      (grandTotalRaw - discountTotal);
-    const roundOff = Number((rawDifference + Number.EPSILON).toFixed(2));
+    const additionalChargesTotal = (additionalCharges || []).reduce(
+      (sum, c) => sum + (Number(c.amount) || 0),
+      0,
+    );
+
+    const preRoundTotal =
+      grandTotalRaw - discountTotal + additionalChargesTotal;
+    const netTotal = Math.round(preRoundTotal);
+    const roundOff = Number(
+      (netTotal - preRoundTotal + Number.EPSILON).toFixed(2),
+    );
     const totalQuantity = computedItems.reduce((s, it) => s + (it.qty || 0), 0);
 
     return {
@@ -236,12 +243,14 @@ export default function SalesFlow() {
       grandTotal: grandTotalRaw,
       grandTotalRaw,
       discountTotal: Number(discountTotal.toFixed(2)),
+      additionalCharges,
+      additionalChargesTotal: Number(additionalChargesTotal.toFixed(2)),
       totalQuantity,
       itemCount: computedItems.length,
       gstBreakdown: isGstInvoice ? gstBreakdown : {},
       computedItems,
     };
-  }, [cartItems, isGstInvoice, discount, isIgst]);
+  }, [cartItems, isGstInvoice, discount, isIgst, additionalCharges]);
 
   const payment = useMemo(() => {
     const grandTotal = Number(invoiceCalculations?.netTotal ?? 0);
@@ -323,6 +332,29 @@ export default function SalesFlow() {
     }
   };
 
+  function buildEffectiveStoredata(doc, liveStoredata) {
+    const hasEmbeddedStoreData = !!doc?.name;
+    if (!hasEmbeddedStoreData) return liveStoredata || {};
+
+    return {
+      ...liveStoredata,
+      name: doc.name,
+      tagline: doc.tagline ?? liveStoredata?.tagline,
+      ownershipType: doc.ownershipType ?? liveStoredata?.ownershipType,
+      gstNumber: doc.gstNumber ?? liveStoredata?.gstNumber,
+      panNumber: doc.panNumber ?? liveStoredata?.panNumber,
+      registrationNo: doc.registrationNo ?? liveStoredata?.registrationNo,
+      contactNo: doc.contactNo ?? liveStoredata?.contactNo,
+      email: doc.email ?? liveStoredata?.email,
+      address: doc.address ?? liveStoredata?.address,
+      bankDetails: doc.bankDetails ?? liveStoredata?.bankDetails,
+      settings: doc.settings ?? liveStoredata?.settings,
+      logoUrl: doc.logoUrl ?? liveStoredata?.logoUrl,
+      signatureUrl: doc.signatureUrl ?? liveStoredata?.signatureUrl,
+      isActive: doc.isActive ?? liveStoredata?.isActive,
+    };
+  }
+
   const fetchCustomers = async () => {
     try {
       const res = await api.get("/customer?limit=500");
@@ -376,8 +408,10 @@ export default function SalesFlow() {
     setPaymentMethod("cash");
     setPaymentNote("");
     setRemarks("");
+    setAdditionalCharges([]);
     setIsEditMode(false);
     setExistingInvoiceId(null);
+    setEditInvoiceStoredata(null);
     const store = await fetchStoreData();
     await fetchLastInvoice(store);
   };
@@ -414,6 +448,7 @@ export default function SalesFlow() {
         setStep("list");
         return;
       }
+      setEditInvoiceStoredata(buildEffectiveStoredata(fullInvoice, store));
 
       // ✅ DB-te discountType kokhono save hoy na, kintu discount value
       // shomoyi rupee-amount-e save kora thake (creation-er shomoy ei
@@ -603,6 +638,13 @@ export default function SalesFlow() {
         ),
         discountTotal: invoiceCalculations.discountTotal,
         roundOff: invoiceCalculations.roundOff,
+        additionalCharges: (invoiceCalculations.additionalCharges || []).map(
+          (c) => ({
+            name: c.name,
+            amount: Number(c.amount) || 0,
+          }),
+        ),
+        additionalChargesTotal: invoiceCalculations.additionalChargesTotal,
         grandTotal: Number(finalGrandTotal.toFixed(2)),
         amountPaid: Number(finalPaid.toFixed(2)),
         amountDue: Number(finalDue.toFixed(2)),
@@ -648,6 +690,15 @@ export default function SalesFlow() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // ✅ Save & Continue — invoice save kore, form/state reset kore diye
+  // "form" step-eই thake, notun invoice-er jonno ready thake
+  const handleSaveAndContinue = async () => {
+    const html = await handleCreateInvoice();
+    if (!html) return null;
+    await resetFormState();
+    return html;
   };
 
   const handleInvoiceModalClose = async () => {
@@ -715,7 +766,7 @@ export default function SalesFlow() {
       isSubmitting={isSubmitting}
       formValues={formValues}
       storedata={
-        Object.keys(afterStoredata).length > 0 ? afterStoredata : storedata
+        isEditMode && editInvoiceStoredata ? editInvoiceStoredata : storedata
       }
       isGstInvoice={isGstInvoice}
       isMrpEnabled={isMrpEnabled}
@@ -724,6 +775,9 @@ export default function SalesFlow() {
       handleRemoveItem={handleRemoveItem}
       handleClearCart={handleClearCart}
       setAllProducts={setAllProducts}
+      additionalCharges={invoiceCalculations.additionalCharges}
+      setAdditionalCharges={setAdditionalCharges}
+      handleSaveAndContinue={handleSaveAndContinue}
     />
   );
 }

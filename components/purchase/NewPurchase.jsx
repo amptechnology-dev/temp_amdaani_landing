@@ -32,6 +32,9 @@ export default function PurchaseFlow() {
   const [purchaseRefreshKey, setPurchaseRefreshKey] = useState(0);
 
   const [purchaseNumber, setPurchaseNumber] = useState("");
+  const [purchaseDate, setPurchaseDate] = useState(
+    format(new Date(), "yyyy-MM-dd"),
+  );
   const [isGstInvoice, setIsGstInvoice] = useState(true);
 
   const [allProducts, setAllProducts] = useState([]);
@@ -281,9 +284,6 @@ export default function PurchaseFlow() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allProducts, isEditMode]);
 
-  // -------------------------------
-  // Reset / Navigation
-  // -------------------------------
   const resetFormState = async () => {
     setSelectedVendor(null);
     setCartItems([]);
@@ -291,9 +291,10 @@ export default function PurchaseFlow() {
     hasUserEditedPaid.current = false;
     setIsEditMode(false);
     setExistingPurchaseId(null);
+    setPurchaseDate(format(new Date(), "yyyy-MM-dd"));
     const store = await fetchStoreData();
     await fetchNextPurchaseNumber();
-    await fetchAllProducts(); // ✅ প্রতিবার fresh product data আনো
+    await fetchAllProducts();
     return store;
   };
 
@@ -340,6 +341,11 @@ export default function PurchaseFlow() {
       setCartItems(normalizedItems);
       setExistingPurchaseId(full._id);
       setPurchaseNumber(full.invoiceNumber);
+      setPurchaseDate(
+        full.date
+          ? format(new Date(full.date), "yyyy-MM-dd")
+          : format(new Date(), "yyyy-MM-dd"),
+      );
       setIsGstInvoice(!!full.vendorGstNumber);
       setSelectedVendor({
         name: full.vendorName,
@@ -477,7 +483,7 @@ export default function PurchaseFlow() {
         vendorGstNumber: vendor.gstNumber || "",
         vendorState: vendor.state || "",
         vendorPostalCode: vendor.postalCode || "",
-        date: format(new Date(), "yyyy-MM-dd"),
+        date: purchaseDate,
         isIgst,
         items: invoiceCalculations.computedItems.map((item) => {
           const rawCostPrice = Number(item.costPrice ?? 0);
@@ -533,7 +539,7 @@ export default function PurchaseFlow() {
         invoiceCalculations,
         invoiceNumber: purchaseNumber,
         storedata,
-        invoiceDate: new Date(),
+        invoiceDate: new Date(purchaseDate),
         isGstInvoice,
         isMrpEnabled,
         payment: {
@@ -595,6 +601,8 @@ export default function PurchaseFlow() {
       isEditMode={isEditMode}
       purchaseNumber={purchaseNumber}
       setPurchaseNumber={setPurchaseNumber}
+      purchaseDate={purchaseDate}
+      setPurchaseDate={setPurchaseDate}
       vendors={vendors}
       selectedVendor={selectedVendor}
       setSelectedVendor={setSelectedVendor}

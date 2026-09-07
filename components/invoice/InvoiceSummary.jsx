@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { format } from "date-fns";
 import {
   FileText,
@@ -28,6 +28,7 @@ export default function InvoiceSummary({
   paymentNote,
   remarks,
   handleCreateInvoice,
+  handleSaveAndContinue,
   onInvoiceModalClose,
   isLoading,
   disabled,
@@ -47,6 +48,7 @@ export default function InvoiceSummary({
   const [isCreatedInvoice, setIsCreatedInvoice] = useState(false);
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [isSavingContinue, setIsSavingContinue] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const iframeRef = useRef(null);
   const thermalIframeRef = useRef(null); // ✅ hidden iframe for thermal (USB) print
@@ -102,6 +104,24 @@ export default function InvoiceSummary({
       toast.error("Invoice create korte problem hoyeche");
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  // ✅ Save & Continue — invoice save kore, form reset kore, notun invoice-er
+  // jonno ready thake (SalesFlow.jsx-er handleSaveAndContinue call kore)
+  const handleSaveAndContinueClick = async () => {
+    if (!handleSaveAndContinue) return;
+    try {
+      setIsSavingContinue(true);
+      const html = await handleSaveAndContinue();
+      if (html) {
+        toast.success("Invoice saved. Ready for the next one.");
+      }
+    } catch (err) {
+      console.error("Save & continue failed:", err);
+      toast.error("Invoice save korte problem hoyeche");
+    } finally {
+      setIsSavingContinue(false);
     }
   };
 
@@ -336,9 +356,22 @@ export default function InvoiceSummary({
     }
   };
 
+  // ✅ F6 → Save shortcut (boss's spec)
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === "F6") {
+        e.preventDefault();
+        if (!disabled && !isLoading && !isCreating) handleCreateClick();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [disabled, isLoading, isCreating]);
+
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
         <Button
           variant="outline"
           className="flex-1"
@@ -349,6 +382,20 @@ export default function InvoiceSummary({
           <FileText className="w-4 h-4 mr-2" />
           Preview
         </Button>
+
+        {handleSaveAndContinue && (
+          <Button
+            variant="outline"
+            className="flex-1 border-blue-200 text-blue-600 hover:bg-blue-50"
+            onClick={handleSaveAndContinueClick}
+            disabled={disabled || isLoading || isSavingContinue}
+          >
+            {isSavingContinue && (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            )}
+            Save & Continue
+          </Button>
+        )}
 
         <Button
           onClick={handleCreateClick}
@@ -364,6 +411,7 @@ export default function InvoiceSummary({
             <>
               <Check className="w-4 h-4 mr-2" />
               {submitLabel}
+              <span className="ml-1.5 text-[10px] opacity-70">(F6)</span>
             </>
           )}
         </Button>

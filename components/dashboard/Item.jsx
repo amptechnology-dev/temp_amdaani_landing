@@ -50,7 +50,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import AddItemFormModal from "../../components/invoice/AddItemFormModal";
-import AdjustStockModal from "./AdjustStockModal";
+import StockTransactionsPage from "./StockTransactionsPage"; // ✅ NEW — full stock history + adjust page
 
 // =========================
 // Sort chip config
@@ -99,9 +99,9 @@ export default function ItemsPage() {
   const [isItemDialogOpen, setIsItemDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
-  // ── Stock adjustment modal ──
-  const [stockModalOpen, setStockModalOpen] = useState(false);
-  const [stockItem, setStockItem] = useState(null);
+  // ✅ NEW — which product's Stock Transactions page is being viewed
+  // (replaces the old standalone stockModalOpen/stockItem quick-modal state)
+  const [viewingStockProduct, setViewingStockProduct] = useState(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["items", { page, limit }],
@@ -225,14 +225,16 @@ export default function ItemsPage() {
     setSelectedItem(null);
   };
 
-  const openStockModal = (item) => {
-    setStockItem(item);
-    setStockModalOpen(true);
+  // ✅ NEW — opens the full Stock Transactions page for this product
+  const openStockTransactions = (item) => {
+    setViewingStockProduct(item);
   };
 
-  const handleStockAdjusted = () => {
+  // ✅ NEW — when leaving the Stock Transactions page, refresh the item
+  // list (stock/cost price may have changed via an adjustment there)
+  const handleBackFromStockTransactions = () => {
+    setViewingStockProduct(null);
     queryClient.invalidateQueries(["items"]);
-    setStockItem(null);
   };
 
   const formatCurrency = (amount) =>
@@ -242,6 +244,18 @@ export default function ItemsPage() {
 
   const stockColor = (stock) =>
     stock <= 5 ? "#DC2626" : stock <= 20 ? "#F57C00" : "#059669";
+
+  // ✅ NEW — if a product's Stock Transactions page is open, render that
+  // instead of the item list (same pattern used by SalesFlow's step switch)
+  if (viewingStockProduct) {
+    return (
+      <StockTransactionsPage
+        productId={viewingStockProduct._id}
+        productName={viewingStockProduct.name}
+        onBack={handleBackFromStockTransactions}
+      />
+    );
+  }
 
   return (
     <div className={`min-h-screen p-3 md:p-4 ${currentTheme.background}`}>
@@ -432,8 +446,8 @@ export default function ItemsPage() {
                         <div className="flex items-center justify-center gap-1.5">
                           {canManageStock && (
                             <button
-                              onClick={() => openStockModal(item)}
-                              title="Adjust Stock"
+                              onClick={() => openStockTransactions(item)}
+                              title="Stock Transactions"
                               className="flex items-center justify-center w-7 h-7 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
                             >
                               <PackagePlus className="w-3.5 h-3.5" />
@@ -489,13 +503,6 @@ export default function ItemsPage() {
         }}
         onItemCreated={handleItemSaved}
         editItem={selectedItem}
-      />
-
-      <AdjustStockModal
-        open={stockModalOpen}
-        onClose={() => setStockModalOpen(false)}
-        item={stockItem}
-        onAdjusted={handleStockAdjusted}
       />
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

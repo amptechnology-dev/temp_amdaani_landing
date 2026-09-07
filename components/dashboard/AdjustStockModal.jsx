@@ -58,13 +58,13 @@ export default function AdjustStockModal({ open, onClose, item, onAdjusted }) {
   const validate = () => {
     const errs = {};
     const qtyNum = Number(quantity);
-    const rateNum = Number(rate);
 
     if (!quantity || !Number.isInteger(qtyNum) || qtyNum <= 0) {
       errs.quantity = "Enter a valid positive whole number";
     }
-    if (!rate || isNaN(rateNum) || rateNum <= 0) {
-      errs.rate = "Enter a valid positive rate";
+    // Rate is optional now — only validate if user actually entered something
+    if (rate && (isNaN(Number(rate)) || Number(rate) < 0)) {
+      errs.rate = "Enter a valid rate";
     }
     if (!reason) {
       errs.reason = "Please select a reason";
@@ -83,18 +83,17 @@ export default function AdjustStockModal({ open, onClose, item, onAdjusted }) {
     if (!validate()) return;
 
     const finalQuantity =
-      actionType === "reduce" ? -Math.abs(Number(quantity)) : Math.abs(Number(quantity));
+      actionType === "reduce"
+        ? -Math.abs(Number(quantity))
+        : Math.abs(Number(quantity));
 
     const selectedReason = reasonOptions.find((r) => r.id === reason);
 
     const body = {
       productId: item._id,
       quantity: finalQuantity,
-      rate: Number(rate),
-      // ✅ backend requires this — fixed value since this endpoint is always a manual adjustment.
-      // Confirm the exact enum string matches your backend schema (e.g. "ADJUSTMENT").
+      ...(rate ? { rate: Number(rate) } : {}),
       transactionType: "ADJUSTMENT",
-      // ✅ the actual selected reason (why the adjustment happened)
       reason: selectedReason?.id,
       reasonLabel: selectedReason?.name,
       remarks: remarks || "",
@@ -104,7 +103,8 @@ export default function AdjustStockModal({ open, onClose, item, onAdjusted }) {
     try {
       setLoading(true);
       const res = await api.post("/product/adjust-stock", body);
-      if (!res?.success) throw new Error(res?.message || "Failed to adjust stock");
+      if (!res?.success)
+        throw new Error(res?.message || "Failed to adjust stock");
 
       toast.success(res?.message || "Stock adjusted successfully!");
       onAdjusted?.();
@@ -118,11 +118,16 @@ export default function AdjustStockModal({ open, onClose, item, onAdjusted }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-      <div className="absolute inset-0 bg-black/40" onClick={() => !loading && onClose()} />
+      <div
+        className="absolute inset-0 bg-black/40"
+        onClick={() => !loading && onClose()}
+      />
       <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
         <div className="flex items-start justify-between mb-1">
           <div>
-            <h3 className="font-bold text-[16px] text-slate-900">Adjust Stock</h3>
+            <h3 className="font-bold text-[16px] text-slate-900">
+              Adjust Stock
+            </h3>
             <p className="text-[12.5px] text-slate-500 mt-0.5">{item.name}</p>
           </div>
           <button
@@ -191,7 +196,9 @@ export default function AdjustStockModal({ open, onClose, item, onAdjusted }) {
                 className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
               />
             </div>
-            {errors.reason && <p className="text-[11.5px] text-red-600 mt-1">{errors.reason}</p>}
+            {errors.reason && (
+              <p className="text-[11.5px] text-red-600 mt-1">{errors.reason}</p>
+            )}
           </div>
 
           {/* Date */}
@@ -206,7 +213,9 @@ export default function AdjustStockModal({ open, onClose, item, onAdjusted }) {
               disabled={loading}
               className="w-full h-10 px-3 rounded-lg border border-slate-200 text-[13.5px] focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
             />
-            {errors.date && <p className="text-[11.5px] text-red-600 mt-1">{errors.date}</p>}
+            {errors.date && (
+              <p className="text-[11.5px] text-red-600 mt-1">{errors.date}</p>
+            )}
           </div>
 
           {/* Quantity */}
@@ -224,14 +233,17 @@ export default function AdjustStockModal({ open, onClose, item, onAdjusted }) {
               className="w-full h-10 px-3 rounded-lg border border-slate-200 text-[13.5px] focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
             />
             {errors.quantity && (
-              <p className="text-[11.5px] text-red-600 mt-1">{errors.quantity}</p>
+              <p className="text-[11.5px] text-red-600 mt-1">
+                {errors.quantity}
+              </p>
             )}
           </div>
 
           {/* Rate */}
           <div>
             <label className="text-[12.5px] font-semibold text-slate-600 mb-1.5 block">
-              Cost Price
+              Cost Price{" "}
+              <span className="text-slate-400 font-normal">(Optional)</span>
             </label>
             <input
               type="number"
@@ -240,10 +252,12 @@ export default function AdjustStockModal({ open, onClose, item, onAdjusted }) {
               value={rate}
               onChange={(e) => setRate(e.target.value)}
               disabled={loading}
-              placeholder="Enter cost price"
+              placeholder="Enter cost price (optional)"
               className="w-full h-10 px-3 rounded-lg border border-slate-200 text-[13.5px] focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
             />
-            {errors.rate && <p className="text-[11.5px] text-red-600 mt-1">{errors.rate}</p>}
+            {errors.rate && (
+              <p className="text-[11.5px] text-red-600 mt-1">{errors.rate}</p>
+            )}
           </div>
 
           {/* Remarks */}
@@ -260,7 +274,9 @@ export default function AdjustStockModal({ open, onClose, item, onAdjusted }) {
               className="w-full px-3 py-2 rounded-lg border border-slate-200 text-[13.5px] resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
             />
             {errors.remarks && (
-              <p className="text-[11.5px] text-red-600 mt-1">{errors.remarks}</p>
+              <p className="text-[11.5px] text-red-600 mt-1">
+                {errors.remarks}
+              </p>
             )}
           </div>
         </div>
