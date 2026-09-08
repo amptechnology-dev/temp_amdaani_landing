@@ -14,6 +14,16 @@ const RAW = {
   CUT: `${GS}\x56\x00`,
 };
 
+// ✅ NEW — strip anything outside printable ASCII (0x20–0x7E) before it
+// ever reaches the ESC/POS byte stream. Store name, customer name, item
+// name etc. can contain Bengali/curly-quote/emoji chars that would get
+// split into multi-byte UTF-8 sequences by the printer's encoder and get
+// misread as stray ESC/POS commands — corrupting the whole print job
+// (this was the cause of the "Error" screen getting printed).
+function safeAscii(str) {
+  return String(str ?? "").replace(/[^\x20-\x7E]/g, "?");
+}
+
 // ---------- Text helpers (shared by ESC/POS + preview => identical alignment) ----------
 function padRight(str, len) {
   str = String(str ?? "");
@@ -65,24 +75,39 @@ function buildReceiptBlocks({
 
   // ── Store header ──
   push({ t: "align", v: "center" });
-  push({ t: "text", v: (storedata?.name || "STORE NAME").toUpperCase(), bold: true });
-  if (storedata?.tagline) push({ t: "text", v: storedata.tagline });
-  const addr1 = [storedata?.address?.street, storedata?.address?.city].filter(Boolean).join(", ");
-  if (addr1) push({ t: "text", v: addr1 });
-  if (isGstInvoice && storedata?.gstNumber) push({ t: "text", v: `GSTIN: ${storedata.gstNumber}` });
-  const addr2 = [storedata?.address?.state, storedata?.address?.postalCode].filter(Boolean).join(" ");
-  if (addr2) push({ t: "text", v: addr2 });
-  if (storedata?.contactNo) push({ t: "text", v: `Ph: ${storedata.contactNo}` });
+  push({
+    t: "text",
+    v: safeAscii((storedata?.name || "STORE NAME").toUpperCase()),
+    bold: true,
+  });
+  if (storedata?.tagline) push({ t: "text", v: safeAscii(storedata.tagline) });
+  const addr1 = [storedata?.address?.street, storedata?.address?.city]
+    .filter(Boolean)
+    .join(", ");
+  if (addr1) push({ t: "text", v: safeAscii(addr1) });
+  if (isGstInvoice && storedata?.gstNumber)
+    push({ t: "text", v: `GSTIN: ${safeAscii(storedata.gstNumber)}` });
+  const addr2 = [storedata?.address?.state, storedata?.address?.postalCode]
+    .filter(Boolean)
+    .join(" ");
+  if (addr2) push({ t: "text", v: safeAscii(addr2) });
+  if (storedata?.contactNo)
+    push({ t: "text", v: `Ph: ${safeAscii(storedata.contactNo)}` });
 
   push({ t: "line" });
   push({ t: "align", v: "left" });
 
   // ── Invoice info ──
-  push({ t: "text", v: `Invoice: ${invoiceNumber}` });
-  push({ t: "text", v: `Date: ${format(new Date(invoiceDate), "dd-MMM-yyyy hh:mm a")}` });
-  if (formValues.contactNumber) push({ t: "text", v: `Mobile: ${formValues.contactNumber}` });
+  push({ t: "text", v: `Invoice: ${safeAscii(invoiceNumber)}` });
+  push({
+    t: "text",
+    v: `Date: ${format(new Date(invoiceDate), "dd-MMM-yyyy hh:mm a")}`,
+  });
+  if (formValues.contactNumber)
+    push({ t: "text", v: `Mobile: ${safeAscii(formValues.contactNumber)}` });
   const customerName = formValues.partyName || formValues.customerName;
-  if (customerName) push({ t: "text", v: `Customer: ${customerName}` });
+  if (customerName)
+    push({ t: "text", v: `Customer: ${safeAscii(customerName)}` });
 
   push({ t: "line" });
 
@@ -99,7 +124,7 @@ function buildReceiptBlocks({
     const qty = item.qty || item.quantity || 0;
     const baseRate = item.baseRate || item.effectiveRate || item.price || 0;
     const totalAmount = item.total || baseRate * qty;
-    const name = item.name || "";
+    const name = safeAscii(item.name || "");
 
     for (let i = 0; i < name.length || i === 0; i += nameW) {
       const chunk = name.slice(i, i + nameW) || "";
@@ -118,7 +143,7 @@ function buildReceiptBlocks({
       if (chunk.length < nameW) break;
     }
 
-    if (item.hsn) push({ t: "text", v: `  HSN: ${item.hsn}`, dim: true });
+    if (item.hsn) push({ t: "text", v: `  HSN: ${safeAscii(item.hsn)}`, dim: true });
 
     const discount = Number(item.discount || 0);
     if (discount > 0) {
@@ -229,7 +254,7 @@ function buildReceiptBlocks({
         v:
           padRight(d, 14) +
           padLeft(`Rs.${tx.amount.toFixed(2)}`, 12) +
-          padLeft((tx.paymentMethod || "").toUpperCase(), Math.max(0, charWidth - 26)),
+          padLeft(safeAscii((tx.paymentMethod || "").toUpperCase()), Math.max(0, charWidth - 26)),
       });
     });
   }
