@@ -228,6 +228,12 @@ export default function ProductWiseSalesReportPage() {
           th:nth-child(4), td:nth-child(4) { text-align: center; }
           th:nth-child(5), td:nth-child(5) { text-align: right; }
           .footer { margin-top: 18px; border-top: 1.5px solid #e5e7eb; padding-top: 10px; font-size: 10px; color: #6b7280; display: flex; justify-content: space-between; align-items: center; }
+          thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 1px 0 #ddd;
+  }
         </style>
       </head>
       <body>

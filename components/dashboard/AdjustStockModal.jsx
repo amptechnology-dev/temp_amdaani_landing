@@ -8,6 +8,7 @@ import api from "../../utils/api";
 const todayStr = () => new Date().toISOString().split("T")[0];
 
 // Mirrors the reasons used in the mobile app's SelectStockReasonBottomSheet
+// These ids MUST exactly match backend StockTransactionType enum values
 const ADD_REASONS = [
   { id: "NEW_PURCHASE", name: "New Purchase" },
   { id: "STOCK_CORRECTION", name: "Stock Correction (Increase)" },
@@ -89,13 +90,20 @@ export default function AdjustStockModal({ open, onClose, item, onAdjusted }) {
 
     const selectedReason = reasonOptions.find((r) => r.id === reason);
 
+    // ✅ FIX: transactionType must be the actual reason id (DAMAGE, EXPIRED,
+    // PURCHASE_RETURN, SALE_RETURN, NEW_PURCHASE, FREE_STOCK, STOCK_CORRECTION,
+    // INTERNAL_USE) — exactly matching backend StockTransactionType enum.
+    // This is exactly how the mobile app (AdjustStockBottomSheet.jsx) sends it:
+    //   transactionType: reason  →  reason === selectedReason.id
+    // Previously this was hardcoded to "ADJUSTMENT" with the real reason stuck
+    // in a separate `reason` field the backend/report never reads — so
+    // Stock Report filters (Damage / Expired / Purchase Return / Sale Return)
+    // never matched web-created adjustments.
     const body = {
       productId: item._id,
       quantity: finalQuantity,
       ...(rate ? { rate: Number(rate) } : {}),
-      transactionType: "ADJUSTMENT",
-      reason: selectedReason?.id,
-      reasonLabel: selectedReason?.name,
+      transactionType: selectedReason?.id,
       remarks: remarks || "",
       date,
     };

@@ -449,6 +449,12 @@ export default function SalesReportPage() {
           th:nth-child(n+6), td:nth-child(n+6) { text-align: right; }
           .grand-total td { border: 1px solid #ddd; padding: 6px; font-size: 11px; font-weight: 700; }
           .footer { margin-top: 18px; border-top: 1.5px solid #e5e7eb; padding-top: 10px; font-size: 10px; color: #6b7280; display: flex; justify-content: space-between; align-items: center; }
+          thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 1px 0 #ddd;
+  }
         </style>
       </head>
       <body>

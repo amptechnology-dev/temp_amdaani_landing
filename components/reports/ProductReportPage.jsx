@@ -255,6 +255,19 @@ export default function ProductReportPage() {
           th, td { border-bottom: 1px solid #eee; padding: 8px 6px; font-size: 11px; word-wrap: break-word; }
           th { background: #fafafa; font-weight: 700; }
           th:nth-child(n+6), td:nth-child(n+6) { text-align: right; }
+
+          /* ── Sticky column headers on screen scroll ───────────────────
+             On print, sticky has no effect (each printed page just repeats
+             the normal flow), but while viewing the print-preview window on
+             screen and scrolling through a long table, the header row now
+             stays fixed at the top instead of scrolling out of view. */
+          thead th {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            box-shadow: 0 1px 0 #ddd;
+          }
+
           .footer { margin-top: 18px; border-top: 1.5px solid #e5e7eb; padding-top: 10px; font-size: 10px; color: #6b7280; display: flex; justify-content: space-between; align-items: center; }
         </style>
       </head>

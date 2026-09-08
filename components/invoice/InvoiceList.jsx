@@ -54,7 +54,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { generateInvoiceHTML } from "../../utils/invoiceTemplate";
-import { generateThermalInvoiceHTML } from "../../utils/generateThermalInvoiceHTML"; // ✅ NEW
+import { generateThermalInvoiceHTML } from "../../utils/generateThermalInvoiceHTML";
 
 const statusStyles = {
   paid: "bg-green-600 text-white",
@@ -113,8 +113,8 @@ export default function InvoiceListPage({
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const iframeRef = useRef(null);
-  const thermalIframeRef = useRef(null); // ✅ NEW — hidden iframe for thermal print
-  const thermalPayloadRef = useRef(null); // ✅ NEW — holds raw data needed to rebuild thermal HTML on demand
+  const thermalIframeRef = useRef(null);
+  const thermalPayloadRef = useRef(null);
 
   const pageFormat = storedata?.settings?.printMode === "a5" ? "a5" : "a4";
 
@@ -226,6 +226,29 @@ export default function InvoiceListPage({
     } else {
       setStatusFilter((prev) => (prev === chip.key ? "all" : chip.key));
     }
+  };
+
+  const buildEffectiveStoredata = (doc, liveStoredata) => {
+    const hasEmbeddedStoreData = !!doc?.name;
+    if (!hasEmbeddedStoreData) return liveStoredata || {};
+
+    return {
+      ...liveStoredata,
+      name: doc.name,
+      tagline: doc.tagline ?? liveStoredata?.tagline,
+      ownershipType: doc.ownershipType ?? liveStoredata?.ownershipType,
+      gstNumber: doc.gstNumber ?? liveStoredata?.gstNumber,
+      panNumber: doc.panNumber ?? liveStoredata?.panNumber,
+      registrationNo: doc.registrationNo ?? liveStoredata?.registrationNo,
+      contactNo: doc.contactNo ?? liveStoredata?.contactNo,
+      email: doc.email ?? liveStoredata?.email,
+      address: doc.address ?? liveStoredata?.address,
+      bankDetails: doc.bankDetails ?? liveStoredata?.bankDetails,
+      settings: doc.settings ?? liveStoredata?.settings,
+      logoUrl: doc.logoUrl ?? liveStoredata?.logoUrl,
+      signatureUrl: doc.signatureUrl ?? liveStoredata?.signatureUrl,
+      isActive: doc.isActive ?? liveStoredata?.isActive,
+    };
   };
 
   const handleRowClick = async (inv) => {
@@ -380,30 +403,53 @@ export default function InvoiceListPage({
 
       const dateObj = new Date(doc.createdAt || doc.invoiceDate);
 
+      // ── FIX: this was previously an empty placeholder object
+      //    (`invoiceData: { /* ... same as before ... */ }`), which meant
+      //    generateInvoiceHTML — called with createdInvoice: true — read
+      //    grandTotal/subTotal/transactions/remarks/status/isIgst as all
+      //    `undefined`. That's what produced ₹NaN, a missing Payment
+      //    Summary block, missing remarks/terms, and a preview that looked
+      //    nothing like the one from InvoiceSummary.js. Building the real
+      //    object here (same shape handleThermalPrint already built below)
+      //    makes both preview entry points render identically.
+      const invoiceData = {
+        transactions: doc.transactions || [],
+        remarks: doc.remarks || "",
+        paymentMethod: doc.paymentMethod,
+        paymentNote: doc.paymentNote,
+        status: doc.status,
+        isIgst: isIgstDoc,
+        subTotal,
+        discountTotal,
+        roundOff,
+        grandTotal,
+      };
+
       thermalPayloadRef.current = {
         doc,
         cartItems,
         invoiceCalculations,
         formValues,
         dateObj,
-        effectiveStoredata, // ✅ NEW
+        effectiveStoredata,
       };
+
       const html = generateInvoiceHTML({
         preview: false,
         createdInvoice: true,
-        invoiceData: {
-          /* ... same as before ... */
-        },
+        invoiceData,
         formValues,
         cartItems,
         invoiceCalculations,
         invoiceNumber: doc.invoiceNumber,
         currentDate: format(dateObj, "dd-MMM-yyyy"),
         currentTime: format(dateObj, "hh:mm a"),
-        storedata: effectiveStoredata, // ✅ CHANGED — was `storedata`
+        storedata: effectiveStoredata,
         invoiceDate: dateObj,
         isGstInvoice: doc.type === "gst",
         isMrpEnabled: Boolean(doc.isMrpEnabled),
+        isFreePlan:
+          effectiveStoredata?.isFreePlan ?? storedata?.isFreePlan ?? true,
         pageFormat,
         payment: {
           paid: doc.paidAmount ?? 0,
@@ -428,29 +474,6 @@ export default function InvoiceListPage({
     }
   };
 
-  const buildEffectiveStoredata = (doc, liveStoredata) => {
-    const hasEmbeddedStoreData = !!doc?.name;
-    if (!hasEmbeddedStoreData) return liveStoredata || {};
-
-    return {
-      ...liveStoredata,
-      name: doc.name,
-      tagline: doc.tagline ?? liveStoredata?.tagline,
-      ownershipType: doc.ownershipType ?? liveStoredata?.ownershipType,
-      gstNumber: doc.gstNumber ?? liveStoredata?.gstNumber,
-      panNumber: doc.panNumber ?? liveStoredata?.panNumber,
-      registrationNo: doc.registrationNo ?? liveStoredata?.registrationNo,
-      contactNo: doc.contactNo ?? liveStoredata?.contactNo,
-      email: doc.email ?? liveStoredata?.email,
-      address: doc.address ?? liveStoredata?.address,
-      bankDetails: doc.bankDetails ?? liveStoredata?.bankDetails,
-      settings: doc.settings ?? liveStoredata?.settings,
-      logoUrl: doc.logoUrl ?? liveStoredata?.logoUrl,
-      signatureUrl: doc.signatureUrl ?? liveStoredata?.signatureUrl,
-      isActive: doc.isActive ?? liveStoredata?.isActive,
-    };
-  };
-
   const handlePrint = () => {
     const win = iframeRef.current?.contentWindow;
     if (!win) return;
@@ -458,7 +481,6 @@ export default function InvoiceListPage({
     win.print();
   };
 
-  // ✅ NEW — Thermal (USB-connected) print, same pattern as InvoiceSummary.js
   const handleThermalPrint = () => {
     const payload = thermalPayloadRef.current;
     if (!payload) {
@@ -977,9 +999,6 @@ export default function InvoiceListPage({
         </div>
       )}
 
-      {/* ✅ REDESIGNED — bigger dialog, title on its own row, buttons
-          wrap cleanly below, content sits in a gray "viewer" frame like
-          a PDF opened from email/Drive */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-5xl w-full h-[92vh] p-0 flex flex-col overflow-hidden gap-0">
           <DialogHeader className="px-5 py-3 border-b shrink-0 space-y-2.5">
@@ -1056,7 +1075,6 @@ export default function InvoiceListPage({
                 Print
               </Button>
 
-              {/* ✅ NEW — Thermal Print, same as InvoiceSummary.js */}
               <Button
                 size="sm"
                 variant="outline"
@@ -1069,8 +1087,6 @@ export default function InvoiceListPage({
             </div>
           </DialogHeader>
 
-          {/* ✅ NEW — gray "viewer" frame around the white invoice page,
-              like a PDF opened from an email attachment */}
           <div className="flex-1 overflow-auto bg-slate-100 p-4 md:p-6">
             <div className="mx-auto h-full max-w-[850px] bg-white shadow-md rounded-md overflow-hidden">
               <iframe
@@ -1082,7 +1098,6 @@ export default function InvoiceListPage({
             </div>
           </div>
 
-          {/* ✅ NEW — hidden iframe for thermal (USB) print */}
           <iframe
             ref={thermalIframeRef}
             title="thermal-print"
@@ -1098,7 +1113,6 @@ export default function InvoiceListPage({
         </DialogContent>
       </Dialog>
 
-      {/* Cancel confirmation dialog */}
       <AlertDialog open={showCancelConfirm} onOpenChange={setShowCancelConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>

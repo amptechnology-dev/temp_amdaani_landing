@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import React, {
+  useState,
+  useMemo,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import {
@@ -65,10 +71,26 @@ const totalOut = (r) =>
   (r.transferQty || 0) +
   (r.adjustmentOutQty || 0);
 
-const safe = (v) => (v === undefined || v === null || v === "" ? "-" : String(v));
+const safe = (v) =>
+  v === undefined || v === null || v === "" ? "-" : String(v);
 const num = (v) => parseFloat(Number(v || 0).toFixed(2));
 const fmt = (v) =>
-  num(v).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  num(v).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+const pick = (r, ...keys) => {
+  for (const k of keys) {
+    if (r[k] !== undefined && r[k] !== null && r[k] !== "") return r[k];
+  }
+  return 0;
+};
+
+const openingVal = (r) =>
+  pick(r, "openingQty", "openingStock", "opening_stock");
+const adjustmentVal = (r) =>
+  pick(r, "adjustmentQty", "adjustment", "netAdjustmentQty");
 
 const currentFinancialYear = () => {
   const today = new Date();
@@ -139,7 +161,9 @@ export default function StockReportPage() {
     if (!storedata?.address) return "";
     if (typeof storedata.address === "object") {
       const a = storedata.address;
-      return [a.street, a.city, a.state, a.postalCode].filter(Boolean).join(", ");
+      return [a.street, a.city, a.state, a.postalCode]
+        .filter(Boolean)
+        .join(", ");
     }
     return String(storedata.address);
   })();
@@ -151,8 +175,12 @@ export default function StockReportPage() {
       try {
         setFyLoading(true);
         const res = await api.get("/store/financial-years");
-        const list = Array.isArray(res?.data) ? res.data : res?.data?.data || [];
-        const years = list.map((item) => item.financialYear ?? item).filter(Boolean);
+        const list = Array.isArray(res?.data)
+          ? res.data
+          : res?.data?.data || [];
+        const years = list
+          .map((item) => item.financialYear ?? item)
+          .filter(Boolean);
         if (years.length > 0) {
           setFyOptions(years);
           const current = currentFinancialYear();
@@ -219,7 +247,9 @@ export default function StockReportPage() {
     }
     try {
       setSuggestionsLoading(true);
-      const res = await api.get("/product/suggestions", { params: { search: query } });
+      const res = await api.get("/product/suggestions", {
+        params: { search: query },
+      });
       const list = Array.isArray(res?.data)
         ? res.data
         : res?.data?.data || res?.data?.suggestions || [];
@@ -250,7 +280,9 @@ export default function StockReportPage() {
 
   const clearAll = () => {
     const current = currentFinancialYear();
-    setFinancialYear(fyOptions.includes(current) ? current : fyOptions[0] || current);
+    setFinancialYear(
+      fyOptions.includes(current) ? current : fyOptions[0] || current,
+    );
     setActiveType(null);
     setProductSearch("");
     setSelectedProduct(null);
@@ -267,7 +299,8 @@ export default function StockReportPage() {
     runFetch(financialYear, type, productSearch);
   };
 
-  const handleGenerate = () => runFetch(financialYear, activeType, productSearch);
+  const handleGenerate = () =>
+    runFetch(financialYear, activeType, productSearch);
 
   // ── derived ──────────────────────────────────────────────────────────────
   const formattedRange = `FY ${financialYear}`;
@@ -276,17 +309,18 @@ export default function StockReportPage() {
 
   const totals = useMemo(() => {
     const all = allRecordsRef.current;
-    const sum = (fn) => parseFloat(all.reduce((s, r) => s + fn(r), 0).toFixed(2));
+    const sum = (fn) =>
+      parseFloat(all.reduce((s, r) => s + fn(r), 0).toFixed(2));
     return {
       count: all.length,
-      openingQty: sum((r) => num(r.openingQty)),
+      openingQty: sum((r) => num(openingVal(r))),
       purchaseQty: sum((r) => num(r.purchaseQty)),
       returnInQty: sum((r) => num(r.returnInQty)),
       saleQty: sum((r) => num(r.saleQty)),
       returnOutQty: sum((r) => num(r.returnOutQty)),
       damageQty: sum((r) => num(r.damageQty)),
       expiredQty: sum((r) => num(r.expiredQty)),
-      adjustmentQty: sum((r) => num(r.adjustmentQty)),
+      adjustmentQty: sum((r) => num(adjustmentVal(r))),
       closingStock: sum((r) => num(r.closingStock)),
       stockValue: sum((r) => num(r.currentStockValue)),
       averageStockValue: sum((r) => num(r.avgStockValue)),
@@ -308,18 +342,18 @@ export default function StockReportPage() {
       <tr>
         <td style="padding:6px;border-bottom:1px solid #eee;font-size:10px;">${i + 1}</td>
         <td style="padding:6px;border-bottom:1px solid #eee;font-size:10px;">${safe(r.itemDescription)}</td>
-        <td style="padding:6px;border-bottom:1px solid #eee;font-size:10px;text-align:center;">${num(r.openingQty)}</td>
+        <td style="padding:6px;border-bottom:1px solid #eee;font-size:10px;text-align:center;">${num(openingVal(r))}</td>
         <td style="padding:6px;border-bottom:1px solid #eee;font-size:10px;text-align:center;">${num(r.purchaseQty)}</td>
         <td style="padding:6px;border-bottom:1px solid #eee;font-size:10px;text-align:center;">${num(r.returnInQty)}</td>
         <td style="padding:6px;border-bottom:1px solid #eee;font-size:10px;text-align:center;">${num(r.saleQty)}</td>
         <td style="padding:6px;border-bottom:1px solid #eee;font-size:10px;text-align:center;">${num(r.returnOutQty)}</td>
         <td style="padding:6px;border-bottom:1px solid #eee;font-size:10px;text-align:center;">${num(r.damageQty)}</td>
         <td style="padding:6px;border-bottom:1px solid #eee;font-size:10px;text-align:center;">${num(r.expiredQty)}</td>
-        <td style="padding:6px;border-bottom:1px solid #eee;font-size:10px;text-align:center;">${num(r.adjustmentQty)}</td>
+        <td style="padding:6px;border-bottom:1px solid #eee;font-size:10px;text-align:center;">${num(adjustmentVal(r))}</td>
         <td style="padding:6px;border-bottom:1px solid #eee;font-size:10px;text-align:center;">${num(r.closingStock)}</td>
         <td style="padding:6px;border-bottom:1px solid #eee;font-size:10px;text-align:right;">${fmt(r.currentStockValue)}</td>
         <td style="padding:6px;border-bottom:1px solid #eee;font-size:10px;text-align:right;">${fmt(r.avgStockValue)}</td>
-      </tr>`
+      </tr>`,
       )
       .join("");
 
@@ -333,6 +367,12 @@ export default function StockReportPage() {
         .chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
         .chip  { background:#f0f0f0; border:1px solid #ddd; border-radius:12px; padding:4px 10px; font-size:10px; }
         .footer{ margin-top:14px; color:#888; font-size:9px; display:flex; justify-content:space-between; }
+        thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 1px 0 #ddd;
+  }
       </style></head><body>
         <h2 style="text-align:center;">${storeName}</h2>
         ${address ? `<p style="text-align:center;">${address}</p>` : ""}
@@ -417,14 +457,14 @@ export default function StockReportPage() {
       const data = allRecords.map((r, i) => ({
         "SL no": i + 1,
         Item: safe(r.itemDescription),
-        "Opening Stock": num(r.openingQty),
+        "Opening Stock": num(openingVal(r)),
         Purchase: num(r.purchaseQty),
         "Purchase Return": num(r.returnInQty),
         Sale: num(r.saleQty),
         "Sales Return": num(r.returnOutQty),
         Damage: num(r.damageQty),
         Expired: num(r.expiredQty),
-        Adjustment: num(r.adjustmentQty),
+        Adjustment: num(adjustmentVal(r)),
         "Closing Stock": num(r.closingStock),
         "Current Stock Value": num(r.currentStockValue),
         "Average Stock Value": num(r.avgStockValue),
@@ -432,14 +472,14 @@ export default function StockReportPage() {
       data.push({
         "SL no": "",
         Item: `TOTAL (${totals.count} items)`,
-        "Opening Stock": totals.openingQty,
+        "Opening Stock": num(openingVal(r)),
         Purchase: totals.purchaseQty,
         "Purchase Return": totals.returnInQty,
         Sale: totals.saleQty,
         "Sales Return": totals.returnOutQty,
         Damage: totals.damageQty,
         Expired: totals.expiredQty,
-        Adjustment: totals.adjustmentQty,
+        Adjustment: num(adjustmentVal(r)),
         "Closing Stock": totals.closingStock,
         "Current Stock Value": totals.stockValue,
         "Average Stock Value": totals.averageStockValue,
@@ -447,7 +487,9 @@ export default function StockReportPage() {
 
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(data);
-      ws["!cols"] = Object.keys(data[0]).map((k) => ({ wch: Math.max(14, k.length + 2) }));
+      ws["!cols"] = Object.keys(data[0]).map((k) => ({
+        wch: Math.max(14, k.length + 2),
+      }));
       XLSX.utils.book_append_sheet(wb, ws, "Stock Report");
 
       const wbout = XLSX.write(wb, { type: "array", bookType: "xlsx" });
@@ -471,52 +513,80 @@ export default function StockReportPage() {
   const emptyMessage = !financialYear
     ? "Select a financial year and tap Generate."
     : hasFetched
-    ? `No stock records found for ${formattedRange}.`
-    : "Tap Generate to load the report.";
+      ? `No stock records found for ${formattedRange}.`
+      : "Tap Generate to load the report.";
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-slate-50/40">
       <div className="px-4 md:px-6 pt-4 pb-3 shrink-0">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <button onClick={() => window.history.back()} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100">
+            <button
+              onClick={() => window.history.back()}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100"
+            >
               <ChevronLeft className="w-4 h-4" />
             </button>
             <h1 className="text-lg font-bold text-slate-900">Stock Report</h1>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={exportPDF} disabled={!hasData || loading} className="h-9 px-3 rounded-lg border border-slate-200 text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium">
-              <FileText className="w-4 h-4" />PDF
+            <button
+              onClick={exportPDF}
+              disabled={!hasData || loading}
+              className="h-9 px-3 rounded-lg border border-slate-200 text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium"
+            >
+              <FileText className="w-4 h-4" />
+              PDF
             </button>
-            <button onClick={exportExcel} disabled={!hasData || loading} className="h-9 px-3 rounded-lg border border-slate-200 text-emerald-600 hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium">
-              <FileSpreadsheet className="w-4 h-4" />Excel
+            <button
+              onClick={exportExcel}
+              disabled={!hasData || loading}
+              className="h-9 px-3 rounded-lg border border-slate-200 text-emerald-600 hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Excel
             </button>
           </div>
         </div>
 
         {/* Single-row filter toolbar */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-3 flex items-center gap-2 flex-wrap" ref={toolbarRef}>
+        <div
+          className="bg-white border border-slate-200/80 rounded-2xl p-3 flex items-center gap-2 flex-wrap"
+          ref={toolbarRef}
+        >
           {/* FY dropdown */}
           <div className="relative shrink-0">
             <button
-              onClick={() => { setFyOpen((v) => !v); setTypeOpen(false); }}
+              onClick={() => {
+                setFyOpen((v) => !v);
+                setTypeOpen(false);
+              }}
               disabled={fyLoading || loading}
               className="h-9 px-3 rounded-lg border border-slate-200 text-[12.5px] font-medium text-slate-700 flex items-center gap-1.5 disabled:opacity-50"
             >
-              <span>{fyLoading ? "Loading…" : financialYear || "Select FY"}</span>
+              <span>
+                {fyLoading ? "Loading…" : financialYear || "Select FY"}
+              </span>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
             </button>
             {fyOpen && !fyLoading && (
               <div className="absolute z-20 mt-1 left-0 w-[140px] bg-white border border-slate-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
                 {fyOptions.length === 0 ? (
-                  <div className="px-3 py-2 text-sm text-slate-400">No financial years found</div>
+                  <div className="px-3 py-2 text-sm text-slate-400">
+                    No financial years found
+                  </div>
                 ) : (
                   fyOptions.map((fy) => (
                     <button
                       key={fy}
-                      onClick={() => { setFinancialYear(fy); setFyOpen(false); }}
+                      onClick={() => {
+                        setFinancialYear(fy);
+                        setFyOpen(false);
+                      }}
                       className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 ${
-                        fy === financialYear ? "text-emerald-600 font-semibold" : "text-slate-700"
+                        fy === financialYear
+                          ? "text-emerald-600 font-semibold"
+                          : "text-slate-700"
                       }`}
                     >
                       {fy}
@@ -539,12 +609,19 @@ export default function StockReportPage() {
               onChange={(e) => handleSearchChange(e.target.value)}
               onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
               className={`h-9 w-[220px] pl-8 pr-8 rounded-lg border text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 ${
-                selectedProduct ? "border-emerald-400 text-emerald-700" : "border-slate-200 text-slate-700"
+                selectedProduct
+                  ? "border-emerald-400 text-emerald-700"
+                  : "border-slate-200 text-slate-700"
               }`}
             />
             {productSearch && (
               <button
-                onClick={() => { setProductSearch(""); setSelectedProduct(null); setSuggestions([]); setShowSuggestions(false); }}
+                onClick={() => {
+                  setProductSearch("");
+                  setSelectedProduct(null);
+                  setSuggestions([]);
+                  setShowSuggestions(false);
+                }}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
               >
                 <X className="w-3.5 h-3.5" />
@@ -554,24 +631,33 @@ export default function StockReportPage() {
             {showSuggestions && suggestions.length > 0 && (
               <div className="absolute z-20 mt-1 w-[280px] bg-white border border-slate-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
                 {suggestions.map((item, idx) => {
-                  const label = item.name || item.itemDescription || item.productName || "";
+                  const label =
+                    item.name || item.itemDescription || item.productName || "";
                   return (
                     <button
                       key={item._id || item.id || idx}
                       onClick={() => handleSelectSuggestion(item)}
                       className={`w-full text-left px-3.5 py-2.5 hover:bg-slate-50 ${
-                        idx < suggestions.length - 1 ? "border-b border-slate-100" : ""
+                        idx < suggestions.length - 1
+                          ? "border-b border-slate-100"
+                          : ""
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-slate-800 truncate">{label}</span>
+                        <span className="text-sm text-slate-800 truncate">
+                          {label}
+                        </span>
                         {item.currentStock !== undefined && (
-                          <span className="text-xs text-slate-400 ml-2 shrink-0">Stock: {fmt(item.currentStock)}</span>
+                          <span className="text-xs text-slate-400 ml-2 shrink-0">
+                            Stock: {fmt(item.currentStock)}
+                          </span>
                         )}
                       </div>
                       {(item.hsn || item.category) && (
                         <div className="text-xs text-slate-400 mt-0.5 truncate">
-                          {[item.hsn && `HSN: ${item.hsn}`, item.category].filter(Boolean).join(" · ")}
+                          {[item.hsn && `HSN: ${item.hsn}`, item.category]
+                            .filter(Boolean)
+                            .join(" · ")}
                         </div>
                       )}
                     </button>
@@ -584,13 +670,20 @@ export default function StockReportPage() {
           {/* Transaction type dropdown */}
           <div className="relative shrink-0">
             <button
-              onClick={() => { setTypeOpen((v) => !v); setFyOpen(false); }}
+              onClick={() => {
+                setTypeOpen((v) => !v);
+                setFyOpen(false);
+              }}
               disabled={loading}
               className={`h-9 px-3 rounded-lg border text-[12.5px] font-medium flex items-center gap-1.5 disabled:opacity-50 ${
-                activeType != null ? "bg-blue-50 border-blue-200 text-blue-700" : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                activeType != null
+                  ? "bg-blue-50 border-blue-200 text-blue-700"
+                  : "border-slate-200 text-slate-600 hover:bg-slate-50"
               }`}
             >
-              <span>{activeTypeMeta?.icon} {activeTypeMeta?.label || "All Types"}</span>
+              <span>
+                {activeTypeMeta?.icon} {activeTypeMeta?.label || "All Types"}
+              </span>
               <ChevronDown className="w-3.5 h-3.5" />
             </button>
             {typeOpen && (
@@ -600,10 +693,14 @@ export default function StockReportPage() {
                     key={String(key)}
                     onClick={() => handleTypeSelect(key)}
                     className={`w-full text-left px-2.5 py-1.5 rounded-lg text-sm flex items-center justify-between ${
-                      activeType === key ? "bg-blue-50 text-blue-700 font-semibold" : "text-slate-600 hover:bg-slate-50"
+                      activeType === key
+                        ? "bg-blue-50 text-blue-700 font-semibold"
+                        : "text-slate-600 hover:bg-slate-50"
                     }`}
                   >
-                    <span>{icon} {label}</span>
+                    <span>
+                      {icon} {label}
+                    </span>
                     {activeType === key && <Check className="w-3.5 h-3.5" />}
                   </button>
                 ))}
@@ -611,14 +708,23 @@ export default function StockReportPage() {
             )}
           </div>
 
-          <button onClick={clearAll} disabled={loading || fyLoading} title="Reset filters"
-            className="h-9 w-9 shrink-0 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-40">
+          <button
+            onClick={clearAll}
+            disabled={loading || fyLoading}
+            title="Reset filters"
+            className="h-9 w-9 shrink-0 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-40"
+          >
             <CalendarX2 className="w-4 h-4" />
           </button>
 
-          <button onClick={handleGenerate} disabled={!financialYear || loading || fyLoading}
-            className="h-9 px-4 ml-auto shrink-0 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-[13px] font-semibold flex items-center gap-2 transition-colors">
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+          <button
+            onClick={handleGenerate}
+            disabled={!financialYear || loading || fyLoading}
+            className="h-9 px-4 ml-auto shrink-0 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-[13px] font-semibold flex items-center gap-2 transition-colors"
+          >
+            <RefreshCw
+              className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`}
+            />
             {loading ? "Loading..." : "Generate"}
           </button>
         </div>
@@ -658,69 +764,161 @@ export default function StockReportPage() {
               </div>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <SummaryStat label="Items" value={String(totals.count)} />
-                <SummaryStat label="Stock Value" value={fmt(totals.stockValue)} bold />
-                <SummaryStat label="Closing Stock" value={fmt(totals.closingStock)} />
-                <SummaryStat label="Total In" value={fmt(totals.totalIn)} accent="text-emerald-600" />
-                <SummaryStat label="Total Out" value={fmt(totals.totalOut)} accent="text-red-600" />
+                <SummaryStat
+                  label="Stock Value"
+                  value={fmt(totals.stockValue)}
+                  bold
+                />
+                <SummaryStat
+                  label="Closing Stock"
+                  value={fmt(totals.closingStock)}
+                />
+                <SummaryStat
+                  label="Total In"
+                  value={fmt(totals.totalIn)}
+                  accent="text-emerald-600"
+                />
+                <SummaryStat
+                  label="Total Out"
+                  value={fmt(totals.totalOut)}
+                  accent="text-red-600"
+                />
               </div>
             </div>
 
             {/* Table */}
             <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden mb-4">
               <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
-                <h2 className="text-sm font-bold text-slate-800">Stock Movement</h2>
-                <span className="text-xs text-slate-400">{totals.count} items</span>
+                <h2 className="text-sm font-bold text-slate-800">
+                  Stock Movement
+                </h2>
+                <span className="text-xs text-slate-400">
+                  {totals.count} items
+                </span>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
-                      <th className="text-left font-semibold px-4 py-3">Item</th>
-                      <th className="text-right font-semibold px-4 py-3">Opening(+)</th>
-                      <th className="text-right font-semibold px-4 py-3">Purchase(+)</th>
-                      <th className="text-right font-semibold px-4 py-3">Sale Ret.(+)</th>
-                      <th className="text-right font-semibold px-4 py-3">Sale(-)</th>
-                      <th className="text-right font-semibold px-4 py-3">Purch.Ret.(-)</th>
-                      <th className="text-right font-semibold px-4 py-3">Damage(-)</th>
-                      <th className="text-right font-semibold px-4 py-3">Expired(-)</th>
-                      <th className="text-right font-semibold px-4 py-3">Adj.(+-)</th>
-                      <th className="text-right font-semibold px-4 py-3">Closing</th>
-                      <th className="text-right font-semibold px-4 py-3">Stock Value</th>
-                      <th className="text-right font-semibold px-4 py-3">Avg Value</th>
+                      <th className="text-left font-semibold px-4 py-3">
+                        Item
+                      </th>
+                      <th className="text-right font-semibold px-4 py-3">
+                        Opening(+)
+                      </th>
+                      <th className="text-right font-semibold px-4 py-3">
+                        Purchase(+)
+                      </th>
+                      <th className="text-right font-semibold px-4 py-3">
+                        Sale Ret.(+)
+                      </th>
+                      <th className="text-right font-semibold px-4 py-3">
+                        Sale(-)
+                      </th>
+                      <th className="text-right font-semibold px-4 py-3">
+                        Purch.Ret.(-)
+                      </th>
+                      <th className="text-right font-semibold px-4 py-3">
+                        Damage(-)
+                      </th>
+                      <th className="text-right font-semibold px-4 py-3">
+                        Expired(-)
+                      </th>
+                      <th className="text-right font-semibold px-4 py-3">
+                        Adj.(+-)
+                      </th>
+                      <th className="text-right font-semibold px-4 py-3">
+                        Closing
+                      </th>
+                      <th className="text-right font-semibold px-4 py-3">
+                        Stock Value
+                      </th>
+                      <th className="text-right font-semibold px-4 py-3">
+                        Avg Value
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {records?.map((r, i) => (
-                      <tr key={`${r._id || r.id || "row"}-${i}`} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3 font-medium text-slate-800">{safe(r.itemDescription)}</td>
-                        <td className="px-4 py-3 text-right text-slate-600">{num(r.openingQty)}</td>
-                        <td className="px-4 py-3 text-right text-emerald-600">{num(r.purchaseQty)}</td>
-                        <td className="px-4 py-3 text-right text-emerald-600">{num(r.returnInQty)}</td>
-                        <td className="px-4 py-3 text-right text-red-600">{num(r.saleQty)}</td>
-                        <td className="px-4 py-3 text-right text-red-600">{num(r.returnOutQty)}</td>
-                        <td className="px-4 py-3 text-right text-red-600">{num(r.damageQty)}</td>
-                        <td className="px-4 py-3 text-right text-red-600">{num(r.expiredQty)}</td>
-                        <td className="px-4 py-3 text-right text-slate-600">{num(r.adjustmentQty)}</td>
-                        <td className="px-4 py-3 text-right font-semibold text-slate-800">{num(r.closingStock)}</td>
-                        <td className="px-4 py-3 text-right font-semibold text-blue-600">{fmt(r.currentStockValue)}</td>
-                        <td className="px-4 py-3 text-right text-slate-600">{fmt(r.avgStockValue)}</td>
+                      <tr
+                        key={`${r._id || r.id || "row"}-${i}`}
+                        className="hover:bg-slate-50 transition-colors"
+                      >
+                        <td className="px-4 py-3 font-medium text-slate-800">
+                          {safe(r.itemDescription)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-slate-600">
+                          {num(openingVal(r))}
+                        </td>
+                        <td className="px-4 py-3 text-right text-emerald-600">
+                          {num(r.purchaseQty)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-emerald-600">
+                          {num(r.returnInQty)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-red-600">
+                          {num(r.saleQty)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-red-600">
+                          {num(r.returnOutQty)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-red-600">
+                          {num(r.damageQty)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-red-600">
+                          {num(r.expiredQty)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-slate-600">
+                          {num(adjustmentVal(r))}
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold text-slate-800">
+                          {num(r.closingStock)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold text-blue-600">
+                          {fmt(r.currentStockValue)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-slate-600">
+                          {fmt(r.avgStockValue)}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
                     <tr className="bg-slate-50 font-semibold text-slate-800">
                       <td className="px-4 py-3 text-right">TOTAL</td>
-                      <td className="px-4 py-3 text-right">{fmt(totals.openingQty)}</td>
-                      <td className="px-4 py-3 text-right text-emerald-700">{fmt(totals.purchaseQty)}</td>
-                      <td className="px-4 py-3 text-right text-emerald-700">{fmt(totals.returnInQty)}</td>
-                      <td className="px-4 py-3 text-right text-red-700">{fmt(totals.saleQty)}</td>
-                      <td className="px-4 py-3 text-right text-red-700">{fmt(totals.returnOutQty)}</td>
-                      <td className="px-4 py-3 text-right text-red-700">{fmt(totals.damageQty)}</td>
-                      <td className="px-4 py-3 text-right text-red-700">{fmt(totals.expiredQty)}</td>
-                      <td className="px-4 py-3 text-right">{fmt(totals.adjustmentQty)}</td>
-                      <td className="px-4 py-3 text-right">{fmt(totals.closingStock)}</td>
-                      <td className="px-4 py-3 text-right text-blue-700">{fmt(totals.stockValue)}</td>
-                      <td className="px-4 py-3 text-right">{fmt(totals.averageStockValue)}</td>
+                      <td className="px-4 py-3 text-right">
+                        {fmt(totals.openingQty)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-emerald-700">
+                        {fmt(totals.purchaseQty)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-emerald-700">
+                        {fmt(totals.returnInQty)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-red-700">
+                        {fmt(totals.saleQty)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-red-700">
+                        {fmt(totals.returnOutQty)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-red-700">
+                        {fmt(totals.damageQty)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-red-700">
+                        {fmt(totals.expiredQty)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {fmt(totals.adjustmentQty)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {fmt(totals.closingStock)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-blue-700">
+                        {fmt(totals.stockValue)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {fmt(totals.averageStockValue)}
+                      </td>
                     </tr>
                   </tfoot>
                 </table>
@@ -742,7 +940,9 @@ function SummaryStat({ label, value, accent, bold }) {
       <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1">
         {label}
       </div>
-      <div className={`${bold ? "text-lg" : "text-base"} font-bold ${accent || "text-slate-800"} truncate`}>
+      <div
+        className={`${bold ? "text-lg" : "text-base"} font-bold ${accent || "text-slate-800"} truncate`}
+      >
         {value}
       </div>
     </div>

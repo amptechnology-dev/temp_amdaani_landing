@@ -258,6 +258,12 @@ export default function GstReportPage() {
         .chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
         .chip  { background:#f0f0f0; border:1px solid #ddd; border-radius:12px; padding:4px 10px; font-size:10px; }
         .footer{ margin-top:14px; color:#888; font-size:9px; display:flex; justify-content:space-between; }
+        thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 1px 0 #ddd;
+  }
       </style></head><body>
         <h2 style="text-align:center;">${storeName}</h2>
         ${address ? `<p style="text-align:center;">${address}</p>` : ""}
