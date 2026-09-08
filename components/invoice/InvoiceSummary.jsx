@@ -21,6 +21,8 @@ import {
 
 import { generateInvoiceHTML } from "../../utils/invoiceTemplate";
 import { generateThermalInvoiceHTML } from "../../utils/generateThermalInvoiceHTML";
+import { useUSBThermalPrinter } from "../../src/hooks/useUSBThermalPrinter";
+import { generateThermalInvoiceESCPOS } from "../../utils/generateThermalInvoiceESCPOS";
 
 export default function InvoiceSummary({
   invoiceCalculations,
@@ -51,9 +53,18 @@ export default function InvoiceSummary({
   const [isSavingContinue, setIsSavingContinue] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const iframeRef = useRef(null);
-  const thermalIframeRef = useRef(null); // ✅ hidden iframe for thermal (USB) print
+  const thermalIframeRef = useRef(null);
+  const {
+    connect: connectPrinter,
+    disconnect: disconnectPrinter,
+    print: sendToPrinter,
+    isConnected: isPrinterConnected,
+    isConnecting: isPrinterConnecting,
+  } = useUSBThermalPrinter();
 
   const pageFormat = storedata?.settings?.printMode === "a5" ? "a5" : "a4";
+  const hasWebSerial =
+    typeof navigator !== "undefined" && "serial" in navigator;
 
   const buildPreviewHtml = () => {
     const now = new Date();
@@ -87,6 +98,52 @@ export default function InvoiceSummary({
     setIsCreatedInvoice(false);
     setPreviewHtml(buildPreviewHtml());
     setPreviewOpen(true);
+  };
+
+  const handleConnectPrinter = async () => {
+    try {
+      await connectPrinter();
+      toast.success("Printer connected successfully");
+    } catch (err) {
+      toast.error(err.message || "Printer connect korte problem hoyeche");
+    }
+  };
+
+  const handleUSBThermalPrint = async () => {
+    if (!isPrinterConnected) {
+      toast.error("Age 'Connect Printer' e click korun");
+      return;
+    }
+    try {
+      const now = new Date();
+      const receipt = generateThermalInvoiceESCPOS({
+        createdInvoice: isCreatedInvoice,
+        invoiceData: {
+          isIgst: false,
+          subTotal: invoiceCalculations.subtotal,
+          discountTotal: invoiceCalculations.discountTotal,
+          roundOff: invoiceCalculations.roundOff,
+          grandTotal: invoiceCalculations.grandTotal,
+        },
+        formValues,
+        cartItems,
+        invoiceCalculations,
+        invoiceNumber,
+        invoiceDate: now,
+        storedata,
+        isGstInvoice,
+        payment: {
+          paid: payment?.paid ?? 0,
+          due: payment?.due ?? 0,
+          status: payment?.status ?? "unpaid",
+        },
+      });
+      await sendToPrinter(receipt);
+      toast.success("Print is sending printer-e");
+    } catch (err) {
+      console.error("USB print error:", err);
+      toast.error(err.message || "USB print failed");
+    }
   };
 
   const handleCreateClick = async () => {
@@ -442,6 +499,7 @@ export default function InvoiceSummary({
                 )}
                 Download
               </Button>
+
               <Button
                 size="sm"
                 variant="outline"
@@ -456,19 +514,49 @@ export default function InvoiceSummary({
                 )}
                 WhatsApp
               </Button>
+
               <Button size="sm" variant="outline" onClick={handlePrint}>
                 <Printer className="w-3.5 h-3.5 mr-1.5" />
                 Print
               </Button>
-              <Button
+
+              {/* <Button
                 size="sm"
                 variant="outline"
                 onClick={handleThermalPrint}
                 className="text-purple-600 border-purple-200 hover:bg-purple-50"
               >
                 <Printer className="w-3.5 h-3.5 mr-1.5" />
-                Thermal Print
-              </Button>
+                Thermal Print (Browser)
+              </Button> */}
+
+              {hasWebSerial &&
+                (!isPrinterConnected ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleConnectPrinter}
+                    disabled={isPrinterConnecting}
+                    className="text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                  >
+                    {isPrinterConnecting ? (
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    ) : (
+                      <Printer className="w-3.5 h-3.5 mr-1.5" />
+                    )}
+                    Connect Printer
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleUSBThermalPrint}
+                    className="text-purple-600 border-purple-200 hover:bg-purple-50"
+                  >
+                    <Printer className="w-3.5 h-3.5 mr-1.5" />
+                    USB Print
+                  </Button>
+                ))}
             </div>
           </DialogHeader>
 
