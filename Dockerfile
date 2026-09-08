@@ -1,7 +1,8 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm install --legacy-peer-deps
+RUN --mount=type=cache,target=/root/.npm,id=npm-cache \
+    npm ci --legacy-peer-deps
 
 FROM node:22-alpine AS builder
 WORKDIR /app
@@ -13,7 +14,9 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
-RUN npm run build
+
+RUN --mount=type=cache,target=/app/.next/cache,id=next-cache \
+    npm run build
 
 FROM node:22-alpine AS runner
 WORKDIR /app

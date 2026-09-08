@@ -48,11 +48,11 @@ export function useUSBThermalPrinter() {
   const connect = useCallback(async () => {
     if (!("serial" in navigator)) {
       throw new Error(
-        "Web Serial supported na. Chrome ba Edge browser use korun.",
+        "Please Use Chrome or Edge Browser"
       );
     }
     if (!window.isSecureContext) {
-      throw new Error("Ei page HTTPS othoba localhost theke open korte hobe.");
+      throw new Error("Please Use Chrome or Edge Browser");
     }
     if (portRef.current && portRef.current.writable) {
       setIsConnected(true);

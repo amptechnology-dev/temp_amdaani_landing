@@ -9,6 +9,7 @@ import {
   Printer,
   MessageCircle,
   Download,
+  Eye,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,10 @@ import {
 import { generateInvoiceHTML } from "../../utils/invoiceTemplate";
 import { generateThermalInvoiceHTML } from "../../utils/generateThermalInvoiceHTML";
 import { useUSBThermalPrinter } from "../../src/hooks/useUSBThermalPrinter";
-import { generateThermalInvoiceESCPOS } from "../../utils/generateThermalInvoiceESCPOS";
+import {
+  generateThermalInvoiceESCPOS,
+  generateThermalReceiptPreviewHTML,
+} from "../../utils/generateThermalInvoiceESCPOS";
 
 export default function InvoiceSummary({
   invoiceCalculations,
@@ -52,8 +56,14 @@ export default function InvoiceSummary({
   const [isCreating, setIsCreating] = useState(false);
   const [isSavingContinue, setIsSavingContinue] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+
+  // ── Thermal print-preview dialog state ──
+  const [thermalPreviewOpen, setThermalPreviewOpen] = useState(false);
+  const [thermalPreviewHtml, setThermalPreviewHtml] = useState("");
+
   const iframeRef = useRef(null);
   const thermalIframeRef = useRef(null);
+  const thermalPreviewIframeRef = useRef(null);
   const {
     connect: connectPrinter,
     disconnect: disconnectPrinter,
@@ -100,6 +110,35 @@ export default function InvoiceSummary({
     setPreviewOpen(true);
   };
 
+  // ── shared param-builder so ESC/POS print + preview always use the same data ──
+  const buildThermalParams = () => {
+    const now = new Date();
+    return {
+      createdInvoice: isCreatedInvoice,
+      invoiceData: {
+        isIgst: false,
+        transactions: [],
+        subTotal: invoiceCalculations.subtotal,
+        discountTotal: invoiceCalculations.discountTotal,
+        roundOff: invoiceCalculations.roundOff,
+        grandTotal: invoiceCalculations.grandTotal,
+      },
+      formValues,
+      cartItems,
+      invoiceCalculations,
+      invoiceNumber,
+      invoiceDate: now,
+      storedata,
+      isGstInvoice,
+      payment: {
+        paid: payment?.paid ?? 0,
+        due: payment?.due ?? 0,
+        status: payment?.status ?? "unpaid",
+      },
+      charWidth: 42, // 80mm; switch to 32 for 58mm printers
+    };
+  };
+
   const handleConnectPrinter = async () => {
     try {
       await connectPrinter();
@@ -109,41 +148,38 @@ export default function InvoiceSummary({
     }
   };
 
+  // Opens a WYSIWYG preview of the exact thermal receipt (same block layout
+  // that generates the ESC/POS bytes) — so the user can check the look
+  // before actually sending it to the printer.
+  const handlePreviewThermal = () => {
+    if (!cartItems?.length) return;
+    setThermalPreviewHtml(generateThermalReceiptPreviewHTML(buildThermalParams()));
+    setThermalPreviewOpen(true);
+  };
+
   const handleUSBThermalPrint = async () => {
     if (!isPrinterConnected) {
       toast.error("Age 'Connect Printer' e click korun");
       return;
     }
     try {
-      const now = new Date();
-      const receipt = generateThermalInvoiceESCPOS({
-        createdInvoice: isCreatedInvoice,
-        invoiceData: {
-          isIgst: false,
-          subTotal: invoiceCalculations.subtotal,
-          discountTotal: invoiceCalculations.discountTotal,
-          roundOff: invoiceCalculations.roundOff,
-          grandTotal: invoiceCalculations.grandTotal,
-        },
-        formValues,
-        cartItems,
-        invoiceCalculations,
-        invoiceNumber,
-        invoiceDate: now,
-        storedata,
-        isGstInvoice,
-        payment: {
-          paid: payment?.paid ?? 0,
-          due: payment?.due ?? 0,
-          status: payment?.status ?? "unpaid",
-        },
-      });
+      const receipt = generateThermalInvoiceESCPOS(buildThermalParams());
       await sendToPrinter(receipt);
       toast.success("Print is sending printer-e");
     } catch (err) {
       console.error("USB print error:", err);
       toast.error(err.message || "USB print failed");
     }
+  };
+
+  // Print button inside the preview dialog itself
+  const handlePrintFromPreview = async () => {
+    if (!isPrinterConnected) {
+      toast.error("Age 'Connect Printer' e click korun");
+      return;
+    }
+    await handleUSBThermalPrint();
+    setThermalPreviewOpen(false);
   };
 
   const handleCreateClick = async () => {
@@ -164,8 +200,6 @@ export default function InvoiceSummary({
     }
   };
 
-  // ✅ Save & Continue — invoice save kore, form reset kore, notun invoice-er
-  // jonno ready thake (SalesFlow.jsx-er handleSaveAndContinue call kore)
   const handleSaveAndContinueClick = async () => {
     if (!handleSaveAndContinue) return;
     try {
@@ -474,9 +508,51 @@ export default function InvoiceSummary({
         </Button>
       </div>
 
-      {/* ✅ REDESIGNED — bigger dialog, title on its own row, buttons
-          wrap cleanly below, content sits in a gray "viewer" frame like
-          a PDF opened from email/Drive */}
+      {/* ── Thermal printer controls ── */}
+      {hasWebSerial && (
+        <div className="flex flex-wrap gap-2">
+          {!isPrinterConnected ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleConnectPrinter}
+              disabled={isPrinterConnecting}
+              className="text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+            >
+              {isPrinterConnecting ? (
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <Printer className="w-3.5 h-3.5 mr-1.5" />
+              )}
+              Connect Printer
+            </Button>
+          ) : (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handlePreviewThermal}
+                disabled={!cartItems?.length}
+                className="text-slate-700 border-slate-200 hover:bg-slate-50"
+              >
+                <Eye className="w-3.5 h-3.5 mr-1.5" />
+                Preview Thermal Print
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleUSBThermalPrint}
+                className="text-purple-600 border-purple-200 hover:bg-purple-50"
+              >
+                <Printer className="w-3.5 h-3.5 mr-1.5" />
+                USB Print
+              </Button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── Full invoice preview dialog (A4/A5) ── */}
       <Dialog open={previewOpen} onOpenChange={handleModalOpenChange}>
         <DialogContent className="max-w-5xl w-full h-[92vh] p-0 flex flex-col overflow-hidden gap-0">
           <DialogHeader className="px-5 py-3 border-b shrink-0 space-y-2.5">
@@ -519,48 +595,9 @@ export default function InvoiceSummary({
                 <Printer className="w-3.5 h-3.5 mr-1.5" />
                 Print
               </Button>
-
-              {/* <Button
-                size="sm"
-                variant="outline"
-                onClick={handleThermalPrint}
-                className="text-purple-600 border-purple-200 hover:bg-purple-50"
-              >
-                <Printer className="w-3.5 h-3.5 mr-1.5" />
-                Thermal Print (Browser)
-              </Button> */}
-
-              {hasWebSerial &&
-                (!isPrinterConnected ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleConnectPrinter}
-                    disabled={isPrinterConnecting}
-                    className="text-emerald-600 border-emerald-200 hover:bg-emerald-50"
-                  >
-                    {isPrinterConnecting ? (
-                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                    ) : (
-                      <Printer className="w-3.5 h-3.5 mr-1.5" />
-                    )}
-                    Connect Printer
-                  </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleUSBThermalPrint}
-                    className="text-purple-600 border-purple-200 hover:bg-purple-50"
-                  >
-                    <Printer className="w-3.5 h-3.5 mr-1.5" />
-                    USB Print
-                  </Button>
-                ))}
             </div>
           </DialogHeader>
 
-          {/* ✅ gray "viewer" frame around the white invoice page */}
           <div className="flex-1 overflow-auto bg-slate-100 p-4 md:p-6">
             <div className="mx-auto h-full max-w-[850px] bg-white shadow-md rounded-md overflow-hidden">
               <iframe
@@ -572,7 +609,6 @@ export default function InvoiceSummary({
             </div>
           </div>
 
-          {/* Hidden iframe — thermal HTML load hoye window.print() call hoy */}
           <iframe
             ref={thermalIframeRef}
             title="thermal-print"
@@ -585,6 +621,40 @@ export default function InvoiceSummary({
               border: "0",
             }}
           />
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Thermal receipt print-preview dialog ── */}
+      <Dialog open={thermalPreviewOpen} onOpenChange={setThermalPreviewOpen}>
+        <DialogContent className="max-w-md w-full h-[85vh] p-0 flex flex-col overflow-hidden gap-0">
+          <DialogHeader className="px-4 py-3 border-b shrink-0 space-y-2">
+            <DialogTitle className="text-base font-semibold text-slate-800">
+              Thermal Receipt Preview
+            </DialogTitle>
+            <p className="text-xs text-slate-500">
+              This is exactly what will print on the thermal printer.
+            </p>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={handlePrintFromPreview}
+                disabled={!isPrinterConnected}
+                className="flex-1"
+              >
+                <Printer className="w-3.5 h-3.5 mr-1.5" />
+                Print Now
+              </Button>
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-auto bg-slate-200">
+            <iframe
+              ref={thermalPreviewIframeRef}
+              title="thermal-receipt-preview"
+              srcDoc={thermalPreviewHtml}
+              className="w-full h-full border-0"
+            />
+          </div>
         </DialogContent>
       </Dialog>
     </div>
