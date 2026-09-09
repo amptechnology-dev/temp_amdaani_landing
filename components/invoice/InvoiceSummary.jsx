@@ -146,9 +146,7 @@ export default function InvoiceSummary({
     },
   });
 
-  // Preview HTML — same width the actual raster print will use, so what
-  // you see here is exactly what gets sent to the printer.
-  const buildThermalPreviewHtml = () => {
+  const buildThermalPreviewHtml = async () => {
     if (!cartItems?.length) return "";
     return generateThermalReceiptPreviewHTML(
       buildThermalParams(),
@@ -156,11 +154,10 @@ export default function InvoiceSummary({
     );
   };
 
-  // Opens the thermal preview dialog. Works regardless of printer
-  // connection state — pure HTML render, no hardware needed.
-  const handleThermalPreview = () => {
+  const handleThermalPreview = async () => {
     if (!cartItems?.length) return;
-    setThermalPreviewHtml(buildThermalPreviewHtml());
+    const html = await buildThermalPreviewHtml();
+    setThermalPreviewHtml(html);
     setThermalPreviewOpen(true);
   };
 
