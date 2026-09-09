@@ -48,6 +48,7 @@ export default function InvoiceSummary({
   isFreePlan = true,
   appBrand = { name: "AMDAANI", logoUrl: "" },
   submitLabel = "Create Invoice",
+  transactions = [],
 }) {
   const [previewHtml, setPreviewHtml] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -116,20 +117,18 @@ export default function InvoiceSummary({
   // Change to 80 if you're using a 3" (80mm) printer.
   const THERMAL_PAPER_WIDTH_MM = storedata?.settings?.thermalPaperWidthMM || 58;
 
-  // Single shared params builder — preview and actual USB print are always
-  // built from IDENTICAL data. Avoids the earlier bug where preview and
-  // print silently used two different invoiceData shapes.
   const buildThermalParams = () => ({
     createdInvoice: isCreatedInvoice,
     invoiceData: {
-      isIgst: false, // TODO: wire your real inter-state/IGST flag here if applicable
+      isIgst: false,
       subTotal: invoiceCalculations.subtotal,
       discountTotal: invoiceCalculations.discountTotal,
       roundOff: invoiceCalculations.roundOff,
       grandTotal: invoiceCalculations.grandTotal,
       paymentMethod,
       paymentNote,
-      transactions: [],
+      transactions, // ✅ was: transactions: [] — that hardcoded empty array
+      //    was the actual reason Payment Summary never showed.
     },
     formValues,
     cartItems,

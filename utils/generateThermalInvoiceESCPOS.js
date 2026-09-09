@@ -1,17 +1,10 @@
 import { format } from "date-fns";
 
-// ============================================================
-// ONE file, ONE HTML builder (buildThermalReceiptHTML) used by
-// BOTH the on-screen preview AND the actual USB print.
-// ============================================================
-
-// ---------- Paper size ----------
 export const PRINTER_DOT_WIDTH = { 58: 384, 80: 576 };
 export function resolveDotWidth(paperWidthMM) {
   return PRINTER_DOT_WIDTH[paperWidthMM] || PRINTER_DOT_WIDTH[58];
 }
 
-// ---------- Safe image loading ----------
 async function fetchImageAsDataURL(url) {
   if (!url) return null;
   try {
@@ -31,12 +24,7 @@ async function fetchImageAsDataURL(url) {
   }
 }
 
-// ---------- RN-parity character-grid engine ----------
 const FONT_CHAR_PX = { a: 12, b: 9 };
-// Use a font that's actually available everywhere (Consolas is
-// Windows-only and silently falls back to a different-metric font
-// on Mac/Linux/mobile, which was the real cause of lines running
-// past the container edge and getting clipped).
 const FONT_FAMILY = '"Courier New", Courier, monospace';
 
 function getLineCapacity(printerWidthPx = 384, font = "a", sizeW = 1) {
@@ -44,16 +32,9 @@ function getLineCapacity(printerWidthPx = 384, font = "a", sizeW = 1) {
   return Math.floor(printerWidthPx / (charWidth * sizeW));
 }
 
-// ---------- Exact font-size measurement ----------
-// Instead of guessing a px-per-character ratio, measure the REAL
-// rendered width of a monospace character in this browser at a
-// reference size, then solve for the font-size that makes exactly
-// `capacity` characters fill `widthPx` pixels. This guarantees the
-// longest line (a divider or a header row) never overflows the
-// receipt width, so nothing gets clipped by overflow-x: hidden.
 let _measureCanvas = null;
 function measureCharWidthPx(fontSizePx) {
-  if (typeof document === "undefined") return fontSizePx * 0.6; // SSR-safe fallback
+  if (typeof document === "undefined") return fontSizePx * 0.6;
   if (!_measureCanvas) _measureCanvas = document.createElement("canvas");
   const ctx = _measureCanvas.getContext("2d");
   ctx.font = `${fontSizePx}px ${FONT_FAMILY}`;
@@ -65,8 +46,7 @@ function computeFontSizePx(widthPx, capacity) {
   const refCharWidth = measureCharWidthPx(REF);
   if (!refCharWidth) return 12;
   const charWidthPerFontPx = refCharWidth / REF;
-  // 0.97 = small safety margin so rounding never pushes past the edge
-  const size = (widthPx / capacity / charWidthPerFontPx) * 0.97;
+  const size = (widthPx / capacity / charWidthPerFontPx) * 0.98;
   return Math.max(6, size);
 }
 
@@ -145,7 +125,6 @@ function wrappedTextLines(text, opts, widthPx) {
     .join("");
 }
 
-// ---------- Styled monospace HTML — mirrors printThermalInvoice.tsx ----------
 async function buildThermalReceiptHTML({
   createdInvoice,
   invoiceData = {},
@@ -162,13 +141,11 @@ async function buildThermalReceiptHTML({
 }) {
   const out = [];
 
-  // 1) Logo
   const logoDataUrl = await fetchImageAsDataURL(storedata?.logoUrl);
   if (logoDataUrl) {
     out.push(`<div class="center"><img src="${logoDataUrl}" class="logo"/></div>`);
   }
 
-  // 2) Store header
   out.push(wrappedTextLines(storedata?.name || "STORE", { align: "center", bold: true, font: "a" }, widthPx));
   if (storedata?.tagline) {
     out.push(wrappedTextLines(storedata.tagline, { align: "center", font: "b" }, widthPx));
@@ -196,7 +173,6 @@ async function buildThermalReceiptHTML({
   }
   out.push(lineDivider("b", widthPx));
 
-  // 3) Invoice details
   out.push(wrappedTextLines(`Invoice: ${invoiceNumber} `, { font: "b" }, widthPx));
   out.push(
     wrappedTextLines(`Date: ${format(new Date(invoiceDate), "dd-MMM-yyyy hh:mm a")} `, { font: "b" }, widthPx),
@@ -220,7 +196,6 @@ async function buildThermalReceiptHTML({
     out.push(lineDivider("a", widthPx));
   }
 
-  // 4) Items header
   const colWidths = getColumnWidths("b", 1, widthPx);
   out.push(lineColumns(colWidths, ["left", "center", "right", "right"], ["Item", "Qty", "Rate", "Amt"], {
     bold: true,
@@ -228,7 +203,6 @@ async function buildThermalReceiptHTML({
   }));
   out.push(lineDivider("b", widthPx));
 
-  // 5) Items
   const items = cartItems?.length ? cartItems : invoiceData?.items || [];
   for (const item of items) {
     const qty = Number(item.qty || item.quantity || 0);
@@ -276,7 +250,6 @@ async function buildThermalReceiptHTML({
     out.push(lineDivider("b", widthPx));
   }
 
-  // 6) Totals — fixed [20, 12] widths, same as the RN printer
   const totalsWidths = [20, 12];
   const subTotal = createdInvoice ? Number(invoiceData?.subTotal || 0) : Number(invoiceCalculations.subtotal || 0);
   out.push(lineColumns(totalsWidths, ["left", "right"], ["Sub Total", subTotal.toFixed(2)], { font: "a" }));
@@ -331,7 +304,6 @@ async function buildThermalReceiptHTML({
 
   out.push(lineText("", {}));
 
-  // 7) Payment status
   let statusText = "";
   switch ((payment.status || "").toLowerCase()) {
     case "paid":
@@ -365,7 +337,6 @@ async function buildThermalReceiptHTML({
     }
   }
 
-  // 8) Payment summary
   if (!isUnpaid && invoiceData?.transactions && invoiceData.transactions.length > 0) {
     out.push(lineDivider("a", widthPx));
     out.push(lineText("PAYMENT SUMMARY", { align: "center", bold: true, font: "b" }));
@@ -396,7 +367,6 @@ async function buildThermalReceiptHTML({
     }
   }
 
-  // 9) Tax summary
   const gstBreakdown = invoiceCalculations.gstBreakdown || {};
   const gstRates = Object.keys(gstBreakdown).filter((r) => parseFloat(r) > 0);
   if (isGstInvoice && gstRates.length > 0) {
@@ -447,7 +417,6 @@ async function buildThermalReceiptHTML({
     out.push(lineColumns(widths, aligns.slice(0, totalRow.length), totalRow, { font: "b", bold: true }));
   }
 
-  // 10) Scan & Pay QR
   if (storedata?.bankDetails?.upiId) {
     const rawGrandTotal = (invoiceCalculations.grandTotal || 0) - (invoiceCalculations?.discountTotal || 0);
     const roundedGrandTotal = createdInvoice ? Math.round(invoiceData?.grandTotal || 0) : Math.round(rawGrandTotal);
@@ -465,7 +434,6 @@ async function buildThermalReceiptHTML({
     out.push(wrappedTextLines(`Amount: Rs.${roundedGrandTotal}`, { align: "center", font: "a" }, widthPx));
   }
 
-  // 11) Footer
   out.push(lineDivider("a", widthPx));
   out.push(wrappedTextLines("Thank you for your purchase!", { align: "center", font: "b" }, widthPx));
   out.push(wrappedTextLines("Visit Again", { align: "center", font: "b" }, widthPx));
@@ -480,7 +448,6 @@ async function buildThermalReceiptHTML({
 
   const body = out.join("");
 
-  // Compute exact font sizes for this widthPx so nothing overflows the paper edge.
   const capacityA = getLineCapacity(widthPx, "a", 1);
   const capacityB = getLineCapacity(widthPx, "b", 1);
   const fontSizeA = computeFontSizePx(widthPx, capacityA);
@@ -505,12 +472,12 @@ async function buildThermalReceiptHTML({
         }
         .ln {
           white-space: pre;
-          line-height: 1.25;
+          line-height: 1.7;
           letter-spacing: 0;
         }
         .fontA { font-size: ${fontSizeA}px; }
         .fontB { font-size: ${fontSizeB}px; }
-        .big { font-size: ${Math.round(widthPx / 10)}px; line-height: 1.1; }
+        .big { font-size: ${Math.round(widthPx / 10)}px; line-height: 1.3; }
         .bold { font-weight: 700; }
         .left { text-align: left; }
         .center { text-align: center; }
@@ -526,13 +493,11 @@ async function buildThermalReceiptHTML({
   </html>`;
 }
 
-// ---------- Preview: same HTML, same width the print will use ----------
 export async function generateThermalReceiptPreviewHTML(params, paperWidthMM = 58) {
   const widthPx = resolveDotWidth(paperWidthMM);
   return buildThermalReceiptHTML({ ...params, widthPx });
 }
 
-// ---------- Print: screenshot the SAME HTML, send as ESC/POS raster ----------
 const ESC = "\x1B";
 const GS = "\x1D";
 const INIT = `${ESC}\x40`;
