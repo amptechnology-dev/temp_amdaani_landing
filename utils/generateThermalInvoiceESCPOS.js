@@ -27,16 +27,11 @@ async function fetchImageAsDataURL(url) {
 const FONT_FAMILY = '"Courier New", Courier, monospace';
 
 // ---- FONT SIZE CONFIG ----
-// These are the TRUE font sizes (in printer dots/px) that will show up on paper.
-// Since html2canvas renders at scale:1, 1 CSS px === 1 printer dot.
-// Tune these two numbers up/down until the printed text matches what you want
-// (bigger number = bigger text on paper = fewer characters fit per line).
 const BASE_WIDTH_PX = 384; // reference width = 58mm paper
 const BASE_FONT_SIZE_PX = { a: 30, b: 24 }; // font "a" = bigger/bold headers, "b" = normal body
 
 function getFontSizePx(font = "b", printerWidthPx = 384) {
   const base = BASE_FONT_SIZE_PX[font] || BASE_FONT_SIZE_PX.b;
-  // scale proportionally if using 80mm (576px) paper etc.
   return Math.max(10, Math.round(base * (printerWidthPx / BASE_WIDTH_PX)));
 }
 
@@ -53,21 +48,45 @@ function measureCharWidthPx(fontSizePx) {
   return w;
 }
 
-// capacity is now DERIVED from the real font size, not the other way around
+// capacity derived from real font size, with a small safety buffer
 function getLineCapacity(printerWidthPx = 384, font = "a", sizeW = 1) {
   const fontSizePx = getFontSizePx(font, printerWidthPx);
   const charWidth = measureCharWidthPx(fontSizePx) * sizeW;
   if (!charWidth) return 32;
-  return Math.max(1, Math.floor(printerWidthPx / charWidth));
+  const rawCapacity = printerWidthPx / charWidth;
+  // 3% buffer so canvas measureText vs actual render mismatch never causes clipping
+  return Math.max(1, Math.floor(rawCapacity * 0.97));
+}
+
+// capacity minus 1 char per inter-column gap
+function usableCapacity(printerWidthPx, font, sizeW, numColumns) {
+  const cap = getLineCapacity(printerWidthPx, font, sizeW);
+  return Math.max(1, cap - (numColumns - 1));
 }
 
 function wrapTextForPrinter(text, sizeW = 1, lineCapacityBase = 32) {
-  const lineCapacity = Math.floor(lineCapacityBase / sizeW);
+  const lineCapacity = Math.max(1, Math.floor(lineCapacityBase / sizeW));
   const words = String(text ?? "").split(" ");
   const lines = [];
   let current = "";
 
-  for (const word of words) {
+  const breakLongWord = (word) => {
+    let w = word;
+    while (w.length > lineCapacity) {
+      lines.push(w.slice(0, lineCapacity));
+      w = w.slice(lineCapacity);
+    }
+    return w;
+  };
+
+  for (let word of words) {
+    if (word.length > lineCapacity) {
+      if (current) {
+        lines.push(current);
+        current = "";
+      }
+      word = breakLongWord(word);
+    }
     if ((current + " " + word).trim().length <= lineCapacity) {
       current = (current + " " + word).trim();
     } else {
@@ -80,10 +99,27 @@ function wrapTextForPrinter(text, sizeW = 1, lineCapacityBase = 32) {
   return lines.length ? lines : [""];
 }
 
-function getColumnWidths(font = "b", sizeW = 1, printerWidthPx = 384) {
-  const total = getLineCapacity(printerWidthPx, font, sizeW);
-  const ratios = [0.4, 0.1, 0.25, 0.25];
-  const widths = ratios.map((r) => Math.floor(total * r));
+// Item table columns: Item / Qty / Rate / Amt — now sized from real data
+function getColumnWidths(font = "b", sizeW = 1, printerWidthPx = 384, items = []) {
+  const total = usableCapacity(printerWidthPx, font, sizeW, 4);
+
+  let qtyMax = "Qty".length;
+  let rateMax = "Rate".length;
+  let amtMax = "Amt".length;
+
+  for (const it of items) {
+    const qty = String(Number(it.qty || it.quantity || 0));
+    const rate = Number(it.baseRate || it.effectiveRate || it.price || 0).toFixed(2);
+    const amt = Number(
+      it.total || Number(it.baseRate || it.price || 0) * Number(it.qty || it.quantity || 0),
+    ).toFixed(2);
+    qtyMax = Math.max(qtyMax, qty.length);
+    rateMax = Math.max(rateMax, rate.length);
+    amtMax = Math.max(amtMax, amt.length);
+  }
+
+  const nameWidth = Math.max(6, total - (qtyMax + rateMax + amtMax));
+  const widths = [nameWidth, qtyMax, rateMax, amtMax];
   const diff = total - widths.reduce((a, b) => a + b, 0);
   widths[0] += diff;
   return widths;
@@ -97,9 +133,13 @@ function escapeHtml(str) {
 }
 
 function padCell(text, width, align) {
-  const str = String(text ?? "");
-  if (str.length >= width) return str;
+  let str = String(text ?? "");
+  if (str.length > width) {
+    // hard safety net — should rarely trigger since widths are now data-driven
+    str = width > 1 ? str.slice(0, width - 1) + "…" : str.slice(0, width);
+  }
   const diff = width - str.length;
+  if (diff <= 0) return str;
   if (align === "right") return " ".repeat(diff) + str;
   if (align === "center") {
     const left = Math.floor(diff / 2);
@@ -109,8 +149,10 @@ function padCell(text, width, align) {
   return str + " ".repeat(diff);
 }
 
+// explicit 1-char gap between columns so right-aligned numbers never touch
+const COL_GAP = " ";
 function formatColumns(widths, aligns, values) {
-  return widths.map((w, i) => padCell(values[i], w, aligns[i])).join("");
+  return widths.map((w, i) => padCell(values[i], w, aligns[i])).join(COL_GAP);
 }
 
 function lineText(text, { align = "left", bold = false, font = "b", big = false } = {}) {
@@ -207,14 +249,17 @@ async function buildThermalReceiptHTML({
     out.push(lineDivider("a", widthPx));
   }
 
-  const colWidths = getColumnWidths("b", 1, widthPx);
-  out.push(lineColumns(colWidths, ["left", "center", "right", "right"], ["Item", "Qty", "Rate", "Amt"], {
-    bold: true,
-    font: "b",
-  }));
+  const items = cartItems?.length ? cartItems : invoiceData?.items || [];
+
+  const colWidths = getColumnWidths("b", 1, widthPx, items);
+  out.push(
+    lineColumns(colWidths, ["left", "center", "right", "right"], ["Item", "Qty", "Rate", "Amt"], {
+      bold: true,
+      font: "b",
+    }),
+  );
   out.push(lineDivider("b", widthPx));
 
-  const items = cartItems?.length ? cartItems : invoiceData?.items || [];
   for (const item of items) {
     const qty = Number(item.qty || item.quantity || 0);
     const baseRate = Number(item.baseRate || item.effectiveRate || item.price || 0);
@@ -248,20 +293,22 @@ async function buildThermalReceiptHTML({
     });
 
     if (totalDiscount > 0) {
-      out.push(
-        lineColumns(
-          colWidths,
-          ["left", "center", "right", "right"],
-          [`${item.hsn ? `HSN: ${item.hsn} ` : ""}`, "", `Dis ${discountPercent ? `${discountPercent}%` : ""}`, ""],
-          { font: "b" },
-        ),
-      );
+      const discLabel = `${item.hsn ? `HSN: ${item.hsn}  ` : ""}Dis ${
+        discountPercent ? `${discountPercent}% ` : ""
+      }(-${totalDiscount.toFixed(2)})`;
+      out.push(wrappedTextLines(discLabel, { font: "b" }, widthPx));
     }
 
     out.push(lineDivider("b", widthPx));
   }
 
-  const totalsWidths = [20, 12];
+  // totals block width — dynamic, based on real capacity, not hardcoded
+  const totalsWidths = (() => {
+    const total = usableCapacity(widthPx, "a", 1, 2);
+    const valueWidth = Math.max(9, Math.min(12, Math.floor(total * 0.32)));
+    return [total - valueWidth, valueWidth];
+  })();
+
   const subTotal = createdInvoice ? Number(invoiceData?.subTotal || 0) : Number(invoiceCalculations.subtotal || 0);
   out.push(lineColumns(totalsWidths, ["left", "right"], ["Sub Total", subTotal.toFixed(2)], { font: "a" }));
 
@@ -294,10 +341,12 @@ async function buildThermalReceiptHTML({
   const grandTotal = createdInvoice
     ? Math.round(invoiceData?.grandTotal || 0)
     : Math.round((invoiceCalculations.grandTotal || 0) - (invoiceCalculations?.discountTotal || 0));
-  out.push(lineColumns(totalsWidths, ["left", "right"], ["Net Total", grandTotal.toFixed(2)], {
-    font: "a",
-    bold: true,
-  }));
+  out.push(
+    lineColumns(totalsWidths, ["left", "right"], ["Net Total", grandTotal.toFixed(2)], {
+      font: "a",
+      bold: true,
+    }),
+  );
 
   const isUnpaid = (payment.status || "").toLowerCase() === "unpaid";
   if (!isUnpaid && (payment.paid > 0 || payment.due > 0)) {
@@ -353,7 +402,7 @@ async function buildThermalReceiptHTML({
     out.push(lineText("PAYMENT SUMMARY", { align: "center", bold: true, font: "b" }));
     out.push(lineDivider("b", widthPx));
 
-    const cap = getLineCapacity(widthPx, "b", 1);
+    const cap = usableCapacity(widthPx, "b", 1, 3);
     const ratios = [0.5, 0.25, 0.25];
     const widths = ratios.map((r) => Math.floor(cap * r));
     widths[widths.length - 1] += cap - widths.reduce((a, b) => a + b, 0);
@@ -387,12 +436,13 @@ async function buildThermalReceiptHTML({
     out.push(lineText("TAX SUMMARY", { align: "center", bold: true, font: "b" }));
     out.push(lineDivider("b", widthPx));
 
-    const cap = getLineCapacity(widthPx, "b", 1);
-    const ratios = isIgst ? [0.25, 0.35, 0.4] : [0.25, 0.25, 0.25, 0.25];
+    const numCols = isIgst ? 3 : 4;
+    const cap = usableCapacity(widthPx, "b", 1, numCols);
+    const ratios = isIgst ? [0.3, 0.35, 0.35] : [0.22, 0.28, 0.25, 0.25];
     const widths = ratios.map((r) => Math.floor(cap * r));
     widths[widths.length - 1] += cap - widths.reduce((a, b) => a + b, 0);
     const aligns = ["left", "right", "right", "right"];
-    const headers = isIgst ? ["GST%", "Tax Value", "IGST"] : ["GST%", "Tax Value", "CGST", "SGST"];
+    const headers = isIgst ? ["GST%", "Taxable", "IGST"] : ["GST%", "Taxable", "CGST", "SGST"];
 
     out.push(lineColumns(widths, aligns.slice(0, headers.length), headers, { font: "b", bold: true }));
     out.push(lineDivider("b", widthPx));
