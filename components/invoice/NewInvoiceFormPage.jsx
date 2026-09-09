@@ -40,7 +40,7 @@ import AddItemFormModal from "./AddItemFormModal";
 import indianStatesData from "../../src/assets/data/states.json";
 
 // -------------------------------
-// Payment method options — mirrors the React Native PaymentMethodBottomSheet
+// Payment method options
 // -------------------------------
 const PAYMENT_OPTIONS = [
   { label: "Cash", value: "cash", icon: Banknote },
@@ -48,12 +48,6 @@ const PAYMENT_OPTIONS = [
   { label: "Card", value: "card", icon: CreditCard },
   { label: "Bank Transfer", value: "bank_transfer", icon: Landmark },
   { label: "Cheque", value: "cheque", icon: Receipt },
-];
-
-const QUICK_PAYMENT_OPTIONS = [
-  { label: "Cash", value: "cash", Icon: Banknote },
-  { label: "Bank", value: "bank_transfer", Icon: Landmark },
-  { label: "UPI", value: "upi", Icon: QrCode },
 ];
 
 const INDIAN_STATES = indianStatesData?.states || [];
@@ -88,11 +82,108 @@ const getReferencePlaceholder = (method) => {
   }
 };
 
-// -------------------------------
-// Payment method modal — web equivalent of the RN bottom sheet,
-// plus Full / Partial payment support baked in.
-// Partial payment is disabled when no customer is selected.
-// -------------------------------
+function PaymentMethodDropdown({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
+  const btnRef = useRef(null);
+  const menuRef = useRef(null);
+  const selected = PAYMENT_OPTIONS.find((p) => p.value === value) || PAYMENT_OPTIONS[0];
+  const SelectedIcon = selected.icon;
+
+  const updateCoords = () => {
+    if (!btnRef.current) return;
+    const rect = btnRef.current.getBoundingClientRect();
+    setCoords({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    updateCoords();
+    const handle = () => updateCoords();
+    window.addEventListener("scroll", handle, true);
+    window.addEventListener("resize", handle);
+    return () => {
+      window.removeEventListener("scroll", handle, true);
+      window.removeEventListener("resize", handle);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    const onClickOutside = (e) => {
+      if (
+        btnRef.current && !btnRef.current.contains(e.target) &&
+        menuRef.current && !menuRef.current.contains(e.target)
+      ) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        ref={btnRef}
+        onClick={() => setOpen((o) => !o)}
+        className="h-10 w-full min-w-[170px] px-3 flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:border-blue-300 transition-colors"
+      >
+        <span className="flex items-center gap-2">
+          <SelectedIcon className="w-4 h-4 text-blue-600" />
+          {selected.label}
+        </span>
+        <ChevronRight
+          className={`w-4 h-4 text-slate-400 transition-transform ${
+            open ? "rotate-90" : ""
+          }`}
+        />
+      </button>
+
+      {open &&
+        typeof window !== "undefined" &&
+        createPortal(
+          <div
+            ref={menuRef}
+            style={{
+              position: "fixed",
+              top: coords.top,
+              left: coords.left,
+              width: coords.width,
+              zIndex: 9999,
+            }}
+            className="min-w-[200px] bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden"
+          >
+            {PAYMENT_OPTIONS.map((opt) => {
+              const Icon = opt.icon;
+              const isSelected = opt.value === value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt.value);
+                    setOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left transition-colors ${
+                    isSelected
+                      ? "bg-blue-50 text-blue-700 font-semibold"
+                      : "text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {opt.label}
+                  {isSelected && <Check className="w-4 h-4 ml-auto text-blue-600" />}
+                </button>
+              );
+            })}
+          </div>,
+          document.body,
+        )}
+    </div>
+  );
+}
+
 function PaymentMethodModal({
   open,
   onClose,
@@ -104,6 +195,7 @@ function PaymentMethodModal({
   setPaidAmount,
   grandTotal,
   hasCustomer,
+  onRequireCustomer,
 }) {
   const [localMethod, setLocalMethod] = useState(paymentMethod || "cash");
   const [localNote, setLocalNote] = useState(paymentNote || "");
@@ -157,7 +249,7 @@ function PaymentMethodModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 shrink-0">
-          <h3 className="text-sm font-semibold text-slate-800">
+          <h3 className="text-base font-semibold text-slate-800">
             Select Payment Method
           </h3>
           <button
@@ -209,7 +301,7 @@ function PaymentMethodModal({
 
           {localMethod !== "cash" && (
             <div>
-              <label className="text-[11px] font-medium text-slate-500 mb-1 block">
+              <label className="text-xs font-medium text-slate-500 mb-1 block">
                 {getReferenceLabel(localMethod)}
               </label>
               <input
@@ -224,7 +316,7 @@ function PaymentMethodModal({
           )}
 
           <div>
-            <label className="text-[11px] font-medium text-slate-500 mb-1.5 block">
+            <label className="text-xs font-medium text-slate-500 mb-1.5 block">
               Payment Status
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -241,34 +333,28 @@ function PaymentMethodModal({
               </button>
               <button
                 type="button"
-                disabled={!hasCustomer}
-                onClick={() => hasCustomer && setLocalPaidType("partial")}
-                title={
-                  !hasCustomer
-                    ? "Select a customer to enable partial payment"
-                    : undefined
-                }
+                onClick={() => {
+                  // POPUP instead of disabled: click still works, but
+                  // if there's no customer we intercept and show the modal.
+                  if (!hasCustomer) {
+                    onRequireCustomer?.();
+                    return;
+                  }
+                  setLocalPaidType("partial");
+                }}
                 className={`h-9 rounded-lg text-xs font-semibold border transition-colors ${
-                  !hasCustomer
-                    ? "border-slate-100 text-slate-300 bg-slate-50 cursor-not-allowed"
-                    : localPaidType === "partial"
-                      ? "bg-blue-600 border-blue-600 text-white"
-                      : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                  localPaidType === "partial"
+                    ? "bg-blue-600 border-blue-600 text-white"
+                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
                 }`}
               >
                 Partial Payment
               </button>
             </div>
 
-            {!hasCustomer && (
-              <p className="text-[11px] text-amber-600 mt-1.5">
-                Select a customer to allow partial payment.
-              </p>
-            )}
-
             {localPaidType === "partial" && hasCustomer && (
               <div className="mt-3">
-                <label className="text-[11px] font-medium text-slate-500 mb-1 block">
+                <label className="text-xs font-medium text-slate-500 mb-1 block">
                   Amount Paid Now
                 </label>
                 <input
@@ -278,7 +364,7 @@ function PaymentMethodModal({
                   placeholder="0.00"
                   className="w-full h-9 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-white"
                 />
-                <div className="flex items-center justify-between mt-2 text-[11px]">
+                <div className="flex items-center justify-between mt-2 text-xs">
                   <span className="text-slate-400">
                     Grand Total: ₹{grandTotal.toFixed(2)}
                   </span>
@@ -313,7 +399,7 @@ function PaymentMethodModal({
 }
 
 // -------------------------------
-// Remarks modal — web equivalent of AddInvoiceRemarksBottomSheet
+// Remarks modal
 // -------------------------------
 function RemarksModal({ open, onClose, remarks, setRemarks }) {
   const [localRemarks, setLocalRemarks] = useState(remarks || "");
@@ -339,7 +425,7 @@ function RemarksModal({ open, onClose, remarks, setRemarks }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-          <h3 className="text-sm font-semibold text-slate-800">
+          <h3 className="text-base font-semibold text-slate-800">
             Invoice Remarks
           </h3>
           <button
@@ -382,8 +468,44 @@ function RemarksModal({ open, onClose, remarks, setRemarks }) {
 }
 
 // -------------------------------
-// Inline product combobox for the "add row" — portal based dropdown,
-// arrow-key navigation (Up/Down/Enter/Escape) mirrors the Purchase flow.
+// NEW: Customer-required modal — replaces disabled-field / silent
+// validation whenever partial payment is attempted without a customer.
+// -------------------------------
+function CustomerRequiredModal({ open, onClose }) {
+  if (!open) return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-6 text-center"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="w-12 h-12 mx-auto rounded-full bg-amber-100 flex items-center justify-center mb-3">
+          <User className="w-6 h-6 text-amber-600" />
+        </div>
+        <h3 className="text-lg font-semibold text-slate-800 mb-1.5">
+          Customer Required
+        </h3>
+        <p className="text-sm text-slate-500 mb-4 leading-relaxed">
+          For partial payments, you need to select or add a customer first. Please fill in the customer details before proceeding with a partial payment.
+        </p>
+        <Button
+          onClick={onClose}
+          className="w-full rounded-lg bg-blue-600 hover:bg-blue-700 text-sm h-10"
+        >
+          Okay, Got it
+        </Button>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+// -------------------------------
+// Inline product combobox for the "add row"
 // -------------------------------
 function InlineProductCombobox({ products, onSelect, onCreateNew }) {
   const [query, setQuery] = useState("");
@@ -544,7 +666,7 @@ function InlineProductCombobox({ products, onSelect, onCreateNew }) {
                   <p className="font-medium text-slate-800 truncate">
                     {p.name}
                   </p>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-xs text-slate-400">
                     HSN: {p.hsn || "-"} · {p.unit || "Pcs"}
                   </p>
                 </div>
@@ -584,7 +706,7 @@ function InlineProductCombobox({ products, onSelect, onCreateNew }) {
 }
 
 // -------------------------------
-// Compact State selector — search + popover, matches Customer form sizing
+// Compact State selector
 // -------------------------------
 function CustomerStateSelect({ value, onChange }) {
   const [open, setOpen] = useState(false);
@@ -620,11 +742,11 @@ function CustomerStateSelect({ value, onChange }) {
 
   return (
     <div className="relative" ref={wrapRef}>
-      <Landmark className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 z-10" />
+      <Landmark className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 z-10" />
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full h-8 pl-7 pr-2.5 text-xs text-left border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-slate-50/60 hover:bg-white transition-colors flex items-center"
+        className="w-full h-9 pl-7 pr-2.5 text-sm text-left border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-slate-50/60 hover:bg-white transition-colors flex items-center"
       >
         <span className={value ? "text-slate-700" : "text-slate-400"}>
           {value || "State"}
@@ -639,12 +761,12 @@ function CustomerStateSelect({ value, onChange }) {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search state..."
-              className="w-full h-7 px-2 text-xs border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full h-8 px-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
           <div className="overflow-y-auto">
             {filtered.length === 0 ? (
-              <p className="text-center text-xs text-slate-400 py-4">
+              <p className="text-center text-sm text-slate-400 py-4">
                 No state found
               </p>
             ) : (
@@ -654,14 +776,14 @@ function CustomerStateSelect({ value, onChange }) {
                   <div
                     key={s.id}
                     onClick={() => handleSelect(s)}
-                    className={`flex items-center justify-between px-2.5 py-1.5 text-xs cursor-pointer ${
+                    className={`flex items-center justify-between px-2.5 py-1.5 text-sm cursor-pointer ${
                       selected
                         ? "bg-blue-50 text-blue-700 font-medium"
                         : "text-slate-700 hover:bg-slate-50"
                     }`}
                   >
                     <span className="truncate">{s.name}</span>
-                    <span className="text-[10px] text-slate-400 shrink-0 ml-2">
+                    <span className="text-xs text-slate-400 shrink-0 ml-2">
                       {s.code}
                     </span>
                   </div>
@@ -685,9 +807,9 @@ const emptyCustomerForm = {
   gstNumber: "",
 };
 
-// Smaller, compact input style for the Customer Details form
+// Bigger, easier-to-read input style for the Customer Details form
 const inputClass =
-  "w-full h-8 pl-7 pr-2.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-slate-50/60 focus:bg-white transition-colors";
+  "w-full h-9 pl-7 pr-2.5 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-slate-50/60 focus:bg-white transition-colors";
 
 export default function NewInvoiceFormPage({
   isLoading,
@@ -724,14 +846,12 @@ export default function NewInvoiceFormPage({
   handleUpdateItemField,
   handleRemoveItem,
   handleClearCart,
-  // ✅ এই তিনটা প্রপস SalesFlow.jsx থেকে আসছে — এখানে আর নতুন করে
-  // local state হিসেবে declare করা যাবে না, তাহলে duplicate error হবে
   additionalCharges = [],
   setAdditionalCharges,
   handleSaveAndContinue,
 }) {
   // -------------------------------
-  // Customer form state — mirrors DB schema exactly
+  // Customer form state
   // -------------------------------
   const [customerForm, setCustomerForm] = useState(() => ({
     ...emptyCustomerForm,
@@ -762,8 +882,11 @@ export default function NewInvoiceFormPage({
   // Payment / Remarks modals
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [remarksModalOpen, setRemarksModalOpen] = useState(false);
+  // NEW: "Customer Required" popup — shown instead of a disabled field
+  const [showCustomerRequiredModal, setShowCustomerRequiredModal] =
+    useState(false);
 
-  // ---- Additional Charges (UI-only local state) + Quick Received Amount ----
+  // ---- Additional Charges + Quick Received Amount ----
   const [addingCharge, setAddingCharge] = useState(false);
   const [chargeName, setChargeName] = useState("");
   const [chargeAmount, setChargeAmount] = useState("");
@@ -1041,11 +1164,8 @@ export default function NewInvoiceFormPage({
     return sum + perUnitDiscount * qty;
   }, 0);
 
-  // ✅ SalesFlow.jsx-এ যেই netTotal calculate হয় (discount + additional
-  // charges + round off সব ধরে) — সেটাই একমাত্র "সত্যি" গ্র্যান্ড টোটাল।
   const displayGrandTotal = Number(invoiceCalculations.netTotal || 0);
 
-  // ✅ Real CGST/SGST/IGST — SalesFlow.jsx-এর gstBreakdown থেকে সরাসরি sum
   const gstTotals = Object.values(
     invoiceCalculations.gstBreakdown || {},
   ).reduce(
@@ -1060,13 +1180,14 @@ export default function NewInvoiceFormPage({
 
   const dueAmount = Math.max(displayGrandTotal - Number(paidAmount || 0), 0);
 
-  // ✅ Whether a customer has actually been entered/selected
+  // Whether a customer has actually been entered/selected
   const hasCustomer = Boolean(
     (customerForm.name && customerForm.name.trim()) ||
     (customerForm.mobile && customerForm.mobile.trim()),
   );
 
-  // ✅ If customer gets cleared while a partial payment was set, force it back to full
+  // Safety net: if customer gets cleared while a partial payment was set,
+  // force it back to full (prevents an invalid state).
   useEffect(() => {
     if (
       !hasCustomer &&
@@ -1078,10 +1199,16 @@ export default function NewInvoiceFormPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasCustomer]);
 
-  const selectedPaymentOption =
-    PAYMENT_OPTIONS.find((p) => p.value === paymentMethod) ||
-    PAYMENT_OPTIONS[0];
-  const SelectedPaymentIcon = selectedPaymentOption.icon;
+  // NEW: guarded setter passed down to InvoiceSummary — blocks partial
+  // amounts with the popup instead of silently clamping/erroring.
+  const guardedSetPaidAmount = (nextValue) => {
+    const n = Number(nextValue || 0);
+    if (!hasCustomer && n > 0 && n < displayGrandTotal) {
+      setShowCustomerRequiredModal(true);
+      return;
+    }
+    setPaidAmount(nextValue);
+  };
 
   const toggleOrderDiscountType = () => {
     setDiscount((prev) => ({
@@ -1101,7 +1228,7 @@ export default function NewInvoiceFormPage({
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-5">
-        {/* Header — compact, blue-accented */}
+        {/* Header */}
         <div className="relative bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="h-1 w-full bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-500" />
           <div className="px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
@@ -1116,16 +1243,16 @@ export default function NewInvoiceFormPage({
               </Button>
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
+                  <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
                     {isEditMode ? "Edit Invoice" : "New Invoice"}
                   </h1>
                   {isEditMode && (
-                    <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border border-amber-200 text-[10px] px-1.5 py-0">
+                    <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border border-amber-200 text-xs px-1.5 py-0">
                       Editing
                     </Badge>
                   )}
                 </div>
-                <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
                   <Sparkles className="w-3 h-3 text-blue-500" />
                   Add a customer and items to{" "}
                   {isEditMode ? "update" : "generate"} the invoice
@@ -1134,22 +1261,22 @@ export default function NewInvoiceFormPage({
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-full text-xs text-slate-600 font-medium">
-                <Calendar className="w-3 h-3 text-slate-400" />
+              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-full text-sm text-slate-600 font-medium">
+                <Calendar className="w-3.5 h-3.5 text-slate-400" />
                 {format(new Date(), "dd MMM yyyy")}
               </div>
-              <div className="flex items-center gap-1.5 bg-blue-600 px-2.5 py-1 rounded-full text-xs text-white font-semibold shadow-sm shadow-blue-200">
-                <Hash className="w-3 h-3 text-blue-200" />
+              <div className="flex items-center gap-1.5 bg-blue-600 px-2.5 py-1 rounded-full text-sm text-white font-semibold shadow-sm shadow-blue-200">
+                <Hash className="w-3.5 h-3.5 text-blue-200" />
                 {invoiceNumber || "Loading..."}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Customer — compact form, now placed below Items */}
+        {/* Customer */}
         <Card className="rounded-2xl border-slate-200 shadow-sm overflow-visible relative">
           <CardHeader className="bg-gradient-to-r from-blue-50 to-transparent border-b border-slate-100 py-2 px-4 rounded-t-2xl">
-            <CardTitle className="flex items-center justify-between text-xs font-semibold text-slate-700">
+            <CardTitle className="flex items-center justify-between text-sm font-semibold text-slate-700">
               <span className="flex items-center gap-2">
                 <span className="w-6 h-6 rounded-lg bg-blue-600 flex items-center justify-center shadow-sm shadow-blue-200">
                   <UserCircle2 className="w-3 h-3 text-white" />
@@ -1159,7 +1286,7 @@ export default function NewInvoiceFormPage({
               {(customerForm.name || customerForm.mobile) && (
                 <button
                   onClick={handleClearCustomer}
-                  className="flex items-center gap-1 text-[11px] text-rose-500 hover:text-rose-600 hover:underline font-medium"
+                  className="flex items-center gap-1 text-xs text-rose-500 hover:text-rose-600 hover:underline font-medium"
                 >
                   <X className="w-3 h-3" />
                   Clear
@@ -1173,7 +1300,7 @@ export default function NewInvoiceFormPage({
               className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2"
             >
               <div className="relative">
-                <Phone className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 z-10" />
+                <Phone className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 z-10" />
                 <input
                   value={customerForm.mobile}
                   onChange={updateField("mobile")}
@@ -1201,7 +1328,7 @@ export default function NewInvoiceFormPage({
                           <p className="font-medium text-slate-800 truncate">
                             {c.name || "Unnamed"}
                           </p>
-                          <p className="text-[11px] text-slate-400">
+                          <p className="text-xs text-slate-400">
                             {c.mobile}
                           </p>
                         </div>
@@ -1212,7 +1339,7 @@ export default function NewInvoiceFormPage({
               </div>
 
               <div className="relative">
-                <User className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 z-10" />
+                <User className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 z-10" />
                 <input
                   value={customerForm.name}
                   onChange={updateField("name")}
@@ -1239,7 +1366,7 @@ export default function NewInvoiceFormPage({
                           <p className="font-medium text-slate-800 truncate">
                             {c.name || "Unnamed"}
                           </p>
-                          <p className="text-[11px] text-slate-400">
+                          <p className="text-xs text-slate-400">
                             {c.mobile}
                           </p>
                         </div>
@@ -1250,7 +1377,7 @@ export default function NewInvoiceFormPage({
               </div>
 
               <div className="relative">
-                <FileText className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                <FileText className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                 <input
                   value={customerForm.gstNumber}
                   onChange={(e) =>
@@ -1265,7 +1392,7 @@ export default function NewInvoiceFormPage({
               </div>
 
               <div className="relative">
-                <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                 <input
                   value={customerForm.address}
                   onChange={updateField("address")}
@@ -1275,7 +1402,7 @@ export default function NewInvoiceFormPage({
               </div>
 
               <div className="relative">
-                <Building2 className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                <Building2 className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                 <input
                   value={customerForm.city}
                   onChange={updateField("city")}
@@ -1299,7 +1426,7 @@ export default function NewInvoiceFormPage({
               />
 
               <div className="relative">
-                <Locate className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                <Locate className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                 <input
                   value={customerForm.postalCode}
                   onChange={updateField("postalCode")}
@@ -1312,17 +1439,17 @@ export default function NewInvoiceFormPage({
           </CardContent>
         </Card>
 
-        {/* Items — moved up to where Customer used to be, now the primary focus */}
+        {/* Items */}
         <Card className="rounded-2xl border-slate-200 shadow-sm overflow-hidden">
           <CardHeader className="bg-gradient-to-r from-blue-50 to-transparent border-b border-slate-100 py-3 px-4">
-            <CardTitle className="flex items-center justify-between text-sm font-semibold text-slate-700">
+            <CardTitle className="flex items-center justify-between text-base font-semibold text-slate-700">
               <span className="flex items-center gap-2.5">
                 <span className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center shadow-sm shadow-blue-200">
                   <ShoppingBag className="w-3.5 h-3.5 text-white" />
                 </span>
                 Items
                 {cartItems.length > 0 && (
-                  <Badge className="ml-1 bg-blue-600 hover:bg-blue-600 text-[10px]">
+                  <Badge className="ml-1 bg-blue-600 hover:bg-blue-600 text-xs">
                     {invoiceCalculations.totalQuantity} qty
                   </Badge>
                 )}
@@ -1334,7 +1461,7 @@ export default function NewInvoiceFormPage({
                   setNewItemPrefillName("");
                   setShowAddItemModal(true);
                 }}
-                className="h-8 rounded-full text-xs gap-1 bg-blue-600 hover:bg-blue-700 shadow-sm shadow-blue-200"
+                className="h-8 rounded-full text-sm gap-1 bg-blue-600 hover:bg-blue-700 shadow-sm shadow-blue-200"
               >
                 <Plus className="w-3.5 h-3.5" />
                 New Product
@@ -1344,7 +1471,7 @@ export default function NewInvoiceFormPage({
           <CardContent className="p-0 overflow-x-auto">
             <table className="w-full text-sm border-collapse min-w-[900px]">
               <thead>
-                <tr className="bg-blue-50/70 text-blue-900/70 text-[11px] uppercase tracking-wide">
+                <tr className="bg-blue-50/70 text-blue-900/70 text-xs uppercase tracking-wide">
                   <th className="text-left font-semibold px-3 py-2.5 border-b border-blue-100 w-10">
                     #
                   </th>
@@ -1503,53 +1630,60 @@ export default function NewInvoiceFormPage({
             {cartItems.length === 0 && (
               <div className="flex flex-col items-center justify-center py-8 text-center border-t border-slate-100">
                 <ShoppingBag className="w-8 h-8 text-slate-200 mb-2" />
-                <p className="text-sm font-medium text-slate-500">
+                <p className="text-base font-medium text-slate-500">
                   No items added yet
                 </p>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-sm text-slate-400 mt-0.5">
                   Start typing a product name above to add it
                 </p>
               </div>
             )}
 
             {cartItems.length > 0 && (
-              <div className="border-t border-slate-100 bg-gradient-to-br from-slate-50 to-blue-50/40 px-4 py-3">
-                {/* ================= ONE SINGLE ROW — everything inline ================= */}
+              /*
+                =========================================================
+                SUMMARY BAR — larger text (was 9–13px, now 12–20px),
+                payment method converted from chip buttons to a single
+                dropdown, and "Received" now opens a popup instead of
+                being silently disabled when there's no customer.
+                =========================================================
+              */
+              <div className="border-t border-slate-100 bg-gradient-to-br from-slate-50 to-blue-50/40 px-5 py-4">
                 <div className="w-full">
                   <div className="flex flex-wrap items-stretch bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                     {/* Subtotal */}
-                    <div className="px-3 py-2 flex flex-col justify-center min-w-[90px]">
-                      <span className="text-[10px] text-slate-400">
+                    <div className="px-4 py-3 flex flex-col justify-center min-w-[110px] border-r border-slate-200">
+                      <span className="text-xs text-slate-400">
                         Subtotal
                       </span>
-                      <span className="text-xs font-semibold text-slate-700">
+                      <span className="text-base font-bold text-slate-800">
                         ₹{Number(invoiceCalculations.subtotal || 0).toFixed(2)}
                       </span>
                     </div>
 
                     {/* GST */}
                     {hasIgst ? (
-                      <div className="px-3 py-2 flex flex-col justify-center min-w-[90px]">
-                        <span className="text-[10px] text-slate-400">IGST</span>
-                        <span className="text-xs font-semibold text-slate-700">
+                      <div className="px-4 py-3 flex flex-col justify-center min-w-[100px] border-r border-slate-200">
+                        <span className="text-xs text-slate-400">IGST</span>
+                        <span className="text-base font-bold text-slate-800">
                           ₹{gstTotals.igst.toFixed(2)}
                         </span>
                       </div>
                     ) : (
                       <>
-                        <div className="px-3 py-2 flex flex-col justify-center min-w-[80px]">
-                          <span className="text-[10px] text-slate-400">
+                        <div className="px-4 py-3 flex flex-col justify-center min-w-[95px] border-r border-slate-200">
+                          <span className="text-xs text-slate-400">
                             CGST
                           </span>
-                          <span className="text-xs font-semibold text-slate-700">
+                          <span className="text-base font-bold text-slate-800">
                             ₹{gstTotals.cgst.toFixed(2)}
                           </span>
                         </div>
-                        <div className="px-3 py-2 flex flex-col justify-center min-w-[80px]">
-                          <span className="text-[10px] text-slate-400">
+                        <div className="px-4 py-3 flex flex-col justify-center min-w-[95px] border-r border-slate-200">
+                          <span className="text-xs text-slate-400">
                             SGST
                           </span>
-                          <span className="text-xs font-semibold text-slate-700">
+                          <span className="text-base font-bold text-slate-800">
                             ₹{gstTotals.sgst.toFixed(2)}
                           </span>
                         </div>
@@ -1557,37 +1691,37 @@ export default function NewInvoiceFormPage({
                     )}
 
                     {/* Item Discount */}
-                    <div className="px-3 py-2 flex flex-col justify-center min-w-[100px]">
-                      <span className="text-[10px] text-slate-400">
+                    <div className="px-4 py-3 flex flex-col justify-center min-w-[120px] border-r border-slate-200">
+                      <span className="text-xs text-slate-400">
                         Item Disc.
                       </span>
-                      <span className="text-xs font-semibold text-emerald-600">
+                      <span className="text-base font-bold text-emerald-600">
                         − ₹{productDiscountTotal.toFixed(2)}
                       </span>
                     </div>
 
                     {/* Extra Discount (editable) */}
-                    <div className="px-3 py-2 flex flex-col justify-center min-w-[110px]">
-                      <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
-                        <Percent className="w-2.5 h-2.5" /> Extra Disc.
+                    <div className="px-4 py-3 flex flex-col justify-center min-w-[135px] border-r border-slate-200">
+                      <span className="text-xs text-slate-400 flex items-center gap-1">
+                        <Percent className="w-3 h-3" /> Extra Disc.
                       </span>
-                      <div className="flex items-center gap-1 mt-0.5">
+                      <div className="flex items-center gap-1.5 mt-1">
                         <input
                           type="text"
                           inputMode="decimal"
                           value={discount?.value ?? 0}
                           onChange={handleOrderDiscountChange}
                           onBlur={handleOrderDiscountBlur}
-                          className="w-12 h-6 text-xs text-right font-semibold text-slate-800 px-1 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="w-16 h-8 text-sm text-right font-semibold text-slate-800 px-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
                         <button
                           type="button"
                           onClick={toggleOrderDiscountType}
                           title="Toggle discount type"
-                          className="w-6 h-6 shrink-0 flex items-center justify-center rounded border border-slate-200 text-[9px] font-bold text-slate-600 hover:bg-slate-50"
+                          className="w-8 h-8 shrink-0 flex items-center justify-center rounded-md border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50"
                         >
                           {discount?.type === "percent" ? (
-                            <Percent className="w-2.5 h-2.5" />
+                            <Percent className="w-3.5 h-3.5" />
                           ) : (
                             "₹"
                           )}
@@ -1596,12 +1730,12 @@ export default function NewInvoiceFormPage({
                     </div>
 
                     {/* Round Off */}
-                    <div className="px-3 py-2 flex flex-col justify-center min-w-[90px]">
-                      <span className="text-[10px] text-slate-400">
+                    <div className="px-4 py-3 flex flex-col justify-center min-w-[100px] border-r border-slate-200">
+                      <span className="text-xs text-slate-400">
                         Round Off
                       </span>
                       <span
-                        className={`text-xs font-semibold ${
+                        className={`text-base font-bold ${
                           invoiceCalculations.roundOff >= 0
                             ? "text-emerald-600"
                             : "text-rose-500"
@@ -1613,9 +1747,9 @@ export default function NewInvoiceFormPage({
                     </div>
 
                     {/* Additional Charges */}
-                    <div className="px-3 py-2 flex flex-col justify-center min-w-[120px]">
+                    <div className="px-4 py-3 flex flex-col justify-center min-w-[140px] border-r border-slate-200">
                       <div className="flex items-center justify-between gap-1">
-                        <span className="text-[10px] text-slate-400">
+                        <span className="text-xs text-slate-400">
                           Charges
                         </span>
                         {(additionalCharges || []).length < 3 &&
@@ -1623,9 +1757,9 @@ export default function NewInvoiceFormPage({
                             <button
                               type="button"
                               onClick={() => setAddingCharge(true)}
-                              className="text-[10px] font-medium text-blue-600 flex items-center gap-0.5"
+                              className="text-xs font-medium text-blue-600 flex items-center gap-0.5"
                             >
-                              <Plus className="w-2.5 h-2.5" /> Add
+                              <Plus className="w-3 h-3" /> Add
                             </button>
                           )}
                       </div>
@@ -1637,7 +1771,7 @@ export default function NewInvoiceFormPage({
                             value={chargeName}
                             onChange={(e) => setChargeName(e.target.value)}
                             placeholder="Name"
-                            className="w-16 h-6 px-1.5 text-[10px] border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className="w-16 h-7 px-1.5 text-xs border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                           />
                           <input
                             value={chargeAmount}
@@ -1647,14 +1781,14 @@ export default function NewInvoiceFormPage({
                               )
                             }
                             placeholder="₹"
-                            className="w-12 h-6 px-1.5 text-[10px] text-right border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className="w-12 h-7 px-1.5 text-xs text-right border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                           />
                           <button
                             type="button"
                             onClick={handleAddCharge}
-                            className="w-6 h-6 shrink-0 flex items-center justify-center rounded bg-blue-600 text-white"
+                            className="w-7 h-7 shrink-0 flex items-center justify-center rounded bg-blue-600 text-white"
                           >
-                            <Check className="w-3 h-3" />
+                            <Check className="w-3.5 h-3.5" />
                           </button>
                           <button
                             type="button"
@@ -1663,17 +1797,17 @@ export default function NewInvoiceFormPage({
                               setChargeName("");
                               setChargeAmount("");
                             }}
-                            className="w-6 h-6 shrink-0 flex items-center justify-center rounded border border-slate-200 text-slate-400"
+                            className="w-7 h-7 shrink-0 flex items-center justify-center rounded border border-slate-200 text-slate-400"
                           >
-                            <X className="w-3 h-3" />
+                            <X className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       ) : (additionalCharges || []).length > 0 ? (
-                        <div className="flex flex-wrap gap-1 mt-0.5">
+                        <div className="flex flex-wrap gap-1 mt-1">
                           {additionalCharges.map((c) => (
                             <span
                               key={c.id}
-                              className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-[9px] font-medium px-1.5 py-0.5 rounded-full"
+                              className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-xs font-medium px-1.5 py-0.5 rounded-full"
                             >
                               {c.name}: ₹{Number(c.amount).toFixed(2)}
                               <button
@@ -1681,60 +1815,46 @@ export default function NewInvoiceFormPage({
                                 onClick={() => handleRemoveCharge(c.id)}
                                 className="hover:text-rose-500"
                               >
-                                <X className="w-2 h-2" />
+                                <X className="w-2.5 h-2.5" />
                               </button>
                             </span>
                           ))}
                         </div>
                       ) : (
-                        <span className="text-xs font-semibold text-slate-300">
+                        <span className="text-base font-semibold text-slate-300">
                           —
                         </span>
                       )}
                     </div>
 
                     {/* Net Total */}
-                    <div className="px-3 py-2 flex flex-col justify-center min-w-[110px] bg-blue-50/50">
-                      <span className="text-[10px] text-slate-500 font-medium">
+                    <div className="px-4 py-3 flex flex-col justify-center min-w-[140px] border-r border-slate-200 bg-blue-50/60">
+                      <span className="text-xs text-slate-500 font-medium">
                         Net Total
                       </span>
-                      <span className="text-sm font-bold text-blue-600">
+                      <span className="text-xl font-extrabold text-blue-600">
                         ₹{displayGrandTotal.toFixed(2)}
                       </span>
                     </div>
 
-                    {/* Payment method chips */}
-                    <div className="px-3 py-2 flex flex-col justify-center min-w-[220px]">
-                      <span className="text-[10px] text-slate-400 mb-0.5">
+                    {/* Payment method — now a dropdown instead of chip buttons */}
+                    <div className="px-4 py-3 flex flex-col justify-center min-w-[190px] border-r border-slate-200">
+                      <span className="text-xs text-slate-400 mb-1">
                         Payment
                       </span>
-                      <div className="flex items-center gap-1 flex-wrap">
-                        {PAYMENT_OPTIONS.map(({ label, value, icon: Icon }) => (
-                          <button
-                            key={value}
-                            type="button"
-                            title={label}
-                            onClick={() => {
-                              setPaymentMethod(value);
-                              if (value === "cash") setPaymentNote("");
-                            }}
-                            className={`h-6 px-1.5 flex items-center gap-1 rounded border text-[9px] font-medium transition-colors ${
-                              paymentMethod === value
-                                ? "bg-blue-600 border-blue-600 text-white"
-                                : "border-slate-200 text-slate-500 hover:bg-slate-50"
-                            }`}
-                          >
-                            <Icon className="w-3 h-3" />
-                            {label}
-                          </button>
-                        ))}
-                      </div>
+                      <PaymentMethodDropdown
+                        value={paymentMethod}
+                        onChange={(val) => {
+                          setPaymentMethod(val);
+                          if (val === "cash") setPaymentNote("");
+                        }}
+                      />
                     </div>
 
                     {/* Reference note — only for non-cash */}
                     {paymentMethod !== "cash" && (
-                      <div className="px-3 py-2 flex flex-col justify-center min-w-[150px]">
-                        <span className="text-[10px] text-slate-400">
+                      <div className="px-4 py-3 flex flex-col justify-center min-w-[170px] border-r border-slate-200">
+                        <span className="text-xs text-slate-400">
                           Reference
                         </span>
                         <input
@@ -1743,42 +1863,46 @@ export default function NewInvoiceFormPage({
                           placeholder={getReferencePlaceholder(paymentMethod)}
                           autoCapitalize="none"
                           autoCorrect="off"
-                          className="w-32 h-6 px-1.5 text-[10px] border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 mt-0.5"
+                          className="w-36 h-8 px-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 mt-1"
                         />
                       </div>
                     )}
 
-                    {/* Received amount */}
-                    <div className="px-3 py-2 flex flex-col justify-center min-w-[110px]">
-                      <span className="text-[10px] text-slate-400">
+                    {/* Received amount — popup-guarded instead of disabled */}
+                    <div className="px-4 py-3 flex flex-col justify-center min-w-[130px] border-r border-slate-200">
+                      <span className="text-xs text-slate-400">
                         Received ₹
                       </span>
                       <input
                         value={
-                          hasCustomer
-                            ? quickReceivedAmount ||
-                              (paidAmount ? String(paidAmount) : "")
-                            : displayGrandTotal.toFixed(2)
+                          quickReceivedAmount ||
+                          (paidAmount ? String(paidAmount) : "")
                         }
                         onChange={handleQuickReceivedChange}
+                        onFocus={(e) => {
+                          if (!hasCustomer) {
+                            e.target.blur();
+                            setShowCustomerRequiredModal(true);
+                          }
+                        }}
                         onBlur={handleQuickReceivedBlur}
-                        disabled={!hasCustomer}
+                        readOnly={!hasCustomer}
                         inputMode="decimal"
                         placeholder="0.00"
-                        className={`w-24 h-6 px-1.5 text-xs border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 mt-0.5 ${
+                        className={`w-28 h-8 px-2 text-sm border rounded-md mt-1 focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                           !hasCustomer
-                            ? "bg-slate-50 text-slate-400 border-slate-100 cursor-not-allowed"
+                            ? "bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200"
                             : "border-slate-200"
                         }`}
                       />
                     </div>
 
                     {/* Due */}
-                    <div className="px-3 py-2 flex flex-col justify-center min-w-[90px] bg-rose-50/50">
-                      <span className="text-[10px] text-rose-400 font-medium">
+                    <div className="px-4 py-3 flex flex-col justify-center min-w-[110px] border-r border-slate-200 bg-rose-50/60">
+                      <span className="text-xs text-rose-400 font-medium">
                         Due
                       </span>
-                      <span className="text-sm font-bold text-rose-500">
+                      <span className="text-xl font-extrabold text-rose-500">
                         ₹{dueAmount.toFixed(2)}
                       </span>
                     </div>
@@ -1787,28 +1911,22 @@ export default function NewInvoiceFormPage({
                     <button
                       type="button"
                       onClick={() => setRemarksModalOpen(true)}
-                      className="px-3 py-2 flex flex-col justify-center min-w-[130px] text-left hover:bg-slate-50"
+                      className="px-4 py-3 flex flex-col justify-center min-w-[150px] text-left hover:bg-slate-50"
                     >
-                      <span className="text-[10px] text-slate-400 flex items-center gap-1">
-                        <MessageSquareText className="w-2.5 h-2.5" /> Remarks
+                      <span className="text-xs text-slate-400 flex items-center gap-1">
+                        <MessageSquareText className="w-3 h-3" /> Remarks
                       </span>
-                      <span className="text-xs font-semibold text-slate-700 truncate max-w-[110px]">
+                      <span className="text-sm font-semibold text-slate-700 truncate max-w-[130px]">
                         {remarks?.trim() ? remarks : "Add remarks"}
                       </span>
                     </button>
                   </div>
                 </div>
 
-                {!hasCustomer && (
-                  <p className="text-[10px] text-amber-600 mt-1.5">
-                    Select a customer to allow partial payment.
-                  </p>
-                )}
-
                 <div className="flex justify-end mt-2">
                   <button
                     onClick={handleClearCart}
-                    className="text-xs font-medium text-rose-500 hover:text-rose-600"
+                    className="text-sm font-medium text-rose-500 hover:text-rose-600"
                   >
                     Clear all items
                   </button>
@@ -1828,7 +1946,7 @@ export default function NewInvoiceFormPage({
               paymentMethod={paymentMethod}
               setPaymentMethod={setPaymentMethod}
               paidAmount={paidAmount}
-              setPaidAmount={setPaidAmount}
+              setPaidAmount={guardedSetPaidAmount}
               paymentNote={paymentNote}
               setPaymentNote={setPaymentNote}
               remarks={remarks}
@@ -1846,6 +1964,8 @@ export default function NewInvoiceFormPage({
               isGstInvoice={isGstInvoice}
               isMrpEnabled={isMrpEnabled}
               submitLabel={isEditMode ? "Update Invoice" : "Create Invoice"}
+              hasCustomer={hasCustomer}
+              onRequireCustomer={() => setShowCustomerRequiredModal(true)}
             />
           </CardContent>
         </Card>
@@ -1874,6 +1994,11 @@ export default function NewInvoiceFormPage({
         onClose={() => setRemarksModalOpen(false)}
         remarks={remarks}
         setRemarks={setRemarks}
+      />
+
+      <CustomerRequiredModal
+        open={showCustomerRequiredModal}
+        onClose={() => setShowCustomerRequiredModal(false)}
       />
     </div>
   );
