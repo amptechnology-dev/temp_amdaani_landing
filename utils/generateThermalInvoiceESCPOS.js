@@ -24,30 +24,41 @@ async function fetchImageAsDataURL(url) {
   }
 }
 
-const FONT_CHAR_PX = { a: 12, b: 9 };
 const FONT_FAMILY = '"Courier New", Courier, monospace';
 
-function getLineCapacity(printerWidthPx = 384, font = "a", sizeW = 1) {
-  const charWidth = FONT_CHAR_PX[font] || FONT_CHAR_PX.a;
-  return Math.floor(printerWidthPx / (charWidth * sizeW));
+// ---- FONT SIZE CONFIG ----
+// These are the TRUE font sizes (in printer dots/px) that will show up on paper.
+// Since html2canvas renders at scale:1, 1 CSS px === 1 printer dot.
+// Tune these two numbers up/down until the printed text matches what you want
+// (bigger number = bigger text on paper = fewer characters fit per line).
+const BASE_WIDTH_PX = 384; // reference width = 58mm paper
+const BASE_FONT_SIZE_PX = { a: 30, b: 24 }; // font "a" = bigger/bold headers, "b" = normal body
+
+function getFontSizePx(font = "b", printerWidthPx = 384) {
+  const base = BASE_FONT_SIZE_PX[font] || BASE_FONT_SIZE_PX.b;
+  // scale proportionally if using 80mm (576px) paper etc.
+  return Math.max(10, Math.round(base * (printerWidthPx / BASE_WIDTH_PX)));
 }
 
 let _measureCanvas = null;
+const _charWidthCache = new Map();
 function measureCharWidthPx(fontSizePx) {
   if (typeof document === "undefined") return fontSizePx * 0.6;
+  if (_charWidthCache.has(fontSizePx)) return _charWidthCache.get(fontSizePx);
   if (!_measureCanvas) _measureCanvas = document.createElement("canvas");
   const ctx = _measureCanvas.getContext("2d");
   ctx.font = `${fontSizePx}px ${FONT_FAMILY}`;
-  return ctx.measureText("0").width;
+  const w = ctx.measureText("0").width;
+  _charWidthCache.set(fontSizePx, w);
+  return w;
 }
 
-function computeFontSizePx(widthPx, capacity) {
-  const REF = 100;
-  const refCharWidth = measureCharWidthPx(REF);
-  if (!refCharWidth) return 12;
-  const charWidthPerFontPx = refCharWidth / REF;
-  const size = (widthPx / capacity / charWidthPerFontPx) * 0.98;
-  return Math.max(6, size);
+// capacity is now DERIVED from the real font size, not the other way around
+function getLineCapacity(printerWidthPx = 384, font = "a", sizeW = 1) {
+  const fontSizePx = getFontSizePx(font, printerWidthPx);
+  const charWidth = measureCharWidthPx(fontSizePx) * sizeW;
+  if (!charWidth) return 32;
+  return Math.max(1, Math.floor(printerWidthPx / charWidth));
 }
 
 function wrapTextForPrinter(text, sizeW = 1, lineCapacityBase = 32) {
@@ -448,10 +459,8 @@ async function buildThermalReceiptHTML({
 
   const body = out.join("");
 
-  const capacityA = getLineCapacity(widthPx, "a", 1);
-  const capacityB = getLineCapacity(widthPx, "b", 1);
-  const fontSizeA = computeFontSizePx(widthPx, capacityA);
-  const fontSizeB = computeFontSizePx(widthPx, capacityB);
+  const fontSizeA = getFontSizePx("a", widthPx);
+  const fontSizeB = getFontSizePx("b", widthPx);
 
   return /*html*/ `
   <html>
@@ -472,12 +481,12 @@ async function buildThermalReceiptHTML({
         }
         .ln {
           white-space: pre;
-          line-height: 1.7;
+          line-height: 1.4;
           letter-spacing: 0;
         }
         .fontA { font-size: ${fontSizeA}px; }
         .fontB { font-size: ${fontSizeB}px; }
-        .big { font-size: ${Math.round(widthPx / 10)}px; line-height: 1.3; }
+        .big { font-size: ${Math.round(widthPx / 8)}px; line-height: 1.3; }
         .bold { font-weight: 700; }
         .left { text-align: left; }
         .center { text-align: center; }
