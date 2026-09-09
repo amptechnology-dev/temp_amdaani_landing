@@ -1,60 +1,30 @@
 import { format } from "date-fns";
 
-// ---------- Raw ESC/POS command bytes ----------
-const ESC = "\x1B";
-const GS = "\x1D";
-const RAW = {
-  INIT: `${ESC}\x40`,
-  ALIGN_LEFT: `${ESC}\x61\x00`,
-  ALIGN_CENTER: `${ESC}\x61\x01`,
-  BOLD_ON: `${ESC}\x45\x01`,
-  BOLD_OFF: `${ESC}\x45\x00`,
-  DOUBLE_ON: `${GS}\x21\x11`,
-  DOUBLE_OFF: `${GS}\x21\x00`,
-  CUT: `${GS}\x56\x00`,
-};
+// ============================================================
+// ONE file, ONE HTML builder (buildThermalReceiptHTML) used by
+// BOTH the on-screen preview AND the actual USB print. Preview
+// renders it in an iframe; print screenshots the SAME html (same
+// width, no responsive scaling) and sends it as an ESC/POS raster
+// image (GS v 0). Since print is literally a screenshot of what
+// preview shows, they can never drift apart again.
+// ============================================================
 
-// ✅ NEW — strip anything outside printable ASCII (0x20–0x7E) before it
-// ever reaches the ESC/POS byte stream. Store name, customer name, item
-// name etc. can contain Bengali/curly-quote/emoji chars that would get
-// split into multi-byte UTF-8 sequences by the printer's encoder and get
-// misread as stray ESC/POS commands — corrupting the whole print job
-// (this was the cause of the "Error" screen getting printed).
-function safeAscii(str) {
-  return String(str ?? "").replace(/[^\x20-\x7E]/g, "?");
+// ---------- Paper size ----------
+// Most 58mm thermal printers print at 203dpi with a 384-dot-wide head;
+// most 80mm printers are 576 dots wide. Check your printer's spec sheet
+// if prints come out too narrow/wide or blank on one side.
+export const PRINTER_DOT_WIDTH = { 58: 384, 80: 576 };
+export function resolveDotWidth(paperWidthMM) {
+  return PRINTER_DOT_WIDTH[paperWidthMM] || PRINTER_DOT_WIDTH[58];
 }
 
-// ---------- Text helpers (shared by ESC/POS + preview => identical alignment) ----------
-function padRight(str, len) {
-  str = String(str ?? "");
-  return str.length >= len ? str.slice(0, len) : str + " ".repeat(len - str.length);
-}
-function padLeft(str, len) {
-  str = String(str ?? "");
-  return str.length >= len ? str.slice(-len) : " ".repeat(len - str.length) + str;
-}
-function dashLine(width) {
-  return "-".repeat(width);
-}
-function twoCol(left, right, width) {
-  left = String(left ?? "");
-  right = String(right ?? "");
-  const space = width - left.length - right.length;
-  if (space < 1) {
-    const cutLeft = left.slice(0, Math.max(0, width - right.length - 1));
-    return `${cutLeft} ${right}`;
-  }
-  return `${left}${" ".repeat(space)}${right}`;
-}
-
-/**
- * Builds a printer-agnostic list of "blocks" describing the receipt.
- * Both the ESC/POS renderer AND the HTML preview renderer walk this
- * exact same list — so whatever the preview shows on screen is
- * guaranteed to match what actually comes out of the thermal printer
- * (USB or Bluetooth, web or React Native).
- */
-function buildReceiptBlocks({
+// ---------- Styled HTML (design ported from the React Native template) ----------
+// widthPx is REQUIRED and must be the same value for preview and for the
+// raster capture — that single shared number is what guarantees identical
+// output. No @media scaling here on purpose: a scale rule keyed off the
+// iframe's own viewport width would differ between the visible preview
+// dialog and the off-screen capture iframe, silently reintroducing drift.
+function buildThermalReceiptHTML({
   createdInvoice,
   invoiceData = {},
   formValues = {},
@@ -64,340 +34,428 @@ function buildReceiptBlocks({
   invoiceDate,
   storedata = {},
   isGstInvoice = false,
+  isFreePlan = true,
   payment = { paid: 0, due: 0, status: "unpaid" },
-  charWidth = 42, // 80mm printer ≈ 42 chars, 58mm ≈ 32 chars
+  widthPx = 384,
 }) {
-  const blocks = [];
-  const push = (b) => blocks.push(b);
+  const itemsHTML = cartItems
+    .map((item) => {
+      const qty = item.qty || item.quantity || 0;
+      const baseRate = item.baseRate || item.effectiveRate || item.price || 0;
+      const gstRate = item.gstRate || 0;
+      const totalAmount = item.total || baseRate * qty;
+      const isTaxInclusive = item.isTaxInclusive || false;
 
+      let perItemDiscount = Number(item.discount || 0);
+      if (isTaxInclusive && gstRate > 0) {
+        perItemDiscount = perItemDiscount / (1 + gstRate / 100);
+      }
+      const totalDiscount = perItemDiscount * qty;
+      const discountPercent =
+        baseRate > 0 && perItemDiscount > 0
+          ? ((perItemDiscount / baseRate) * 100).toFixed(2)
+          : null;
+
+      return `
+        <tr class="line">
+          <td>${item.name}<br>${item.hsn ? `HSN: ${item.hsn}` : ""}</td>
+          <td class="right">${qty}</td>
+          <td class="right">${baseRate.toFixed(2)} ${
+        Number(totalDiscount || 0) > 0 ? `<br>Dis @ ${discountPercent}%` : ""
+      }</td>
+          <td class="right">${totalAmount.toFixed(2)}</td>
+        </tr>`;
+    })
+    .join("");
+
+  let gstTotals = { taxableValue: 0, cgst: 0, sgst: 0, igst: 0 };
+  let gstBreakdownHTML = "";
   const isIgst = invoiceData?.isIgst === true;
-  const isUnpaid = (payment.status || "").toLowerCase() === "unpaid";
 
-  // ── Store header ──
-  push({ t: "align", v: "center" });
-  push({
-    t: "text",
-    v: safeAscii((storedata?.name || "STORE NAME").toUpperCase()),
-    bold: true,
-  });
-  if (storedata?.tagline) push({ t: "text", v: safeAscii(storedata.tagline) });
-  const addr1 = [storedata?.address?.street, storedata?.address?.city]
-    .filter(Boolean)
-    .join(", ");
-  if (addr1) push({ t: "text", v: safeAscii(addr1) });
-  if (isGstInvoice && storedata?.gstNumber)
-    push({ t: "text", v: `GSTIN: ${safeAscii(storedata.gstNumber)}` });
-  const addr2 = [storedata?.address?.state, storedata?.address?.postalCode]
-    .filter(Boolean)
-    .join(" ");
-  if (addr2) push({ t: "text", v: safeAscii(addr2) });
-  if (storedata?.contactNo)
-    push({ t: "text", v: `Ph: ${safeAscii(storedata.contactNo)}` });
+  for (const [rate, breakdown] of Object.entries(invoiceCalculations.gstBreakdown || {})) {
+    if (parseFloat(rate) === 0) continue;
+    const taxable = breakdown.taxableAmount || 0;
+    const cgst = isIgst ? 0 : breakdown.cgstAmount || 0;
+    const sgst = isIgst ? 0 : breakdown.sgstAmount || 0;
+    const igst = isIgst ? breakdown.igstAmount || (breakdown.cgstAmount || 0) + (breakdown.sgstAmount || 0) : 0;
 
-  push({ t: "line" });
-  push({ t: "align", v: "left" });
+    gstBreakdownHTML += `
+      <tr>
+        <td>${rate}%</td>
+        <td>${taxable.toFixed(2)}</td>
+        ${isIgst ? `<td>${igst.toFixed(2)}</td>` : `<td>${cgst.toFixed(2)}</td><td>${sgst.toFixed(2)}</td>`}
+      </tr>`;
 
-  // ── Invoice info ──
-  push({ t: "text", v: `Invoice: ${safeAscii(invoiceNumber)}` });
-  push({
-    t: "text",
-    v: `Date: ${format(new Date(invoiceDate), "dd-MMM-yyyy hh:mm a")}`,
-  });
-  if (formValues.contactNumber)
-    push({ t: "text", v: `Mobile: ${safeAscii(formValues.contactNumber)}` });
-  const customerName = formValues.partyName || formValues.customerName;
-  if (customerName)
-    push({ t: "text", v: `Customer: ${safeAscii(customerName)}` });
-
-  push({ t: "line" });
-
-  // ── Items ──
-  const nameW = charWidth - 22;
-  push({
-    t: "text",
-    v: padRight("Item", nameW) + padLeft("Qty", 5) + padLeft("Rate", 8) + padLeft("Amt", 9),
-    bold: true,
-  });
-  push({ t: "line" });
-
-  cartItems.forEach((item) => {
-    const qty = item.qty || item.quantity || 0;
-    const baseRate = item.baseRate || item.effectiveRate || item.price || 0;
-    const totalAmount = item.total || baseRate * qty;
-    const name = safeAscii(item.name || "");
-
-    for (let i = 0; i < name.length || i === 0; i += nameW) {
-      const chunk = name.slice(i, i + nameW) || "";
-      if (i === 0) {
-        push({
-          t: "text",
-          v:
-            padRight(chunk, nameW) +
-            padLeft(qty, 5) +
-            padLeft(baseRate.toFixed(2), 8) +
-            padLeft(totalAmount.toFixed(2), 9),
-        });
-      } else {
-        push({ t: "text", v: padRight(chunk, nameW) });
-      }
-      if (chunk.length < nameW) break;
-    }
-
-    if (item.hsn) push({ t: "text", v: `  HSN: ${safeAscii(item.hsn)}`, dim: true });
-
-    const discount = Number(item.discount || 0);
-    if (discount > 0) {
-      const discPercent = baseRate > 0 ? ((discount / baseRate) * 100).toFixed(1) : 0;
-      push({ t: "text", v: `  Dis @ ${discPercent}%`, dim: true });
-    }
-  });
-
-  push({ t: "line" });
-
-  // ── Totals ──
-  const subTotal = createdInvoice ? invoiceData?.subTotal : invoiceCalculations.subtotal;
-  push({ t: "twoCol", left: "Sub Total", right: Number(subTotal || 0).toFixed(2) });
-
-  const discountTotal = createdInvoice ? invoiceData?.discountTotal : invoiceCalculations.discountTotal;
-  if (Number(discountTotal || 0) > 0) {
-    push({ t: "twoCol", left: "Extra Discount", right: `-${Number(discountTotal).toFixed(2)}` });
+    gstTotals.taxableValue += taxable;
+    gstTotals.cgst += cgst;
+    gstTotals.sgst += sgst;
+    gstTotals.igst += igst;
   }
 
-  const grandTotalRaw = createdInvoice
-    ? invoiceData?.grandTotal
-    : invoiceCalculations.grandTotal - (invoiceCalculations?.discountTotal || 0);
-  const roundedGrandTotal = Math.round(grandTotalRaw);
-  const roundOffValue = createdInvoice
-    ? Number(invoiceData?.roundOff || 0)
-    : Number((roundedGrandTotal - grandTotalRaw).toFixed(2));
-
-  if (roundOffValue !== 0) {
-    push({
-      t: "twoCol",
-      left: "Round Off",
-      right: `${roundOffValue >= 0 ? "+" : ""}${roundOffValue.toFixed(2)}`,
-    });
+  if (Object.keys(invoiceCalculations.gstBreakdown || {}).length > 0 && isGstInvoice) {
+    gstBreakdownHTML += `
+      <tr class="gst-total-row">
+        <td>Total</td>
+        <td>${gstTotals.taxableValue.toFixed(2)}</td>
+        ${isIgst ? `<td>${gstTotals.igst.toFixed(2)}</td>` : `<td>${gstTotals.cgst.toFixed(2)}</td><td>${gstTotals.sgst.toFixed(2)}</td>`}
+      </tr>`;
   }
 
-  push({
-    t: "twoCol",
-    left: "Net Total",
-    right: `Rs.${roundedGrandTotal.toFixed(2)}`,
-    double: true,
-    bold: true,
-    width: Math.floor(charWidth / 2),
-  });
+  const rawGrandTotal = invoiceCalculations.grandTotal - (invoiceCalculations?.discountTotal || 0);
+  const roundedGrandTotal = Math.round(rawGrandTotal);
+  const roundOffValue = (roundedGrandTotal - rawGrandTotal).toFixed(2);
 
-  if (!isUnpaid && (payment.paid > 0 || payment.due > 0)) {
-    push({ t: "twoCol", left: "Paid", right: Number(payment.paid).toFixed(2), bold: true });
-    push({ t: "twoCol", left: "Due", right: Math.round(payment.due).toFixed(2), bold: true });
-  }
+  const upiString = `upi://pay?pa=${storedata.bankDetails?.upiId}&pn=${encodeURIComponent(
+    storedata?.name || "Merchant",
+  )}&am=${roundedGrandTotal}&cu=INR`;
+  const qrURL = `https://quickchart.io/qr?text=${encodeURIComponent(upiString)}`;
 
-  push({ t: "line" });
+  const isUnpaid = payment.status?.toLowerCase() === "unpaid";
 
-  // ── Payment status ──
-  push({ t: "align", v: "center" });
-  const statusText =
-    payment.status === "paid"
-      ? "AMOUNT FULLY PAID"
-      : payment.status === "partial"
-      ? "AMOUNT PARTIALLY PAID"
-      : "AMOUNT UNPAID";
-  push({ t: "text", v: statusText, bold: true });
-
-  // ── GST breakdown (properly tabulated, matches web/RN receipt) ──
-  if (isGstInvoice && invoiceCalculations.gstBreakdown) {
-    const rows = Object.entries(invoiceCalculations.gstBreakdown).filter(([rate]) => parseFloat(rate) > 0);
-    if (rows.length) {
-      push({ t: "align", v: "left" });
-      push({ t: "line" });
-      push({ t: "text", v: "TAX SUMMARY", bold: true, align: "center" });
-
-      const rateW = 6;
-      const col2W = isIgst ? 10 : 10;
-      const taxW = charWidth - rateW - (isIgst ? col2W : col2W * 2);
-
-      push({
-        t: "text",
-        v: isIgst
-          ? padRight("GST%", rateW) + padRight("Taxable", taxW) + padLeft("IGST", col2W)
-          : padRight("GST%", rateW) + padRight("Taxable", taxW) + padLeft("CGST", col2W) + padLeft("SGST", col2W),
-        bold: true,
-      });
-
-      rows.forEach(([rate, b]) => {
-        const taxable = (b.taxableAmount || 0).toFixed(2);
-        if (isIgst) {
-          const igst = (b.igstAmount || (b.cgstAmount || 0) + (b.sgstAmount || 0)).toFixed(2);
-          push({ t: "text", v: padRight(`${rate}%`, rateW) + padRight(taxable, taxW) + padLeft(igst, col2W) });
-        } else {
-          const cgst = (b.cgstAmount || 0).toFixed(2);
-          const sgst = (b.sgstAmount || 0).toFixed(2);
-          push({
-            t: "text",
-            v: padRight(`${rate}%`, rateW) + padRight(taxable, taxW) + padLeft(cgst, col2W) + padLeft(sgst, col2W),
-          });
-        }
-      });
-    }
-  }
-
-  // ── Payment summary (only when paid/partial, mirrors web/RN receipt) ──
-  if (!isUnpaid && invoiceData?.transactions?.length) {
-    push({ t: "align", v: "left" });
-    push({ t: "line" });
-    push({ t: "text", v: "PAYMENT SUMMARY", bold: true, align: "center" });
-    invoiceData.transactions.forEach((tx) => {
-      const d = format(new Date(tx.createdAt), "dd/MM hh:mm a");
-      push({
-        t: "text",
-        v:
-          padRight(d, 14) +
-          padLeft(`Rs.${tx.amount.toFixed(2)}`, 12) +
-          padLeft(safeAscii((tx.paymentMethod || "").toUpperCase()), Math.max(0, charWidth - 26)),
-      });
-    });
-  }
-
-  // ── Footer ──
-  push({ t: "align", v: "center" });
-  push({ t: "line" });
-  push({ t: "text", v: "Thank you for your purchase!" });
-  push({ t: "text", v: "Visit Again" });
-  push({ t: "feed", n: 3 });
-  push({ t: "cut" });
-
-  return blocks;
-}
-
-// ---------- ESC/POS renderer (bytes for USB/Bluetooth print) ----------
-export function generateThermalInvoiceESCPOS(params) {
-  const { charWidth = 42 } = params;
-  const blocks = buildReceiptBlocks(params);
-
-  let r = RAW.INIT;
-  let bold = false;
-  let double = false;
-
-  blocks.forEach((b) => {
-    switch (b.t) {
-      case "align":
-        r += b.v === "center" ? RAW.ALIGN_CENTER : RAW.ALIGN_LEFT;
-        break;
-      case "line":
-        r += dashLine(charWidth) + "\n";
-        break;
-      case "text": {
-        if (b.align) r += b.align === "center" ? RAW.ALIGN_CENTER : RAW.ALIGN_LEFT;
-        const wantBold = !!b.bold;
-        const wantDouble = !!b.double;
-        if (wantBold !== bold) {
-          r += wantBold ? RAW.BOLD_ON : RAW.BOLD_OFF;
-          bold = wantBold;
-        }
-        if (wantDouble !== double) {
-          r += wantDouble ? RAW.DOUBLE_ON : RAW.DOUBLE_OFF;
-          double = wantDouble;
-        }
-        r += b.v + "\n";
-        break;
-      }
-      case "twoCol": {
-        const wantBold = !!b.bold;
-        const wantDouble = !!b.double;
-        if (wantBold !== bold) {
-          r += wantBold ? RAW.BOLD_ON : RAW.BOLD_OFF;
-          bold = wantBold;
-        }
-        if (wantDouble !== double) {
-          r += wantDouble ? RAW.DOUBLE_ON : RAW.DOUBLE_OFF;
-          double = wantDouble;
-        }
-        r += twoCol(b.left, b.right, b.width || charWidth) + "\n";
-        break;
-      }
-      case "feed":
-        r += "\n".repeat(b.n || 1);
-        break;
-      case "cut":
-        r += RAW.CUT;
-        break;
-      default:
-        break;
-    }
-  });
-
-  return r;
-}
-
-// ---------- HTML preview renderer (used for the "print preview" dialog) ----------
-// Walks the SAME blocks as the ESC/POS renderer, in a monospace fixed-width
-// column, so this preview is a pixel-accurate mirror of what the thermal
-// printer will actually output — no separate design to keep in sync.
-export function generateThermalReceiptPreviewHTML(params) {
-  const { charWidth = 42 } = params;
-  const blocks = buildReceiptBlocks(params);
-
-  let align = "left";
-  let html = "";
-
-  blocks.forEach((b) => {
-    switch (b.t) {
-      case "align":
-        align = b.v;
-        break;
-      case "line":
-        html += `<div class="tline"></div>`;
-        break;
-      case "text": {
-        const a = b.align || align;
-        html += `<div class="trow" style="text-align:${a};font-weight:${b.bold ? 700 : 400};${
-          b.double ? "font-size:1.6em;letter-spacing:1px;" : ""
-        }${b.dim ? "color:#555;font-size:0.9em;" : ""}">${escapeHtml(b.v)}</div>`;
-        break;
-      }
-      case "twoCol": {
-        html += `<div class="trow" style="white-space:pre;font-weight:${b.bold ? 700 : 400};${
-          b.double ? "font-size:1.6em;letter-spacing:1px;" : ""
-        }">${escapeHtml(twoCol(b.left, b.right, b.width || charWidth))}</div>`;
-        break;
-      }
-      case "feed":
-        html += `<div style="height:${(b.n || 1) * 14}px;"></div>`;
-        break;
-      default:
-        break;
-    }
-  });
-
-  return `
+  return /*html*/ `
   <html>
     <head>
       <meta charset="utf-8" />
       <style>
-        body { margin:0; background:#e5e7eb; font-family: 'Courier New', monospace; }
-        #paper {
-          width: ${charWidth * 8.6}px;
-          margin: 16px auto;
-          background: #fff;
-          padding: 14px 10px;
-          box-shadow: 0 1px 4px rgba(0,0,0,.15);
-          font-size: 13px;
-          line-height: 1.35;
+        body {
+          font-family: monospace, Arial, sans-serif;
+          font-size: 12px;
+          width: ${widthPx}px;
+          margin: 0 auto;
+          color: #000;
+          overflow-x: hidden;
         }
-        .trow { white-space: pre-wrap; word-break: break-word; }
-        .tline { border-top: 1px dashed #000; margin: 4px 0; }
+        #container { width: ${widthPx}px; margin: 0 auto; }
+        .center { text-align: center; }
+        .right { text-align: right; }
+        .bold { font-weight: bold; }
+        .line { border-top: 1px dashed #000; margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 3px 0; }
+        th { border-bottom: 1px solid #000; font-size: 12px; }
+        td { font-size: 11px; }
+        .totals td { padding: 2px 0; }
+        .grand { font-size: 13px; font-weight: bold; }
+        .footer { margin-top: 10px; text-align: center; font-size: 11px; }
+        img.logo { max-width: 90px; margin: 4px auto; display: block; }
+        .gst-breakdown { width: 100%; margin-top: 4px; padding-top: 3px; }
+        .gst-title {
+          text-align: center; font-weight: bold; font-size: 11px;
+          margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .gst-table { width: 100%; border-collapse: collapse; font-size: 10px; line-height: 1.2; }
+        .gst-table th { text-align: center; border-bottom: 1px solid #000; padding: 2px 0; }
+        .gst-table td { text-align: center; padding: 2px 0; border-bottom: 1px dotted #999; }
+        .gst-total-row { font-weight: bold; border-top: 1px solid #000; }
+        .gst-total-row td { border-bottom: none; padding-top: 3px; }
+        .payment-status {
+          display: inline-block; padding: 3px 12px; border-radius: 16px;
+          font-weight: 600; font-size: 10px; text-transform: capitalize;
+          font-style: italic; letter-spacing: 0.3px; color: #fff;
+        }
+        .payment-status.paid { background-color: #43a047; }
+        .payment-status.partial { background-color: #fb8c00; }
+        .payment-status.unpaid { background-color: #e53935; }
       </style>
     </head>
     <body>
-      <div id="paper">${html}</div>
+      <div id="container">
+        <div class="center">
+          ${storedata?.logoUrl ? `<img src="${storedata.logoUrl}" class="logo"/>` : ""}
+          <div class="bold" style="font-size:14px;">${storedata?.name || "STORE NAME"}</div>
+          ${storedata?.tagline ? `<div>${storedata.tagline}</div>` : ""}
+          <div>${storedata?.address?.street || ""}, ${storedata?.address?.city || ""}</div>
+          ${isGstInvoice && storedata?.gstNumber ? `<div>GSTIN: ${storedata.gstNumber}</div>` : ""}
+          <div>${storedata?.address?.state || ""} ${storedata?.address?.postalCode || ""}</div>
+          <div>Ph. No.: ${storedata?.contactNo || ""}</div>
+          ${storedata?.email ? `<div>Email: ${storedata.email}</div>` : ""}
+        </div>
+
+        <div class="line"></div>
+
+        <div>
+          <div><span class="bold">Invoice:</span> ${invoiceNumber}</div>
+          <div><span class="bold">Date:</span> ${format(new Date(invoiceDate), "dd-MMM-yyyy hh:mm a")}</div>
+          ${formValues.contactNumber ? `<div><span class="bold">Customer Mobile:</span> ${formValues.contactNumber}</div>` : ""}
+          ${
+            formValues.partyName || formValues.customerName
+              ? `<div><span class="bold">Customer Name:</span> ${formValues.partyName || formValues.customerName}</div>`
+              : ""
+          }
+        </div>
+
+        <div class="line"></div>
+
+        <table>
+          <thead>
+            <tr>
+              <th style="text-align:left;">Item</th>
+              <th class="right">Qty</th>
+              <th class="right">Rate</th>
+              <th class="right">Amt</th>
+            </tr>
+          </thead>
+          <tbody>${itemsHTML}</tbody>
+        </table>
+
+        <div class="line"></div>
+
+        <table class="totals">
+          <tr>
+            <td class="bold">Sub Total</td>
+            <td class="right">${
+              createdInvoice ? Number(invoiceData?.subTotal || 0).toFixed(2) : invoiceCalculations.subtotal.toFixed(2)
+            }</td>
+          </tr>
+          ${
+            Number(invoiceCalculations.discountTotal || 0) > 0
+              ? `<tr>
+                  <td class="bold">Extra Discount</td>
+                  <td class="right">-${
+                    createdInvoice
+                      ? Number(invoiceData?.discountTotal || 0).toFixed(2)
+                      : Number(invoiceCalculations.discountTotal).toFixed(2)
+                  }</td>
+                </tr>`
+              : ""
+          }
+          ${
+            roundOffValue != 0
+              ? `<tr>
+                  <td class="bold">Round Off</td>
+                  <td class="right" style="color:${roundOffValue < 0 ? "#e53935" : "#43a047"};">
+                    ${
+                      createdInvoice
+                        ? `${Number(invoiceData?.roundOff || 0) >= 0 ? "+" : ""}${Number(invoiceData?.roundOff || 0).toFixed(2)}`
+                        : `${roundOffValue < 0 ? "−" : "+"}${Math.abs(roundOffValue).toFixed(2)}`
+                    }
+                  </td>
+                </tr>`
+              : ""
+          }
+          <tr>
+            <td class="grand">Net Total</td>
+            <td class="right grand">
+              ${createdInvoice ? Math.round(invoiceData?.grandTotal || 0).toFixed(2) : roundedGrandTotal.toFixed(2)}
+            </td>
+          </tr>
+          ${
+            !isUnpaid && (payment.paid > 0 || payment.due > 0)
+              ? `<tr>
+                  <td class="grand">Paid Amount</td>
+                  <td class="right grand">${payment.paid.toFixed(2)}</td>
+                </tr>
+                <tr>
+                  <td class="grand">Due Amount</td>
+                  <td class="right grand" style="color:${payment.due > 0 ? "#e53935" : "#000"};">
+                    ${Math.round(payment.due).toFixed(2)}
+                  </td>
+                </tr>`
+              : ""
+          }
+        </table>
+
+        <div class="center" style="margin-top:6px;">
+          <span class="payment-status ${payment.status?.toLowerCase()}">
+            ${
+              payment.status === "paid"
+                ? "Amount is Fully Paid"
+                : payment.status === "partial"
+                ? "Amount is Partially Paid"
+                : "Amount is Unpaid"
+            }
+          </span>
+        </div>
+
+        ${
+          !isUnpaid && (invoiceData?.paymentMethod || invoiceData?.paymentNote)
+            ? `<div style="text-align:center;margin-top:4px;font-size:10px;line-height:1.5;">
+                <div style="margin-bottom:4px;">
+                  <span style="color:#666;">Payment:</span>
+                  <span style="font-weight:600;margin-left:4px;">${(invoiceData.paymentMethod || "").toUpperCase()}</span>
+                  ${invoiceData?.paymentNote ? `(${invoiceData.paymentNote})` : ""}
+                </div>
+              </div>`
+            : ""
+        }
+
+        <div class="line"></div>
+
+        ${
+          !isUnpaid && invoiceData?.transactions && invoiceData.transactions.length > 0
+            ? `<div class="gst-breakdown">
+                <div class="gst-title">Payment Summary</div>
+                <table class="gst-table">
+                  <thead>
+                    <tr>
+                      <th style="text-align:left;">Date</th>
+                      <th style="text-align:right;">Amount</th>
+                      <th style="text-align:center;">Method</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${invoiceData.transactions
+                      .map(
+                        (tx) => `
+                      <tr>
+                        <td style="text-align:left;">${format(new Date(tx.createdAt), "dd/MM hh:mm a")}</td>
+                        <td style="text-align:right;">₹${tx.amount.toFixed(2)}</td>
+                        <td style="text-align:center;">${tx.paymentMethod.toUpperCase()}</td>
+                      </tr>`,
+                      )
+                      .join("")}
+                  </tbody>
+                </table>
+              </div>`
+            : ""
+        }
+
+        ${
+          Object.keys(invoiceCalculations.gstBreakdown || {}).some((r) => parseFloat(r) > 0) && isGstInvoice
+            ? `<div class="gst-breakdown">
+                <div class="gst-title">Tax Summary</div>
+                <table class="gst-table">
+                  <thead>
+                    <tr>
+                      <th>GST%</th>
+                      <th>Tax Value</th>
+                      ${isIgst ? `<th>IGST</th>` : `<th>CGST</th><th>SGST</th>`}
+                    </tr>
+                  </thead>
+                  <tbody>${gstBreakdownHTML}</tbody>
+                </table>
+              </div>`
+            : ""
+        }
+
+        ${
+          storedata?.bankDetails?.upiId
+            ? `<div style="text-align:center;margin-top:10px;">
+                <div style="font-weight:bold;margin-bottom:4px;">Scan & Pay</div>
+                <img src="${qrURL}" style="width:110px;height:110px;"/>
+                <div style="font-size:11px;">UPI: ${storedata.bankDetails.upiId}</div>
+                <div style="font-size:11px;">Amount: ₹${roundedGrandTotal}</div>
+              </div>`
+            : ""
+        }
+
+        <div class="footer">
+          Thank you for your purchase!<br/>
+          Visit Again
+          ${
+            storedata?.signatureUrl
+              ? `<div class="center"><img src="${storedata.signatureUrl}" style="max-width:100px;object-fit:contain;margin-top:8px;"/></div>`
+              : ""
+          }
+          ${isFreePlan ? `<div style="font-size:18px;text-align:center;margin-top:8px;">Powered by AMDAANI</div>` : ""}
+        </div>
+      </div>
     </body>
   </html>`;
 }
 
-function escapeHtml(s) {
-  return String(s ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+// ---------- Preview: same HTML, same width the print will use ----------
+export function generateThermalReceiptPreviewHTML(params, paperWidthMM = 58) {
+  const widthPx = resolveDotWidth(paperWidthMM);
+  return buildThermalReceiptHTML({ ...params, widthPx });
+}
+
+// ---------- Print: screenshot the SAME HTML, send as ESC/POS raster ----------
+const ESC = "\x1B";
+const GS = "\x1D";
+const INIT = `${ESC}\x40`;
+const CUT = `${GS}\x56\x00`;
+const feed = (n = 3) => "\n".repeat(n);
+
+function canvasToRasterBytes(canvas, threshold = 160) {
+  const ctx = canvas.getContext("2d");
+  const { width, height } = canvas;
+  const { data } = ctx.getImageData(0, 0, width, height);
+  const bytesPerRow = Math.ceil(width / 8);
+  const raster = new Uint8Array(bytesPerRow * height);
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+      const lum = a === 0 ? 255 : 0.299 * r + 0.587 * g + 0.114 * b;
+      if (lum < threshold) {
+        const byteIndex = y * bytesPerRow + (x >> 3);
+        raster[byteIndex] |= 0x80 >> (x % 8);
+      }
+    }
+  }
+  return { raster, bytesPerRow, height };
+}
+
+function rasterToEscPosString({ raster, bytesPerRow, height }) {
+  const xL = bytesPerRow & 0xff;
+  const xH = (bytesPerRow >> 8) & 0xff;
+  const yL = height & 0xff;
+  const yH = (height >> 8) & 0xff;
+
+  let header =
+    `${GS}v0` +
+    String.fromCharCode(0x00) +
+    String.fromCharCode(xL) +
+    String.fromCharCode(xH) +
+    String.fromCharCode(yL) +
+    String.fromCharCode(yH);
+
+  let body = "";
+  for (let i = 0; i < raster.length; i++) body += String.fromCharCode(raster[i]);
+
+  return header + body;
+}
+
+export async function generateThermalInvoiceESCPOS(params, paperWidthMM = 58) {
+  const widthPx = resolveDotWidth(paperWidthMM);
+  const html = buildThermalReceiptHTML({ ...params, widthPx });
+
+  const { default: html2canvas } = await import("html2canvas-pro");
+
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.left = "-9999px";
+  iframe.style.top = "0";
+  iframe.style.width = `${widthPx}px`;
+  iframe.style.border = "0";
+  document.body.appendChild(iframe);
+
+  try {
+    await new Promise((resolve) => {
+      iframe.onload = resolve;
+      iframe.srcdoc = html;
+    });
+
+    const idoc = iframe.contentDocument;
+    const imgs = Array.from(idoc.querySelectorAll("img"));
+    await Promise.all(
+      imgs.map((img) =>
+        img.complete
+          ? Promise.resolve()
+          : new Promise((res) => {
+              img.addEventListener("load", res, { once: true });
+              img.addEventListener("error", res, { once: true });
+            }),
+      ),
+    );
+    await new Promise((r) => setTimeout(r, 80));
+
+    const container = idoc.getElementById("container") || idoc.body;
+    const canvas = await html2canvas(container, {
+      scale: 1,
+      backgroundColor: "#ffffff",
+      useCORS: true,
+      width: widthPx,
+      windowWidth: widthPx,
+    });
+
+    const rasterInfo = canvasToRasterBytes(canvas);
+    const image = rasterToEscPosString(rasterInfo);
+
+    return INIT + image + feed(3) + CUT;
+  } finally {
+    document.body.removeChild(iframe);
+  }
 }

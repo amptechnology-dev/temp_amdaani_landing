@@ -21,9 +21,12 @@ import {
 } from "@/components/ui/dialog";
 
 import { generateInvoiceHTML } from "../../utils/invoiceTemplate";
-import { generateThermalInvoiceHTML } from "../../utils/generateThermalInvoiceHTML";
 import { useUSBThermalPrinter } from "../../src/hooks/useUSBThermalPrinter";
-import { generateThermalInvoiceESCPOS } from "../../utils/generateThermalInvoiceESCPOS";
+import {
+  generateThermalInvoiceESCPOS,
+  generateThermalReceiptPreviewHTML,
+  resolveDotWidth,
+} from "../../utils/generateThermalInvoiceESCPOS";
 
 export default function InvoiceSummary({
   invoiceCalculations,
@@ -54,13 +57,13 @@ export default function InvoiceSummary({
   const [isSavingContinue, setIsSavingContinue] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
-  // ✅ NEW — Thermal preview state (works even before printer is connected)
+  // Thermal preview state (works even before printer is connected)
   const [thermalPreviewOpen, setThermalPreviewOpen] = useState(false);
   const [thermalPreviewHtml, setThermalPreviewHtml] = useState("");
+  const [isThermalPrinting, setIsThermalPrinting] = useState(false);
 
   const iframeRef = useRef(null);
-  const thermalIframeRef = useRef(null); // kept for backward-compat, no longer used to auto-print
-  const thermalPreviewIframeRef = useRef(null); // ✅ NEW — visible thermal preview iframe
+  const thermalPreviewIframeRef = useRef(null);
 
   const {
     connect: connectPrinter,
@@ -74,6 +77,7 @@ export default function InvoiceSummary({
   const hasWebSerial =
     typeof navigator !== "undefined" && "serial" in navigator;
 
+  // ── A4/A5 main invoice preview ──
   const buildPreviewHtml = () => {
     const now = new Date();
     return generateInvoiceHTML({
@@ -108,44 +112,60 @@ export default function InvoiceSummary({
     setPreviewOpen(true);
   };
 
-  // ✅ NEW — Builds the thermal HTML using the SAME styled CSS
-  // (generateThermalInvoiceHTML) that used to be used for silent
-  // browser printing. This is the "old code" CSS you wanted reused.
+  // ── Thermal receipt (preview + USB print) ──
+  // Change to 80 if you're using a 3" (80mm) printer.
+  const THERMAL_PAPER_WIDTH_MM = storedata?.settings?.thermalPaperWidthMM || 58;
+
+  // Single shared params builder — preview and actual USB print are always
+  // built from IDENTICAL data. Avoids the earlier bug where preview and
+  // print silently used two different invoiceData shapes.
+  const buildThermalParams = () => ({
+    createdInvoice: isCreatedInvoice,
+    invoiceData: {
+      isIgst: false, // TODO: wire your real inter-state/IGST flag here if applicable
+      subTotal: invoiceCalculations.subtotal,
+      discountTotal: invoiceCalculations.discountTotal,
+      roundOff: invoiceCalculations.roundOff,
+      grandTotal: invoiceCalculations.grandTotal,
+      paymentMethod,
+      paymentNote,
+      transactions: [],
+    },
+    formValues,
+    cartItems,
+    invoiceCalculations,
+    invoiceNumber,
+    invoiceDate: new Date(),
+    storedata,
+    isGstInvoice,
+    isFreePlan,
+    payment: {
+      paid: payment?.paid ?? 0,
+      due: payment?.due ?? 0,
+      status: payment?.status ?? "unpaid",
+    },
+  });
+
+  // Preview HTML — same width the actual raster print will use, so what
+  // you see here is exactly what gets sent to the printer.
   const buildThermalPreviewHtml = () => {
-    const now = new Date();
-    return generateThermalInvoiceHTML({
-      createdInvoice: isCreatedInvoice,
-      invoiceData: { transactions: [], remarks, paymentMethod, paymentNote },
-      formValues,
-      cartItems,
-      invoiceCalculations,
-      invoiceNumber,
-      currentDate: format(now, "dd-MMM-yyyy"),
-      currentTime: format(now, "hh:mm a"),
-      storedata,
-      invoiceDate: now,
-      isGstInvoice,
-      isFreePlan,
-      payment: {
-        paid: payment?.paid ?? 0,
-        due: payment?.due ?? 0,
-        status: payment?.status ?? "unpaid",
-      },
-      paperWidthMM: 80,
-    });
+    if (!cartItems?.length) return "";
+    return generateThermalReceiptPreviewHTML(
+      buildThermalParams(),
+      THERMAL_PAPER_WIDTH_MM,
+    );
   };
 
-  // ✅ NEW — Opens the thermal preview dialog. Works regardless of
-  // printer connection state — pure HTML render, no hardware needed.
+  // Opens the thermal preview dialog. Works regardless of printer
+  // connection state — pure HTML render, no hardware needed.
   const handleThermalPreview = () => {
     if (!cartItems?.length) return;
     setThermalPreviewHtml(buildThermalPreviewHtml());
     setThermalPreviewOpen(true);
   };
 
-  // ✅ NEW — Auto-resize the thermal preview iframe to fit its content,
-  // so the whole receipt is visible like a real paper strip instead of
-  // being clipped or leaving blank space.
+  // Auto-resize the thermal preview iframe to fit its content, so the
+  // whole receipt is visible like a real paper strip.
   const handleThermalPreviewIframeLoad = () => {
     const iframe = thermalPreviewIframeRef.current;
     if (!iframe) return;
@@ -158,8 +178,8 @@ export default function InvoiceSummary({
     }
   };
 
-  // ✅ NEW — Prints exactly what's shown in the thermal preview dialog,
-  // so preview and actual print output can never drift apart.
+  // Prints exactly what's shown in the thermal preview dialog via the
+  // browser's own print dialog (useful for non-USB / any printer).
   const handleThermalPreviewPrint = () => {
     const win = thermalPreviewIframeRef.current?.contentWindow;
     if (!win) return;
@@ -176,40 +196,29 @@ export default function InvoiceSummary({
     }
   };
 
+  // USB thermal print — renders the SAME styled HTML the preview shows,
+  // screenshots it, and sends it to the printer as an ESC/POS raster
+  // image. Preview and print can never visually diverge because print
+  // literally is a screenshot of the preview HTML.
   const handleUSBThermalPrint = async () => {
     if (!isPrinterConnected) {
       toast.error("Age 'Connect Printer' e click korun");
       return;
     }
+    if (!cartItems?.length) return;
     try {
-      const now = new Date();
-      const receipt = generateThermalInvoiceESCPOS({
-        createdInvoice: isCreatedInvoice,
-        invoiceData: {
-          isIgst: false,
-          subTotal: invoiceCalculations.subtotal,
-          discountTotal: invoiceCalculations.discountTotal,
-          roundOff: invoiceCalculations.roundOff,
-          grandTotal: invoiceCalculations.grandTotal,
-        },
-        formValues,
-        cartItems,
-        invoiceCalculations,
-        invoiceNumber,
-        invoiceDate: now,
-        storedata,
-        isGstInvoice,
-        payment: {
-          paid: payment?.paid ?? 0,
-          due: payment?.due ?? 0,
-          status: payment?.status ?? "unpaid",
-        },
-      });
+      setIsThermalPrinting(true);
+      const receipt = await generateThermalInvoiceESCPOS(
+        buildThermalParams(),
+        THERMAL_PAPER_WIDTH_MM,
+      );
       await sendToPrinter(receipt);
       toast.success("Print is sending printer-e");
     } catch (err) {
       console.error("USB print error:", err);
       toast.error(err.message || "USB print failed");
+    } finally {
+      setIsThermalPrinting(false);
     }
   };
 
@@ -437,7 +446,7 @@ export default function InvoiceSummary({
     }
   };
 
-  // ✅ F6 → Save shortcut (boss's spec)
+  // F6 → Save shortcut (boss's spec)
   useEffect(() => {
     const onKeyDown = (e) => {
       if (e.key === "F6") {
@@ -542,8 +551,8 @@ export default function InvoiceSummary({
                 Print
               </Button>
 
-              {/* ✅ NEW — Thermal preview button. Always visible, works
-                  even before "Connect Printer" is clicked. */}
+              {/* Thermal preview button. Always visible, works even
+                  before "Connect Printer" is clicked. */}
               <Button
                 size="sm"
                 variant="outline"
@@ -575,9 +584,14 @@ export default function InvoiceSummary({
                     size="sm"
                     variant="outline"
                     onClick={handleUSBThermalPrint}
+                    disabled={isThermalPrinting}
                     className="text-purple-600 border-purple-200 hover:bg-purple-50"
                   >
-                    <Printer className="w-3.5 h-3.5 mr-1.5" />
+                    {isThermalPrinting ? (
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    ) : (
+                      <Printer className="w-3.5 h-3.5 mr-1.5" />
+                    )}
                     USB Print
                   </Button>
                 ))}
@@ -597,11 +611,14 @@ export default function InvoiceSummary({
         </DialogContent>
       </Dialog>
 
-      {/* ✅ NEW — Thermal Preview Dialog.
-          Uses generateThermalInvoiceHTML (same styled CSS as before),
-          rendered visibly in a narrow "receipt paper" strip so you can
-          check the layout BEFORE connecting/printing to a real device.
-          The Print button here prints exactly this same iframe. */}
+      {/* ── Thermal Preview Dialog ──
+          Uses the SAME styled HTML (generateThermalReceiptPreviewHTML)
+          and SAME dot-width the actual USB raster print will use, so
+          what's shown here is exactly what comes out of the printer.
+          The "Print" button here uses the browser's own print dialog
+          (useful even without a connected USB printer); the "USB Print"
+          button in the main dialog sends this same content as an
+          ESC/POS raster image. */}
       <Dialog open={thermalPreviewOpen} onOpenChange={setThermalPreviewOpen}>
         <DialogContent className="max-w-md w-full h-[92vh] p-0 flex flex-col overflow-hidden gap-0">
           <DialogHeader className="px-4 py-3 border-b shrink-0 flex-row items-center justify-between space-y-0">
@@ -620,7 +637,13 @@ export default function InvoiceSummary({
           </DialogHeader>
 
           <div className="flex-1 overflow-auto bg-slate-200 p-4 flex justify-center">
-            <div className="bg-white shadow-md rounded-sm" style={{ width: "320px" }}>
+            <div
+              className="bg-white shadow-md rounded-sm"
+              style={{
+                width: `${resolveDotWidth(THERMAL_PAPER_WIDTH_MM)}px`,
+                maxWidth: "100%",
+              }}
+            >
               <iframe
                 ref={thermalPreviewIframeRef}
                 title="thermal-preview"
