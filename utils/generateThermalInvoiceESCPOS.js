@@ -25,18 +25,28 @@ async function fetchImageAsDataURL(url) {
 }
 
 const FONT_FAMILY = '"Courier New", Courier, monospace';
-
 const BASE_WIDTH_PX = 384;
-const BASE_FONT_SIZE_PX = {
-  a: 22, // store name only
-  b: 16, // body — item rows, meta info, normal totals
-  c: 13, // store address / GSTIN / phone / email / item sub-lines
-  d: 18, // Net Total / Paid / Due — bold emphasis, smaller than before
-};
 
+// ✅ Only TWO font sizes now — this mirrors the app's actual ESC/POS
+// printer fonts: 'a' (big) and 'b' (normal). The old 4-tier system
+// (a/b/c/d) is why the web receipt never matched the app's look —
+// the app doesn't have a "small" font at all, it only has these two.
+const BASE_FONT_SIZE_PX = {
+  a: 22, // store name, CANCELLED banner, the whole totals block, UPI id/amount, "Power by AMDAANI"
+  b: 16, // everything else — tagline, address, meta, items, item headers, payment/tax tables, footer
+};
 function scaleFont(key, widthPx) {
   const base = BASE_FONT_SIZE_PX[key] || BASE_FONT_SIZE_PX.b;
   return Math.max(9, Math.round(base * (widthPx / BASE_WIDTH_PX)));
+}
+
+// ✅ Logo/QR/signature sizes scaled from the SAME dot-widths the app
+// uses (200 / 180 / 150 out of a 384-dot base) instead of the old
+// fixed 130/140/120px — so they come out the same relative size as
+// on the app, on both 58mm and 80mm paper.
+const BASE_IMG_PX = { logo: 200, qr: 180, sig: 150 };
+function scaleImg(key, widthPx) {
+  return Math.max(40, Math.round(BASE_IMG_PX[key] * (widthPx / BASE_WIDTH_PX)));
 }
 
 function escapeHtml(str) {
@@ -66,7 +76,13 @@ async function buildThermalReceiptHTML({
   const isIgst = invoiceData?.isIgst === true;
 
   const logoDataUrl = await fetchImageAsDataURL(storedata?.logoUrl);
+  const logoW = scaleImg("logo", widthPx);
 
+  // ── Items ── mirrors printThermal.ts exactly:
+  // main row  = name | qty | rate | amt      (40/10/25/25 columns)
+  // extra row = HSN  |     | Dis X% |        (only when discount > 0)
+  // a dashed divider after EVERY item — not just once after the whole
+  // table — which is what makes the app receipt look "lomba"/spacious.
   const itemsHTML = items
     .map((item) => {
       const qty = Number(item.qty || item.quantity || 0);
@@ -84,27 +100,31 @@ async function buildThermalReceiptHTML({
       const discountPercent =
         baseRate > 0 && perItemDiscount > 0 ? ((perItemDiscount / baseRate) * 100).toFixed(2) : null;
 
-      return `
+      const mainRow = `
         <tr>
-          <td class="item-name">
-            ${escapeHtml(item.name || "")}
-            ${item.hsn ? `<div class="sub">HSN: ${escapeHtml(item.hsn)}</div>` : ""}
-          </td>
+          <td class="item-name">${escapeHtml(item.name || "")}</td>
           <td class="center nowrap">${qty}</td>
-          <td class="right rate-cell">
-            <div class="nowrap">${baseRate.toFixed(2)}</div>
-            ${
-              totalDiscount > 0
-                ? `<div class="sub">Dis ${discountPercent ? `${discountPercent}% ` : ""}(-${totalDiscount.toFixed(2)})</div>`
-                : ""
-            }
-          </td>
+          <td class="right nowrap">${baseRate.toFixed(2)}</td>
           <td class="right nowrap">${totalAmount.toFixed(2)}</td>
         </tr>`;
+
+      const discountRow =
+        totalDiscount > 0
+          ? `
+        <tr>
+          <td class="item-name">${item.hsn ? `HSN: ${escapeHtml(item.hsn)}` : ""}</td>
+          <td></td>
+          <td class="right nowrap">${discountPercent ? `Dis ${discountPercent}%` : ""}</td>
+          <td></td>
+        </tr>`
+          : "";
+
+      return `${mainRow}${discountRow}
+        <tr class="item-divider-row"><td colspan="4"><div class="dashed"></div></td></tr>`;
     })
     .join("");
 
-  // ── GST breakdown ── colgroup added so Taxable/CGST/SGST never touch
+  // ── GST breakdown ── ratios now match app: 25/35/40 (IGST) or 25/25/25/25
   let gstBreakdownHTML = "";
   const gstBreakdown = invoiceCalculations.gstBreakdown || {};
   const gstRates = Object.keys(gstBreakdown).filter((r) => parseFloat(r) > 0);
@@ -130,7 +150,7 @@ async function buildThermalReceiptHTML({
       })
       .join("");
 
-    const colWidths = isIgst ? ["28%", "40%", "32%"] : ["22%", "34%", "22%", "22%"];
+    const colWidths = isIgst ? ["25%", "35%", "40%"] : ["25%", "25%", "25%", "25%"];
 
     gstBreakdownHTML = `
       <div class="dashed"></div>
@@ -153,7 +173,7 @@ async function buildThermalReceiptHTML({
       </table>`;
   }
 
-  // ── Payment summary ── colgroup added too
+  // ── Payment summary ── ratio now matches app: 50/25/25
   let paymentSummaryHTML = "";
   if (!isUnpaid && invoiceData?.transactions?.length > 0) {
     const rows = invoiceData.transactions
@@ -170,7 +190,7 @@ async function buildThermalReceiptHTML({
       <div class="dashed"></div>
       <div class="section-title">PAYMENT SUMMARY</div>
       <table class="data-table">
-        <colgroup><col style="width:40%;"/><col style="width:30%;"/><col style="width:30%;"/></colgroup>
+        <colgroup><col style="width:50%;"/><col style="width:25%;"/><col style="width:25%;"/></colgroup>
         <thead><tr><th>Date</th><th class="right">Amount</th><th class="center">Method</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>`;
@@ -178,6 +198,7 @@ async function buildThermalReceiptHTML({
 
   // ── UPI QR ──
   let upiHTML = "";
+  const qrW = scaleImg("qr", widthPx);
   if (storedata?.bankDetails?.upiId) {
     const rawGrandTotal = (invoiceCalculations.grandTotal || 0) - (invoiceCalculations?.discountTotal || 0);
     const roundedGrandTotal = createdInvoice ? Math.round(invoiceData?.grandTotal || 0) : Math.round(rawGrandTotal);
@@ -188,10 +209,10 @@ async function buildThermalReceiptHTML({
     const qrDataUrl = await fetchImageAsDataURL(qrURL);
     upiHTML = `
       <div class="dashed"></div>
-      <div class="center bold small">Scan & Pay</div>
-      ${qrDataUrl ? `<img src="${qrDataUrl}" class="qr"/>` : ""}
-      <div class="center small">UPI: ${escapeHtml(storedata.bankDetails.upiId)}</div>
-      <div class="center small">Amount: Rs.${roundedGrandTotal}</div>`;
+      <div class="center bold sizeB">Scan & Pay</div>
+      ${qrDataUrl ? `<img src="${qrDataUrl}" style="width:${qrW}px;height:${qrW}px;" class="qr"/>` : ""}
+      <div class="center sizeA">UPI: ${escapeHtml(storedata.bankDetails.upiId)}</div>
+      <div class="center sizeA">Amount: Rs.${roundedGrandTotal}</div>`;
   }
 
   const subTotal = createdInvoice ? Number(invoiceData?.subTotal || 0) : Number(invoiceCalculations.subtotal || 0);
@@ -209,20 +230,16 @@ async function buildThermalReceiptHTML({
   const addrLine2 = [addr.state, addr.postalCode].filter(Boolean).join(" ");
 
   const sigDataUrl = await fetchImageAsDataURL(storedata?.signatureUrl);
+  const sigW = scaleImg("sig", widthPx);
 
   const fA = scaleFont("a", widthPx);
   const fB = scaleFont("b", widthPx);
-  const fC = scaleFont("c", widthPx);
-  const fD = scaleFont("d", widthPx);
 
   return /*html*/ `
   <html>
     <head>
       <meta charset="utf-8" />
       <style>
-        /* ✅ Hard-enforced 2-inch (mm-based) page size — wins over
-           browser default Letter/A4 so print preview & saved PDF
-           always come out at the receipt's real width, not A4. */
         @page {
           size: ${paperWidthMM}mm auto !important;
           margin: 0 !important;
@@ -258,37 +275,39 @@ async function buildThermalReceiptHTML({
         .right { text-align: right; }
         .left { text-align: left; }
         .bold { font-weight: 700; }
-        .small { font-size: ${fC}px; }
         .nowrap { white-space: nowrap; }
-        .dashed { border-top: 1px dashed #000; margin: 4px 0; }
-        .store-name { font-size: ${fA}px; font-weight: 700; }
-        .tagline { font-size: ${fC}px; }
-        /* ✅ no border under store-name/tagline — dashed line removed
-           from markup, address block sits right after with small gap */
-        .addr-block { margin-top: 4px; }
-        .addr { font-size: ${fC}px; line-height: 1.3; }
+        .dashed { border-top: 1px dashed #000; margin: 5px 0; }
+        .sizeA { font-size: ${fA}px; }
+        .sizeB { font-size: ${fB}px; }
 
-        /* ✅ Customer Mobile / Invoice meta — bold, single line, no wrap */
-        .meta { font-size: ${fC}px; line-height: 1.35; font-weight: 700; }
+        /* ✅ Store name — font 'a', bold, big, with a clear gap under
+           the (now bigger) logo, matching the app */
+        .store-name { font-size: ${fA}px; font-weight: 700; }
+        .tagline { font-size: ${fB}px; }
+        .addr-block { margin-top: 4px; }
+        .addr { font-size: ${fB}px; line-height: 1.35; }
+
+        /* ✅ Meta (Invoice/Date/Customer) — app prints these plain,
+           NOT bold, font 'b'. Old web code bolded these; removed. */
+        .meta { font-size: ${fB}px; line-height: 1.4; font-weight: 400; }
         .meta div { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         .section-title {
           text-align: center;
           font-weight: 700;
-          font-size: ${fC}px;
-          margin: 2px 0;
+          font-size: ${fB}px;
+          margin: 3px 0;
           text-transform: uppercase;
         }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 
-        /* ✅ Items table — extra padding + letter-spacing so
-           Qty / Rate / Amt don't feel glued together */
+        /* ✅ Items — 40/10/25/25 columns, font 'b', matching app */
         .items-table { font-size: ${fB}px; margin-top: 2px; }
         .items-table th {
           border-bottom: 1px solid #000;
           text-align: left;
           padding: 2px 4px;
-          font-size: ${fC}px;
+          font-size: ${fB}px;
           font-weight: 700;
           letter-spacing: 0.3px;
         }
@@ -296,44 +315,43 @@ async function buildThermalReceiptHTML({
         .items-table .item-name { word-wrap: break-word; overflow-wrap: break-word; padding-right: 6px; }
         .items-table th.right, .items-table td.right { text-align: right; }
         .items-table th.center, .items-table td.center { text-align: center; }
-        .items-table .rate-cell { text-align: right; }
-        .items-table .sub { font-size: ${fC}px; color: #333; white-space: normal; line-height: 1.25; }
+        .item-divider-row td { padding: 0; }
+        .item-divider-row .dashed { margin: 4px 0; }
 
-        /* ✅ Totals — normal rows small, Net/Paid/Due bold + slightly
-           bigger (fD) but not oversized, each on its own single line */
-        .totals-table { font-size: ${fB}px; margin-top: 4px; }
-        .totals-table td { padding: 1px 0; }
-        .totals-emphasis td {
-          font-size: ${fD}px;
-          font-weight: 700;
-          white-space: nowrap;
-        }
-        .totals-emphasis.grand td { border-top: 1px dashed #000; padding-top: 4px; }
+        /* ✅ Totals — the WHOLE block is font 'a' size (matches app;
+           Sub Total/Extra discount/Round Off/Paid/Due all print at
+           font 'a' there too), only "Net Total" is bold + has the
+           divider line above it */
+        .totals-table { font-size: ${fA}px; margin-top: 4px; }
+        .totals-table td { padding: 2px 0; white-space: nowrap; }
+        .totals-table .grand td { font-weight: 700; border-top: 1px dashed #000; padding-top: 5px; }
 
-        .data-table { font-size: ${fC}px; margin-top: 2px; }
+        .data-table { font-size: ${fB}px; margin-top: 2px; }
         .data-table th, .data-table td { padding: 2px 3px; text-align: left; }
-        .data-table th { border-bottom: 1px solid #000; }
+        .data-table th { border-bottom: 1px solid #000; font-weight: 700; }
 
-        .status-text { text-align: center; font-weight: 700; font-size: ${fC}px; margin-top: 4px; }
-        .logo { max-width: 130px; margin: 4px auto; display: block; }
-        .qr { width: 140px; height: 140px; margin: 6px auto; display: block; }
-        .sig { max-width: 120px; object-fit: contain; margin: 8px auto 0; display: block; }
-        .footer-text { text-align: center; font-size: ${fC}px; margin-top: 4px; }
-        .powered { text-align: center; font-size: ${fB}px; font-weight: 700; margin-top: 4px; }
+        .status-text { text-align: center; font-weight: 700; font-size: ${fB}px; margin-top: 4px; }
+        .logo { margin: 6px auto 8px; display: block; }
+        .qr { margin: 6px auto; display: block; }
+        .sig { object-fit: contain; margin: 8px auto 0; display: block; }
+        .footer-text { text-align: center; font-size: ${fB}px; margin-top: 4px; }
+        .powered { text-align: center; font-size: ${fA}px; font-weight: 700; margin-top: 4px; }
         .cancel-banner {
           text-align: center;
           font-weight: 700;
-          font-size: ${Math.round(widthPx / 9)}px;
+          font-size: ${fA * 2}px;
           margin: 6px 0;
         }
       </style>
     </head>
     <body>
       <div id="container">
-        ${logoDataUrl ? `<img src="${logoDataUrl}" class="logo"/>` : ""}
+        ${logoDataUrl ? `<img src="${logoDataUrl}" style="width:${logoW}px;" class="logo"/>` : ""}
 
         <div class="center store-name">${escapeHtml(storedata?.name || "STORE")}</div>
         ${storedata?.tagline ? `<div class="center tagline">${escapeHtml(storedata.tagline)}</div>` : ""}
+
+        <div class="dashed"></div>
 
         <div class="addr-block">
           ${
@@ -372,10 +390,10 @@ async function buildThermalReceiptHTML({
 
         <table class="items-table">
           <colgroup>
-            <col style="width:34%;" />
-            <col style="width:16%;" />
-            <col style="width:28%;" />
-            <col style="width:22%;" />
+            <col style="width:40%;" />
+            <col style="width:10%;" />
+            <col style="width:25%;" />
+            <col style="width:25%;" />
           </colgroup>
           <thead>
             <tr>
@@ -388,21 +406,19 @@ async function buildThermalReceiptHTML({
           <tbody>${itemsHTML}</tbody>
         </table>
 
-        <div class="dashed"></div>
-
         <table class="totals-table">
-          <tr><td>Sub Total</td><td class="right nowrap">${subTotal.toFixed(2)}</td></tr>
-          ${discountTotal > 0 ? `<tr><td>Extra discount</td><td class="right nowrap">-${discountTotal.toFixed(2)}</td></tr>` : ""}
+          <tr><td>Sub Total</td><td class="right">${subTotal.toFixed(2)}</td></tr>
+          ${discountTotal > 0 ? `<tr><td>Extra discount</td><td class="right">-${discountTotal.toFixed(2)}</td></tr>` : ""}
           ${
             roundOffValue !== 0
-              ? `<tr><td>Round Off</td><td class="right nowrap">${roundOffValue > 0 ? "+" : ""}${roundOffValue.toFixed(2)}</td></tr>`
+              ? `<tr><td>Round Off</td><td class="right">${roundOffValue > 0 ? "+" : ""}${roundOffValue.toFixed(2)}</td></tr>`
               : ""
           }
-          <tr class="totals-emphasis grand"><td>Net Total</td><td class="right">${grandTotal.toFixed(2)}</td></tr>
+          <tr class="grand"><td>Net Total</td><td class="right">${grandTotal.toFixed(2)}</td></tr>
           ${
             !isUnpaid && (payment.paid > 0 || payment.due > 0)
-              ? `<tr class="totals-emphasis"><td>Paid Amount</td><td class="right">${Number(payment.paid || 0).toFixed(2)}</td></tr>
-                 <tr class="totals-emphasis"><td>Due Amount</td><td class="right">${Math.round(payment.due || 0).toFixed(2)}</td></tr>`
+              ? `<tr><td>Paid Amount</td><td class="right">${Number(payment.paid || 0).toFixed(2)}</td></tr>
+                 <tr><td>Due Amount</td><td class="right">${Math.round(payment.due || 0).toFixed(2)}</td></tr>`
               : ""
           }
         </table>
@@ -440,7 +456,7 @@ async function buildThermalReceiptHTML({
         <div class="footer-text">Thank you for your purchase!</div>
         <div class="footer-text">Visit Again</div>
 
-        ${sigDataUrl ? `<img src="${sigDataUrl}" class="sig"/>` : ""}
+        ${sigDataUrl ? `<img src="${sigDataUrl}" style="width:${sigW}px;" class="sig"/>` : ""}
         ${isFreePlan ? `<div class="powered">"Power by AMDAANI"</div>` : ""}
       </div>
     </body>
@@ -458,6 +474,8 @@ const INIT = `${ESC}\x40`;
 const CUT = `${GS}\x56\x00`;
 const feed = (n = 3) => "\n".repeat(n);
 
+// Floyd–Steinberg dithering (unchanged from last fix) — flat threshold
+// turns gradient/photo logos into noise, dithering keeps them clean.
 function canvasToRasterBytes(canvas, threshold = 160) {
   const ctx = canvas.getContext("2d");
   const { width, height } = canvas;
@@ -465,17 +483,36 @@ function canvasToRasterBytes(canvas, threshold = 160) {
   const bytesPerRow = Math.ceil(width / 8);
   const raster = new Uint8Array(bytesPerRow * height);
 
+  const gray = new Float32Array(width * height);
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const i = (y * width + x) * 4;
       const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
-      const lum = a === 0 ? 255 : 0.299 * r + 0.587 * g + 0.114 * b;
-      if (lum < threshold) {
+      gray[y * width + x] = a === 0 ? 255 : 0.299 * r + 0.587 * g + 0.114 * b;
+    }
+  }
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = y * width + x;
+      const oldPixel = gray[idx];
+      const newPixel = oldPixel < threshold ? 0 : 255;
+      const error = oldPixel - newPixel;
+
+      if (newPixel === 0) {
         const byteIndex = y * bytesPerRow + (x >> 3);
         raster[byteIndex] |= 0x80 >> x % 8;
       }
+
+      if (x + 1 < width) gray[idx + 1] += error * (7 / 16);
+      if (y + 1 < height) {
+        if (x - 1 >= 0) gray[idx - 1 + width] += error * (3 / 16);
+        gray[idx + width] += error * (5 / 16);
+        if (x + 1 < width) gray[idx + 1 + width] += error * (1 / 16);
+      }
     }
   }
+
   return { raster, bytesPerRow, height };
 }
 
@@ -510,6 +547,7 @@ export async function generateThermalInvoiceESCPOS(params, paperWidthMM = 58) {
   iframe.style.left = "-9999px";
   iframe.style.top = "0";
   iframe.style.width = `${widthPx}px`;
+  iframe.style.height = "10px";
   iframe.style.border = "0";
   document.body.appendChild(iframe);
 
@@ -520,10 +558,12 @@ export async function generateThermalInvoiceESCPOS(params, paperWidthMM = 58) {
     });
 
     const idoc = iframe.contentDocument;
+    const iwin = iframe.contentWindow;
+
     const imgs = Array.from(idoc.querySelectorAll("img"));
     await Promise.all(
       imgs.map((img) =>
-        img.complete
+        img.complete && img.naturalWidth > 0
           ? Promise.resolve()
           : new Promise((res) => {
               img.addEventListener("load", res, { once: true });
@@ -531,15 +571,34 @@ export async function generateThermalInvoiceESCPOS(params, paperWidthMM = 58) {
             }),
       ),
     );
-    await new Promise((r) => setTimeout(r, 80));
+
+    if (idoc.fonts && idoc.fonts.ready) {
+      try {
+        await idoc.fonts.ready;
+      } catch (_) {}
+    }
 
     const container = idoc.getElementById("container") || idoc.body;
+
+    const fullHeight = Math.max(
+      container.scrollHeight,
+      idoc.body.scrollHeight,
+      idoc.documentElement.scrollHeight,
+    );
+    iframe.style.height = `${fullHeight}px`;
+
+    await new Promise((res) =>
+      iwin.requestAnimationFrame(() => iwin.requestAnimationFrame(res)),
+    );
+
     const canvas = await html2canvas(container, {
       scale: 1,
       backgroundColor: "#ffffff",
       useCORS: true,
       width: widthPx,
+      height: fullHeight,
       windowWidth: widthPx,
+      windowHeight: fullHeight,
     });
 
     const rasterInfo = canvasToRasterBytes(canvas);
