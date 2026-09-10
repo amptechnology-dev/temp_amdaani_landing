@@ -27,25 +27,16 @@ async function fetchImageAsDataURL(url) {
 const FONT_FAMILY = '"Courier New", Courier, monospace';
 
 const BASE_WIDTH_PX = 384;
-
-// ✅ Bumped up from the old {a:22, b:16, c:13, d:18} — the old sizes were
-// legible on screen (anti-aliased) but broke apart after 1-bit thresholding
-// for the printer, which is why prints looked blurry/unreadable while the
-// on-screen preview looked fine.
 const BASE_FONT_SIZE_PX = {
-  a: 24, // store name only
-  b: 18, // body — item rows, meta info, normal totals
-  c: 15, // store address / GSTIN / phone / email / item sub-lines
-  d: 20, // Net Total / Paid / Due — bold emphasis, smaller than before
+  a: 22, // store name only
+  b: 16, // body — item rows, meta info, normal totals
+  c: 13, // store address / GSTIN / phone / email / item sub-lines
+  d: 18, // Net Total / Paid / Due — bold emphasis, smaller than before
 };
 
 function scaleFont(key, widthPx) {
   const base = BASE_FONT_SIZE_PX[key] || BASE_FONT_SIZE_PX.b;
-  // ✅ Raised floor from 9px -> 11px. Below ~10px, Courier New strokes are
-  // only 1-2 physical dots wide on a 58mm (384 dot) head, so a hard
-  // black/white threshold drops pixels mid-glyph and text becomes unreadable
-  // even though it looks fine anti-aliased on screen.
-  return Math.max(11, Math.round(base * (widthPx / BASE_WIDTH_PX)));
+  return Math.max(9, Math.round(base * (widthPx / BASE_WIDTH_PX)));
 }
 
 function escapeHtml(str) {
@@ -257,11 +248,6 @@ async function buildThermalReceiptHTML({
           background: #fff;
           font-family: ${FONT_FAMILY};
           overflow-x: hidden;
-          /* ✅ keep text rendering crisp/geometric rather than the browser's
-             "optimizeLegibility" hinting, which adds soft anti-aliasing that
-             gets destroyed by 1-bit thresholding */
-          text-rendering: optimizeSpeed;
-          -webkit-font-smoothing: antialiased;
         }
         #container {
           width: 100%;
@@ -280,9 +266,7 @@ async function buildThermalReceiptHTML({
         /* ✅ no border under store-name/tagline — dashed line removed
            from markup, address block sits right after with small gap */
         .addr-block { margin-top: 4px; }
-        /* ✅ address bumped to font-weight 600 (was 400) — thin regular
-           strokes at ${fC}px were disappearing after thresholding */
-        .addr { font-size: ${fC}px; line-height: 1.3; font-weight: 600; }
+        .addr { font-size: ${fC}px; line-height: 1.3; }
 
         /* ✅ Customer Mobile / Invoice meta — bold, single line, no wrap */
         .meta { font-size: ${fC}px; line-height: 1.35; font-weight: 700; }
@@ -299,7 +283,7 @@ async function buildThermalReceiptHTML({
 
         /* ✅ Items table — extra padding + letter-spacing so
            Qty / Rate / Amt don't feel glued together */
-        .items-table { font-size: ${fB}px; margin-top: 2px; font-weight: 600; }
+        .items-table { font-size: ${fB}px; margin-top: 2px; }
         .items-table th {
           border-bottom: 1px solid #000;
           text-align: left;
@@ -313,11 +297,11 @@ async function buildThermalReceiptHTML({
         .items-table th.right, .items-table td.right { text-align: right; }
         .items-table th.center, .items-table td.center { text-align: center; }
         .items-table .rate-cell { text-align: right; }
-        .items-table .sub { font-size: ${fC}px; color: #000; font-weight: 600; white-space: normal; line-height: 1.25; }
+        .items-table .sub { font-size: ${fC}px; color: #333; white-space: normal; line-height: 1.25; }
 
         /* ✅ Totals — normal rows small, Net/Paid/Due bold + slightly
            bigger (fD) but not oversized, each on its own single line */
-        .totals-table { font-size: ${fB}px; margin-top: 4px; font-weight: 600; }
+        .totals-table { font-size: ${fB}px; margin-top: 4px; }
         .totals-table td { padding: 1px 0; }
         .totals-emphasis td {
           font-size: ${fD}px;
@@ -326,15 +310,15 @@ async function buildThermalReceiptHTML({
         }
         .totals-emphasis.grand td { border-top: 1px dashed #000; padding-top: 4px; }
 
-        .data-table { font-size: ${fC}px; margin-top: 2px; font-weight: 600; }
+        .data-table { font-size: ${fC}px; margin-top: 2px; }
         .data-table th, .data-table td { padding: 2px 3px; text-align: left; }
-        .data-table th { border-bottom: 1px solid #000; font-weight: 700; }
+        .data-table th { border-bottom: 1px solid #000; }
 
         .status-text { text-align: center; font-weight: 700; font-size: ${fC}px; margin-top: 4px; }
         .logo { max-width: 130px; margin: 4px auto; display: block; }
         .qr { width: 140px; height: 140px; margin: 6px auto; display: block; }
         .sig { max-width: 120px; object-fit: contain; margin: 8px auto 0; display: block; }
-        .footer-text { text-align: center; font-size: ${fC}px; margin-top: 4px; font-weight: 600; }
+        .footer-text { text-align: center; font-size: ${fC}px; margin-top: 4px; }
         .powered { text-align: center; font-size: ${fB}px; font-weight: 700; margin-top: 4px; }
         .cancel-banner {
           text-align: center;
@@ -474,11 +458,7 @@ const INIT = `${ESC}\x40`;
 const CUT = `${GS}\x56\x00`;
 const feed = (n = 3) => "\n".repeat(n);
 
-// ✅ threshold raised 160 -> 185. After the supersample+downscale step below,
-// anti-aliased pixel edges are averaged into mid-grey; a higher cutoff means
-// "not clearly white" becomes black, which makes strokes bolder/solid
-// instead of thin and broken — this is what was making prints unreadable.
-function canvasToRasterBytes(canvas, threshold = 185) {
+function canvasToRasterBytes(canvas, threshold = 160) {
   const ctx = canvas.getContext("2d");
   const { width, height } = canvas;
   const { data } = ctx.getImageData(0, 0, width, height);
@@ -519,15 +499,6 @@ function rasterToEscPosString({ raster, bytesPerRow, height }) {
   return header + body;
 }
 
-// ✅ Render html2canvas at a higher internal resolution (SUPER_SCALE), then
-// downscale back to the printer's real dot width using canvas smoothing
-// before thresholding. This is the core fix: capturing at scale:1 and
-// thresholding directly loses/breaks thin anti-aliased glyph strokes, which
-// is exactly why the preview looked fine but the physical print didn't.
-// Supersampling first lets the downscale step properly average those edge
-// pixels into clean, solid strokes that survive 1-bit conversion.
-const SUPER_SCALE = 3;
-
 export async function generateThermalInvoiceESCPOS(params, paperWidthMM = 58) {
   const widthPx = resolveDotWidth(paperWidthMM);
   const html = await buildThermalReceiptHTML({ ...params, widthPx, paperWidthMM });
@@ -563,32 +534,15 @@ export async function generateThermalInvoiceESCPOS(params, paperWidthMM = 58) {
     await new Promise((r) => setTimeout(r, 80));
 
     const container = idoc.getElementById("container") || idoc.body;
-
-    // Step 1: capture at SUPER_SCALE resolution (e.g. 1152px wide instead of 384px)
-    const rawCanvas = await html2canvas(container, {
-      scale: SUPER_SCALE,
+    const canvas = await html2canvas(container, {
+      scale: 1,
       backgroundColor: "#ffffff",
       useCORS: true,
       width: widthPx,
       windowWidth: widthPx,
     });
 
-    // Step 2: downscale to the printer's real dot width with smoothing —
-    // this averages every glyph edge cleanly instead of leaving jagged /
-    // gapped anti-aliasing that a direct threshold would butcher.
-    const targetHeight = Math.round(rawCanvas.height / SUPER_SCALE);
-    const finalCanvas = document.createElement("canvas");
-    finalCanvas.width = widthPx;
-    finalCanvas.height = targetHeight;
-    const fctx = finalCanvas.getContext("2d");
-    fctx.imageSmoothingEnabled = true;
-    fctx.imageSmoothingQuality = "high";
-    fctx.fillStyle = "#ffffff";
-    fctx.fillRect(0, 0, widthPx, targetHeight);
-    fctx.drawImage(rawCanvas, 0, 0, widthPx, targetHeight);
-
-    // Step 3: threshold the clean, downsampled canvas into 1-bit for ESC/POS
-    const rasterInfo = canvasToRasterBytes(finalCanvas);
+    const rasterInfo = canvasToRasterBytes(canvas);
     const image = rasterToEscPosString(rasterInfo);
 
     return INIT + image + feed(3) + CUT;
