@@ -68,6 +68,7 @@ export default function InvoiceSummary({
 
   const {
     connect: connectPrinter,
+    selectNewPort,
     disconnect: disconnectPrinter,
     print: sendToPrinter,
     isConnected: isPrinterConnected,
@@ -189,6 +190,15 @@ export default function InvoiceSummary({
       toast.success("Printer connected successfully");
     } catch (err) {
       toast.error(err.message || "Printer connect korte problem hoyeche");
+    }
+  };
+
+  const handleChangePrinter = async () => {
+    try {
+      await selectNewPort();
+      toast.success("Printer changed successfully");
+    } catch (err) {
+      toast.error(err.message || "Printer change korte problem hoyeche");
     }
   };
 
@@ -576,20 +586,38 @@ export default function InvoiceSummary({
                     Connect Printer
                   </Button>
                 ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleUSBThermalPrint}
-                    disabled={isThermalPrinting}
-                    className="text-purple-600 border-purple-200 hover:bg-purple-50"
-                  >
-                    {isThermalPrinting ? (
-                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                    ) : (
-                      <Printer className="w-3.5 h-3.5 mr-1.5" />
-                    )}
-                    USB Print
-                  </Button>
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleUSBThermalPrint}
+                      disabled={isThermalPrinting}
+                      className="text-purple-600 border-purple-200 hover:bg-purple-50"
+                    >
+                      {isThermalPrinting ? (
+                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <Printer className="w-3.5 h-3.5 mr-1.5" />
+                      )}
+                      USB Print
+                    </Button>
+
+                    {/* ✅ নতুন — port change করার button */}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleChangePrinter}
+                      disabled={isPrinterConnecting}
+                      className="text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                    >
+                      {isPrinterConnecting ? (
+                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <Printer className="w-3.5 h-3.5 mr-1.5" />
+                      )}
+                      Change Printer
+                    </Button>
+                  </>
                 ))}
             </div>
           </DialogHeader>
