@@ -22,6 +22,7 @@ import {
   MessageCircle,
   Download,
   Ban,
+  Eye,
 } from "lucide-react";
 
 import api from "../../utils/api";
@@ -54,7 +55,12 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { generateInvoiceHTML } from "../../utils/invoiceTemplate";
-import { generateThermalInvoiceHTML } from "../../utils/generateThermalInvoiceHTML";
+import { useUSBThermalPrinter } from "../../src/hooks/useUSBThermalPrinter";
+import {
+  generateThermalInvoiceESCPOS,
+  generateThermalReceiptPreviewHTML,
+  resolveDotWidth,
+} from "../../utils/generateThermalInvoiceESCPOS";
 
 const statusStyles = {
   paid: "bg-green-600 text-white",
@@ -113,10 +119,27 @@ export default function InvoiceListPage({
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const iframeRef = useRef(null);
-  const thermalIframeRef = useRef(null);
+
+  const [thermalPreviewOpen, setThermalPreviewOpen] = useState(false);
+  const [thermalPreviewHtml, setThermalPreviewHtml] = useState("");
+  const [isThermalPrinting, setIsThermalPrinting] = useState(false);
+  const thermalPreviewIframeRef = useRef(null);
+
   const thermalPayloadRef = useRef(null);
 
   const pageFormat = storedata?.settings?.printMode === "a5" ? "a5" : "a4";
+  const hasWebSerial =
+    typeof navigator !== "undefined" && "serial" in navigator;
+
+  const {
+    connect: connectPrinter,
+    selectNewPort,
+    print: sendToPrinter,
+    isConnected: isPrinterConnected,
+    isConnecting: isPrinterConnecting,
+  } = useUSBThermalPrinter();
+
+  const THERMAL_PAPER_WIDTH_MM = storedata?.settings?.thermalPaperWidthMM || 58;
 
   useEffect(() => {
     fetchInvoices();
@@ -344,6 +367,34 @@ export default function InvoiceListPage({
         doc.invoiceCalculations?.roundOff ?? doc.roundOff ?? 0,
       );
 
+      // ✅ FIXED: doc.paidAmount / doc.dueAmount field backend response-e
+      // exact ei naam-e na-o thakte pare (naming mismatch) — age eta
+      // silently 0/0 hoye jachhilo, fole buildThermalReceiptHTML-er
+      // `!isUnpaid && (payment.paid > 0 || payment.due > 0)` condition
+      // false hoye "Paid Amount / Due Amount" row-i print hocchilo na,
+      // shudhu list theke print korle (InvoiceSummary.js-e direct
+      // checkout-theke asha payment prop thik chilo bole okhane problem
+      // hoyni). Ekhon multiple possible field-name fallback + shesh
+      // upay hishebe grandTotal theke compute kora hocche.
+      const resolvedPaidAmount = Number(
+        doc.paidAmount ??
+          doc.paid ??
+          doc.amountPaid ??
+          doc.totalPaid ??
+          (doc.transactions || []).reduce(
+            (sum, tx) => sum + Number(tx.amount || 0),
+            0,
+          ) ??
+          0,
+      );
+      const resolvedDueAmount = Number(
+        doc.dueAmount ??
+          doc.due ??
+          doc.amountDue ??
+          doc.balanceDue ??
+          Math.max(grandTotal - resolvedPaidAmount, 0),
+      );
+
       const isIgstDoc = Boolean(doc.isIgst);
       const computedGstBreakdown = {};
 
@@ -403,15 +454,6 @@ export default function InvoiceListPage({
 
       const dateObj = new Date(doc.createdAt || doc.invoiceDate);
 
-      // ── FIX: this was previously an empty placeholder object
-      //    (`invoiceData: { /* ... same as before ... */ }`), which meant
-      //    generateInvoiceHTML — called with createdInvoice: true — read
-      //    grandTotal/subTotal/transactions/remarks/status/isIgst as all
-      //    `undefined`. That's what produced ₹NaN, a missing Payment
-      //    Summary block, missing remarks/terms, and a preview that looked
-      //    nothing like the one from InvoiceSummary.js. Building the real
-      //    object here (same shape handleThermalPrint already built below)
-      //    makes both preview entry points render identically.
       const invoiceData = {
         transactions: doc.transactions || [],
         remarks: doc.remarks || "",
@@ -425,13 +467,25 @@ export default function InvoiceListPage({
         grandTotal,
       };
 
+      // ✅ CHANGED: resolvedPaidAmount / resolvedDueAmount use kora
+      // hocche, age-r doc.paidAmount / doc.dueAmount er bodole
       thermalPayloadRef.current = {
-        doc,
+        createdInvoice: true,
+        invoiceData,
+        formValues,
         cartItems,
         invoiceCalculations,
-        formValues,
-        dateObj,
-        effectiveStoredata,
+        invoiceNumber: doc.invoiceNumber,
+        invoiceDate: dateObj,
+        storedata: effectiveStoredata,
+        isGstInvoice: doc.type === "gst",
+        isFreePlan:
+          effectiveStoredata?.isFreePlan ?? storedata?.isFreePlan ?? true,
+        payment: {
+          paid: resolvedPaidAmount,
+          due: resolvedDueAmount,
+          status: doc.paymentStatus ?? "unpaid",
+        },
       };
 
       const html = generateInvoiceHTML({
@@ -451,9 +505,11 @@ export default function InvoiceListPage({
         isFreePlan:
           effectiveStoredata?.isFreePlan ?? storedata?.isFreePlan ?? true,
         pageFormat,
+        // ✅ CHANGED: eikhaneo resolvedPaidAmount / resolvedDueAmount —
+        // jate A4 preview-e o same value dekhay, kono mismatch na thake
         payment: {
-          paid: doc.paidAmount ?? 0,
-          due: doc.dueAmount ?? 0,
+          paid: resolvedPaidAmount,
+          due: resolvedDueAmount,
           status: doc.paymentStatus ?? "unpaid",
         },
       });
@@ -481,67 +537,84 @@ export default function InvoiceListPage({
     win.print();
   };
 
-  const handleThermalPrint = () => {
+  const buildThermalPreviewHtml = async () => {
+    const payload = thermalPayloadRef.current;
+    if (!payload) return "";
+    return generateThermalReceiptPreviewHTML(payload, THERMAL_PAPER_WIDTH_MM);
+  };
+
+  const handleThermalPreview = async () => {
     const payload = thermalPayloadRef.current;
     if (!payload) {
       toast.error("Invoice data not ready yet, try again");
       return;
     }
-    const {
-      doc,
-      cartItems,
-      invoiceCalculations,
-      formValues,
-      dateObj,
-      effectiveStoredata,
-    } = payload;
+    const html = await buildThermalPreviewHtml();
+    setThermalPreviewHtml(html);
+    setThermalPreviewOpen(true);
+  };
 
-    const html = generateThermalInvoiceHTML({
-      createdInvoice: true,
-      invoiceData: {
-        transactions: doc.transactions || [],
-        remarks: doc.remarks || "",
-        paymentMethod: doc.paymentMethod,
-        paymentNote: doc.paymentNote,
-        status: doc.status,
-        isIgst: Boolean(doc.isIgst),
-        subTotal: invoiceCalculations.subtotal,
-        discountTotal: invoiceCalculations.discountTotal,
-        roundOff: invoiceCalculations.roundOff,
-        grandTotal: invoiceCalculations.grandTotal,
-      },
-      formValues,
-      cartItems,
-      invoiceCalculations,
-      invoiceNumber: doc.invoiceNumber,
-      currentDate: format(dateObj, "dd-MMM-yyyy"),
-      currentTime: format(dateObj, "hh:mm a"),
-      storedata: effectiveStoredata,
-      invoiceDate: dateObj,
-      isGstInvoice: doc.type === "gst",
-      isFreePlan:
-        effectiveStoredata?.isFreePlan ?? storedata?.isFreePlan ?? true,
-      payment: {
-        paid: doc.paidAmount ?? 0,
-        due: doc.dueAmount ?? 0,
-        status: doc.paymentStatus ?? "unpaid",
-      },
-    });
-
-    const iframe = thermalIframeRef.current;
+  const handleThermalPreviewIframeLoad = () => {
+    const iframe = thermalPreviewIframeRef.current;
     if (!iframe) return;
+    try {
+      const doc = iframe.contentDocument || iframe.contentWindow.document;
+      const height = doc?.body?.scrollHeight || 600;
+      iframe.style.height = `${height + 20}px`;
+    } catch (err) {
+      console.warn("Thermal preview resize failed:", err);
+    }
+  };
 
-    const idoc = iframe.contentDocument || iframe.contentWindow.document;
-    idoc.open();
-    idoc.write(html);
-    idoc.close();
+  const handleThermalPreviewPrint = () => {
+    const win = thermalPreviewIframeRef.current?.contentWindow;
+    if (!win) return;
+    win.focus();
+    win.print();
+  };
 
-    const triggerPrint = () => {
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
-    };
-    iframe.onload = () => setTimeout(triggerPrint, 150);
-    setTimeout(triggerPrint, 600);
+  const handleConnectPrinter = async () => {
+    try {
+      await connectPrinter();
+      toast.success("Printer connected successfully");
+    } catch (err) {
+      toast.error(err.message || "Printer connect korte problem hoyeche");
+    }
+  };
+
+  const handleChangePrinter = async () => {
+    try {
+      await selectNewPort();
+      toast.success("Printer changed successfully");
+    } catch (err) {
+      toast.error(err.message || "Printer change korte problem hoyeche");
+    }
+  };
+
+  const handleUSBThermalPrint = async () => {
+    if (!isPrinterConnected) {
+      toast.error("Age 'Connect Printer' e click korun");
+      return;
+    }
+    const payload = thermalPayloadRef.current;
+    if (!payload) {
+      toast.error("Invoice data not ready yet, try again");
+      return;
+    }
+    try {
+      setIsThermalPrinting(true);
+      const receipt = await generateThermalInvoiceESCPOS(
+        payload,
+        THERMAL_PAPER_WIDTH_MM,
+      );
+      await sendToPrinter(receipt);
+      toast.success("Print is sending printer-e");
+    } catch (err) {
+      console.error("USB print error:", err);
+      toast.error(err.message || "USB print failed");
+    } finally {
+      setIsThermalPrinting(false);
+    }
   };
 
   const toDataURL = async (url) => {
@@ -1078,12 +1151,62 @@ export default function InvoiceListPage({
               <Button
                 size="sm"
                 variant="outline"
-                onClick={handleThermalPrint}
+                onClick={handleThermalPreview}
                 className="text-purple-600 border-purple-200 hover:bg-purple-50"
               >
-                <Printer className="w-3.5 h-3.5 mr-1.5" />
-                Thermal Print
+                <Eye className="w-3.5 h-3.5 mr-1.5" />
+                Thermal Preview
               </Button>
+
+              {hasWebSerial &&
+                (!isPrinterConnected ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleConnectPrinter}
+                    disabled={isPrinterConnecting}
+                    className="text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                  >
+                    {isPrinterConnecting ? (
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    ) : (
+                      <Printer className="w-3.5 h-3.5 mr-1.5" />
+                    )}
+                    Connect Printer
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleUSBThermalPrint}
+                      disabled={isThermalPrinting}
+                      className="text-purple-600 border-purple-200 hover:bg-purple-50"
+                    >
+                      {isThermalPrinting ? (
+                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <Printer className="w-3.5 h-3.5 mr-1.5" />
+                      )}
+                      USB Print
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleChangePrinter}
+                      disabled={isPrinterConnecting}
+                      className="text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                    >
+                      {isPrinterConnecting ? (
+                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <Printer className="w-3.5 h-3.5 mr-1.5" />
+                      )}
+                      Change Printer
+                    </Button>
+                  </>
+                ))}
             </div>
           </DialogHeader>
 
@@ -1097,19 +1220,44 @@ export default function InvoiceListPage({
               />
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
 
-          <iframe
-            ref={thermalIframeRef}
-            title="thermal-print"
-            style={{
-              position: "fixed",
-              top: "-9999px",
-              left: "-9999px",
-              width: "265px",
-              height: "600px",
-              border: "0",
-            }}
-          />
+      <Dialog open={thermalPreviewOpen} onOpenChange={setThermalPreviewOpen}>
+        <DialogContent className="max-w-md w-full h-[92vh] p-0 flex flex-col overflow-hidden gap-0">
+          <DialogHeader className="px-4 py-3 border-b shrink-0 flex-row items-center justify-between space-y-0">
+            <DialogTitle className="text-base font-semibold text-slate-800">
+              Thermal Preview
+            </DialogTitle>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleThermalPreviewPrint}
+              className="text-purple-600 border-purple-200 hover:bg-purple-50"
+            >
+              <Printer className="w-3.5 h-3.5 mr-1.5" />
+              Print
+            </Button>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-auto bg-slate-200 p-4 flex justify-center">
+            <div
+              className="bg-white shadow-md rounded-sm"
+              style={{
+                width: `${resolveDotWidth(THERMAL_PAPER_WIDTH_MM)}px`,
+                maxWidth: "100%",
+              }}
+            >
+              <iframe
+                ref={thermalPreviewIframeRef}
+                title="thermal-preview"
+                srcDoc={thermalPreviewHtml}
+                onLoad={handleThermalPreviewIframeLoad}
+                className="w-full border-0 bg-white block"
+                style={{ minHeight: "400px" }}
+              />
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 

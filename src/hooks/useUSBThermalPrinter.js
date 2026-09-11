@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 function toPrinterBytes(str) {
   const bytes = new Uint8Array(str.length);
@@ -28,33 +28,81 @@ const PORT_OPTIONS = {
   flowControl: "none",
 };
 
+// ✅ NEW: module-level singleton — EK-e-EKTA port + connection state,
+// shared across EVERY component je useUSBThermalPrinter() call kore
+// (InvoiceListPage, InvoiceSummary, jekhane e call koro). Age protita
+// component-er nijer আলাদা portRef/isConnected state chilo, tai ekhane
+// connect korle okhane "not connected" dekhato — pagination-e notun
+// row click korle je fresh render/remount hoto, shetar state fresh
+// false-e start hoto, r auto-reconnect abar port.open() korte giye
+// "port already open" error khete silently fail hoto (sudhu
+// console.warn hoto, UI update hoto na).
+//
+// Ekhon shob hook-instance ei EKTAI global state-ke SUBSCRIBE kore —
+// tai kono remount/pagination/page-switch-e desync hobe na.
+let globalPort = null;
+let globalConnected = false;
+const listeners = new Set();
+
+function notifyListeners() {
+  listeners.forEach((fn) => fn(globalConnected));
+}
+
+function setGlobalConnected(value) {
+  globalConnected = value;
+  notifyListeners();
+}
+
+// ✅ Shudhu app-e ekbar (first hook mount-e) previously-granted port
+// silently re-adopt korar chesta kore — protibar notun component mount
+// hole na (age ei bug-i duplicate-open error-er main karon chilo)
+let autoReconnectAttempted = false;
+async function tryAutoReconnect() {
+  if (autoReconnectAttempted) return;
+  autoReconnectAttempted = true;
+  if (!("serial" in navigator)) return;
+  try {
+    // ✅ Onno kono hook-instance already connect kore rekheche kina
+    // seta age check koro — thakle sheita reuse koro, notun open()
+    // call koro na (double-open error avoid korte)
+    if (globalPort && globalPort.writable) {
+      setGlobalConnected(true);
+      return;
+    }
+    const ports = await navigator.serial.getPorts();
+    if (ports.length > 0) {
+      await ports[0].open(PORT_OPTIONS);
+      globalPort = ports[0];
+      setGlobalConnected(true);
+    }
+  } catch (err) {
+    console.warn("Auto-reconnect skipped:", err.message);
+  }
+}
+
 export function useUSBThermalPrinter() {
-  const portRef = useRef(null);
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState(globalConnected);
   const [isConnecting, setIsConnecting] = useState(false);
 
+  // ✅ Global state-e subscribe kora holo — ei component chara onno
+  // jekono component theke connect/disconnect korleo eikhane instantly
+  // reflect hobe
   useEffect(() => {
-    (async () => {
-      if (!("serial" in navigator)) return;
-      try {
-        const ports = await navigator.serial.getPorts();
-        if (ports.length > 0) {
-          await ports[0].open(PORT_OPTIONS);
-          portRef.current = ports[0];
-          setIsConnected(true);
-        }
-      } catch (err) {
-        console.warn("Auto-reconnect skipped:", err.message);
-      }
-    })();
+    const listener = (value) => setIsConnected(value);
+    listeners.add(listener);
+    // Mount hobar somoy global state already ki ache seta sathe sathe
+    // sync kore nao (onno page theke age theke connected thakle)
+    setIsConnected(globalConnected);
+    tryAutoReconnect();
+    return () => listeners.delete(listener);
   }, []);
 
   useEffect(() => {
     if (!("serial" in navigator)) return;
     const handleDisconnect = (event) => {
-      if (event.target === portRef.current) {
-        portRef.current = null;
-        setIsConnected(false);
+      if (event.target === globalPort) {
+        globalPort = null;
+        setGlobalConnected(false);
       }
     };
     navigator.serial.addEventListener("disconnect", handleDisconnect);
@@ -62,24 +110,20 @@ export function useUSBThermalPrinter() {
       navigator.serial.removeEventListener("disconnect", handleDisconnect);
   }, []);
 
-  // ── internal helper: close whatever's open right now ──
   const closeCurrentPort = useCallback(async () => {
-    if (portRef.current) {
+    if (globalPort) {
       try {
-        // release any locked reader/writer before closing, otherwise close() throws
-        if (portRef.current.writable?.locked || portRef.current.readable?.locked) {
-          // best effort — most consumers already release their writer in `finally`
-        }
-        await portRef.current.close();
+        await globalPort.close();
       } catch (err) {
         console.warn("Close error (ignored):", err.message);
       }
-      portRef.current = null;
-      setIsConnected(false);
+      globalPort = null;
+      setGlobalConnected(false);
     }
   }, []);
 
-  // ✅ connect(): reuses an already-open port if present (old behavior, unchanged)
+  // connect(): already open globalPort thakle sheita reuse kore —
+  // notun picker dekhay na
   const connect = useCallback(async () => {
     if (!("serial" in navigator)) {
       throw new Error("Please Use Chrome or Edge Browser");
@@ -87,26 +131,25 @@ export function useUSBThermalPrinter() {
     if (!window.isSecureContext) {
       throw new Error("Please Use Chrome or Edge Browser");
     }
-    if (portRef.current && portRef.current.writable) {
-      setIsConnected(true);
-      return portRef.current;
+    if (globalPort && globalPort.writable) {
+      setGlobalConnected(true);
+      return globalPort;
     }
 
     setIsConnecting(true);
     try {
       const port = await navigator.serial.requestPort();
       await port.open(PORT_OPTIONS);
-      portRef.current = port;
-      setIsConnected(true);
+      globalPort = port;
+      setGlobalConnected(true);
       return port;
     } finally {
       setIsConnecting(false);
     }
   }, []);
 
-  // ✅ NEW: selectNewPort() — always closes current port first, then
-  // forces the browser's port-picker to show up again so user can
-  // choose a different printer/port.
+  // selectNewPort(): shob jaygay theke age-r port close kore, tarpor
+  // browser-er port-picker abar dekhay
   const selectNewPort = useCallback(async () => {
     if (!("serial" in navigator)) {
       throw new Error("Please Use Chrome or Edge Browser");
@@ -117,11 +160,11 @@ export function useUSBThermalPrinter() {
 
     setIsConnecting(true);
     try {
-      await closeCurrentPort(); // এখানেই আগের port release হয়ে যাবে
-      const port = await navigator.serial.requestPort(); // picker আবার খুলবে
+      await closeCurrentPort();
+      const port = await navigator.serial.requestPort();
       await port.open(PORT_OPTIONS);
-      portRef.current = port;
-      setIsConnected(true);
+      globalPort = port;
+      setGlobalConnected(true);
       return port;
     } finally {
       setIsConnecting(false);
@@ -133,14 +176,13 @@ export function useUSBThermalPrinter() {
   }, [closeCurrentPort]);
 
   const print = useCallback(async (escposString) => {
-    const port = portRef.current;
-    if (!port || !port.writable) {
+    if (!globalPort || !globalPort.writable) {
       throw new Error(
         "Printer connected nei. Age 'Connect Printer' e click korun.",
       );
     }
     const bytes = toPrinterBytes(escposString);
-    const writer = port.writable.getWriter();
+    const writer = globalPort.writable.getWriter();
     try {
       await writeInChunks(writer, bytes);
     } finally {
@@ -150,7 +192,7 @@ export function useUSBThermalPrinter() {
 
   return {
     connect,
-    selectNewPort, 
+    selectNewPort,
     disconnect,
     print,
     isConnected,
