@@ -10,6 +10,8 @@ import {
   ChevronDown,
   LogOut,
   Settings,
+  Users,
+  History,
 } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
@@ -21,7 +23,7 @@ import {
   BreadcrumbLink,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { getPageInfo } from "../../src/lib/navigation"; 
+import { getPageInfo } from "../../src/lib/navigation";
 
 export default function Topbar({ theme, pageTitle }) {
   const { theme: currentTheme, toggleTheme } = useTheme();
@@ -252,6 +254,29 @@ export default function Topbar({ theme, pageTitle }) {
                   <User size={15} className={theme.textSecondary} />
                   Profile
                 </button>
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    router.push("/dashboard/users");
+                  }}
+                  className={`w-[calc(100%-8px)] flex items-center gap-2.5 text-left px-3.5 py-2 rounded-lg mx-1 hover:${theme.surfaceVariant} ${theme.text} text-[13px] font-medium transition-colors cursor-pointer`}
+                >
+                  <Users size={15} className={theme.textSecondary} />
+                  Manage Staff
+                </button>
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    router.push("/dashboard/user-activity");
+                  }}
+                  className={`w-[calc(100%-8px)] flex items-center gap-2.5 text-left px-3.5 py-2 rounded-lg mx-1 hover:${theme.surfaceVariant} ${theme.text} text-[13px] font-medium transition-colors cursor-pointer`}
+                >
+                  <History size={15} className={theme.textSecondary} />
+                  Login Activities
+                </button>
+                <div
+                  className={`h-px ${theme.outline} bg-current opacity-30 mx-1 my-1`}
+                />
                 <button
                   onClick={handleLogout}
                   disabled={loggingOut}
