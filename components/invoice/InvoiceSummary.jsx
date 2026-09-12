@@ -83,7 +83,7 @@ export default function InvoiceSummary({
   const buildPreviewHtml = () => {
     const now = new Date();
     return generateInvoiceHTML({
-      preview: false,
+      preview: true,
       createdInvoice: false,
       invoiceData: { transactions: [], remarks, paymentMethod, paymentNote },
       formValues,
@@ -521,92 +521,63 @@ export default function InvoiceSummary({
               {isCreatedInvoice ? "Invoice Created" : "Invoice Preview"}
             </DialogTitle>
 
-            <div className="flex gap-2 flex-wrap">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleDownloadClick}
-                disabled={isDownloading}
-                className="text-blue-600 border-blue-200 hover:bg-blue-50"
-              >
-                {isDownloading ? (
-                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                ) : (
-                  <Download className="w-3.5 h-3.5 mr-1.5" />
-                )}
-                Download
-              </Button>
+            {/* Only show action buttons for the ACTUAL created/updated invoice —
+          not for the plain pre-creation preview */}
+            {isCreatedInvoice && (
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleDownloadClick}
+                  disabled={isDownloading}
+                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                >
+                  {isDownloading ? (
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                  ) : (
+                    <Download className="w-3.5 h-3.5 mr-1.5" />
+                  )}
+                  Download
+                </Button>
 
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleWhatsAppShare}
-                disabled={sendingWhatsApp}
-                className="text-green-600 border-green-200 hover:bg-green-50"
-              >
-                {sendingWhatsApp ? (
-                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                ) : (
-                  <MessageCircle className="w-3.5 h-3.5 mr-1.5" />
-                )}
-                WhatsApp
-              </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleWhatsAppShare}
+                  disabled={sendingWhatsApp}
+                  className="text-green-600 border-green-200 hover:bg-green-50"
+                >
+                  {sendingWhatsApp ? (
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                  ) : (
+                    <MessageCircle className="w-3.5 h-3.5 mr-1.5" />
+                  )}
+                  WhatsApp
+                </Button>
 
-              <Button size="sm" variant="outline" onClick={handlePrint}>
-                <Printer className="w-3.5 h-3.5 mr-1.5" />
-                Print
-              </Button>
+                <Button size="sm" variant="outline" onClick={handlePrint}>
+                  <Printer className="w-3.5 h-3.5 mr-1.5" />
+                  Print
+                </Button>
 
-              {/* Thermal preview button. Always visible, works even
-                  before "Connect Printer" is clicked. */}
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleThermalPreview}
-                className="text-purple-600 border-purple-200 hover:bg-purple-50"
-              >
-                <Eye className="w-3.5 h-3.5 mr-1.5" />
-                Thermal Preview
-              </Button>
+                {/* Thermal preview button. Always visible, works even
+              before "Connect Printer" is clicked. */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleThermalPreview}
+                  className="text-purple-600 border-purple-200 hover:bg-purple-50"
+                >
+                  <Eye className="w-3.5 h-3.5 mr-1.5" />
+                  Thermal Preview
+                </Button>
 
-              {hasWebSerial &&
-                (!isPrinterConnected ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleConnectPrinter}
-                    disabled={isPrinterConnecting}
-                    className="text-emerald-600 border-emerald-200 hover:bg-emerald-50"
-                  >
-                    {isPrinterConnecting ? (
-                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                    ) : (
-                      <Printer className="w-3.5 h-3.5 mr-1.5" />
-                    )}
-                    Connect Printer
-                  </Button>
-                ) : (
-                  <>
+                {hasWebSerial &&
+                  (!isPrinterConnected ? (
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={handleUSBThermalPrint}
-                      disabled={isThermalPrinting}
-                      className="text-purple-600 border-purple-200 hover:bg-purple-50"
-                    >
-                      {isThermalPrinting ? (
-                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                      ) : (
-                        <Printer className="w-3.5 h-3.5 mr-1.5" />
-                      )}
-                      USB Print
-                    </Button>
-
-                    {/* ✅ নতুন — port change করার button */}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleChangePrinter}
+                      onClick={handleConnectPrinter}
                       disabled={isPrinterConnecting}
                       className="text-emerald-600 border-emerald-200 hover:bg-emerald-50"
                     >
@@ -615,11 +586,44 @@ export default function InvoiceSummary({
                       ) : (
                         <Printer className="w-3.5 h-3.5 mr-1.5" />
                       )}
-                      Change Printer
+                      Connect Printer
                     </Button>
-                  </>
-                ))}
-            </div>
+                  ) : (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleUSBThermalPrint}
+                        disabled={isThermalPrinting}
+                        className="text-purple-600 border-purple-200 hover:bg-purple-50"
+                      >
+                        {isThermalPrinting ? (
+                          <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                        ) : (
+                          <Printer className="w-3.5 h-3.5 mr-1.5" />
+                        )}
+                        USB Print
+                      </Button>
+
+                      {/* ✅ নতুন — port change করার button */}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleChangePrinter}
+                        disabled={isPrinterConnecting}
+                        className="text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                      >
+                        {isPrinterConnecting ? (
+                          <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                        ) : (
+                          <Printer className="w-3.5 h-3.5 mr-1.5" />
+                        )}
+                        Change Printer
+                      </Button>
+                    </>
+                  ))}
+              </div>
+            )}
           </DialogHeader>
 
           <div className="flex-1 overflow-auto bg-slate-100 p-4 md:p-6">

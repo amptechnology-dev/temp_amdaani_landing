@@ -658,19 +658,40 @@ export default function SalesFlow() {
         ? await api.put(`/invoice/id/${existingInvoiceId}`, invoiceData)
         : await api.post("/invoice", invoiceData);
 
+      const savedInvoiceId = isEditMode ? existingInvoiceId : res?.data?._id;
+      let freshInvoiceDoc = res.data;
+
+      if (savedInvoiceId) {
+        try {
+          const freshRes = await api.get(`/invoice/id/${savedInvoiceId}`);
+          freshInvoiceDoc = freshRes?.data?.data || freshRes?.data || res.data;
+        } catch (fetchErr) {
+          console.error("Failed to fetch fresh invoice for preview:", fetchErr);
+        }
+      }
+
+      const effectiveStoredataForPrint =
+        Object.keys(afterStoredata).length > 0 ? afterStoredata : storedata;
+
+      const pageFormat =
+        effectiveStoredataForPrint?.settings?.printMode === "a5" ? "a5" : "a4";
+
       const html = generateInvoiceHTML({
         preview: false,
         createdInvoice: true,
-        invoiceData: res.data,
+        invoiceData: {
+          ...freshInvoiceDoc,
+          transactions: freshInvoiceDoc?.transactions || [],
+        },
         formValues,
         cartItems: invoiceCalculations.computedItems,
         invoiceCalculations,
         invoiceNumber,
-        storedata:
-          Object.keys(afterStoredata).length > 0 ? afterStoredata : storedata,
+        storedata: effectiveStoredataForPrint,
         invoiceDate: new Date(),
         isGstInvoice,
         isMrpEnabled,
+        pageFormat,
         payment: {
           paid: finalPaid,
           due: finalDue,
