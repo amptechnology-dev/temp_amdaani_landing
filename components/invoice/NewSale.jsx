@@ -676,7 +676,7 @@ export default function SalesFlow() {
       const pageFormat =
         effectiveStoredataForPrint?.settings?.printMode === "a5" ? "a5" : "a4";
 
-      const html = generateInvoiceHTML({
+      const printParams = {
         preview: false,
         createdInvoice: true,
         invoiceData: {
@@ -691,13 +691,19 @@ export default function SalesFlow() {
         invoiceDate: new Date(),
         isGstInvoice,
         isMrpEnabled,
-        pageFormat,
         payment: {
           paid: finalPaid,
           due: finalDue,
           status: paymentStatus,
         },
-      });
+      };
+
+      const html = generateInvoiceHTML({ ...printParams, pageFormat });
+
+      toast.success(isEditMode ? "Invoice updated!" : "Invoice created!");
+      setInvoiceRefreshKey((k) => k + 1);
+
+      return { html, printParams };
 
       toast.success(isEditMode ? "Invoice updated!" : "Invoice created!");
       setInvoiceRefreshKey((k) => k + 1);
@@ -713,13 +719,11 @@ export default function SalesFlow() {
     }
   };
 
-  // ✅ Save & Continue — invoice save kore, form/state reset kore diye
-  // "form" step-eই thake, notun invoice-er jonno ready thake
-  const handleSaveAndContinue = async () => {
-    const html = await handleCreateInvoice();
-    if (!html) return null;
+ const handleSaveAndContinue = async () => {
+    const result = await handleCreateInvoice();
+    if (!result) return null;
     await resetFormState();
-    return html;
+    return result.html;
   };
 
   const handleInvoiceModalClose = async () => {

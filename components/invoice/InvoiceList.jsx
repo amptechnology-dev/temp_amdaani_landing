@@ -23,6 +23,7 @@ import {
   Download,
   Ban,
   Eye,
+  ChefHat,
 } from "lucide-react";
 
 import api from "../../utils/api";
@@ -61,6 +62,10 @@ import {
   generateThermalReceiptPreviewHTML,
   resolveDotWidth,
 } from "../../utils/generateThermalInvoiceESCPOS";
+import {
+  generateKOTPreviewHTML,
+  generateKOTESCPOS,
+} from "../../utils/generateThermalKOT";
 
 const statusStyles = {
   paid: "bg-green-600 text-white",
@@ -81,6 +86,11 @@ const STATUS_FILTERS = [
   { key: "partial", label: "Partial" },
   { key: "unpaid", label: "Unpaid" },
 ];
+
+const isMobileDevice = () => {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod|Mobile|webOS/i.test(navigator.userAgent);
+};
 
 export default function InvoiceListPage({
   refreshKey,
@@ -114,6 +124,9 @@ export default function InvoiceListPage({
   const [activePreviewId, setActivePreviewId] = useState(null);
   const [activePreviewStatus, setActivePreviewStatus] = useState("active");
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [activePreviewPageFormat, setActivePreviewPageFormat] = useState("a4");
+const [isSavingPrintPref, setIsSavingPrintPref] = useState(false);
+const previewParamsRef = useRef(null);
   const [isCancelling, setIsCancelling] = useState(false);
 
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
@@ -126,6 +139,11 @@ export default function InvoiceListPage({
   const thermalPreviewIframeRef = useRef(null);
 
   const thermalPayloadRef = useRef(null);
+
+  const [kotPreviewOpen, setKotPreviewOpen] = useState(false);
+  const [kotPreviewHtml, setKotPreviewHtml] = useState("");
+  const [isKOTPrinting, setIsKOTPrinting] = useState(false);
+  const kotPreviewIframeRef = useRef(null);
 
   const pageFormat = storedata?.settings?.printMode === "a5" ? "a5" : "a4";
   const hasWebSerial =
@@ -488,7 +506,7 @@ export default function InvoiceListPage({
         },
       };
 
-      const html = generateInvoiceHTML({
+      const invoiceHtmlParams = {
         preview: false,
         createdInvoice: true,
         invoiceData,
@@ -504,15 +522,25 @@ export default function InvoiceListPage({
         isMrpEnabled: Boolean(doc.isMrpEnabled),
         isFreePlan:
           effectiveStoredata?.isFreePlan ?? storedata?.isFreePlan ?? true,
-        pageFormat,
-        // ✅ CHANGED: eikhaneo resolvedPaidAmount / resolvedDueAmount —
-        // jate A4 preview-e o same value dekhay, kono mismatch na thake
         payment: {
           paid: resolvedPaidAmount,
           due: resolvedDueAmount,
           status: doc.paymentStatus ?? "unpaid",
         },
+      };
+      previewParamsRef.current = invoiceHtmlParams;
+
+      const html = generateInvoiceHTML({ ...invoiceHtmlParams, pageFormat });
+
+      setActivePreviewNumber(doc.invoiceNumber);
+      setActivePreviewPageFormat(pageFormat);
+      setActivePreviewMeta({
+        customerName: doc.customerName || "",
+        customerMobile: doc.customerMobile || "",
+        grandTotal,
       });
+      setPreviewHtml(html);
+      setPreviewOpen(true);
 
       setActivePreviewNumber(doc.invoiceNumber);
       setActivePreviewMeta({
@@ -571,6 +599,59 @@ export default function InvoiceListPage({
     if (!win) return;
     win.focus();
     win.print();
+  };
+
+  const handleKOTPreview = async () => {
+    const payload = thermalPayloadRef.current;
+    if (!payload) {
+      toast.error("Invoice data not ready yet, try again");
+      return;
+    }
+    const html = await generateKOTPreviewHTML(payload, THERMAL_PAPER_WIDTH_MM);
+    setKotPreviewHtml(html);
+    setKotPreviewOpen(true);
+  };
+
+  const handleKOTPreviewIframeLoad = () => {
+    const iframe = kotPreviewIframeRef.current;
+    if (!iframe) return;
+    try {
+      const doc = iframe.contentDocument || iframe.contentWindow.document;
+      const height = doc?.body?.scrollHeight || 600;
+      iframe.style.height = `${height + 20}px`;
+    } catch (err) {
+      console.warn("KOT preview resize failed:", err);
+    }
+  };
+
+  const handleKOTPreviewPrint = () => {
+    const win = kotPreviewIframeRef.current?.contentWindow;
+    if (!win) return;
+    win.focus();
+    win.print();
+  };
+
+  const handleGenerateKOT = async () => {
+    if (!isPrinterConnected) {
+      toast.error("Age 'Connect Printer' e click korun");
+      return;
+    }
+    const payload = thermalPayloadRef.current;
+    if (!payload) {
+      toast.error("Invoice data not ready yet, try again");
+      return;
+    }
+    try {
+      setIsKOTPrinting(true);
+      const kot = await generateKOTESCPOS(payload, THERMAL_PAPER_WIDTH_MM);
+      await sendToPrinter(kot);
+      toast.success("KOT is sending printer-e");
+    } catch (err) {
+      console.error("KOT print error:", err);
+      toast.error(err.message || "KOT print failed");
+    } finally {
+      setIsKOTPrinting(false);
+    }
   };
 
   const handleConnectPrinter = async () => {
@@ -741,7 +822,8 @@ export default function InvoiceListPage({
     }
   };
 
-  const handleWhatsAppShare = async () => {
+  
+const handleWhatsAppShare = async () => {
     const phoneDigits = (activePreviewMeta.customerMobile || "").replace(
       /\D/g,
       "",
@@ -764,9 +846,19 @@ export default function InvoiceListPage({
       const waNumber =
         phoneDigits.length === 10 ? `91${phoneDigits}` : phoneDigits;
 
+      // ✅ FIX: navigator.share() shudhu MOBILE device-e use kora hocche —
+      // ota-i eta-r expected UX (native share sheet). Desktop/laptop-e
+      // navigator.canShare({files}) true dile o OS-level "which app"
+      // picker khule jay (WhatsApp Web soho onno app-o suggest kore),
+      // tai desktop-e eta shorasori skip kore direct PDF download +
+      // wa.me link open kora hocche — WhatsApp Web 100% sure-shot khulbe.
       const file = new File([blob], filename, { type: "application/pdf" });
+      const canUseNativeShare =
+        isMobileDevice() &&
+        navigator.canShare &&
+        navigator.canShare({ files: [file] });
 
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      if (canUseNativeShare) {
         await navigator.share({
           files: [file],
           title: `Invoice #${activePreviewNumber}`,
@@ -817,6 +909,42 @@ export default function InvoiceListPage({
       toast.error("Failed to cancel invoice");
     } finally {
       setIsCancelling(false);
+    }
+  };
+
+  const handleChangePrintFormat = async (newFormat) => {
+    if (newFormat === activePreviewPageFormat || isSavingPrintPref) return;
+    const params = previewParamsRef.current;
+    if (!params) return;
+
+    // ✅ Instant feedback — local re-render, kono API wait na kore
+    setActivePreviewPageFormat(newFormat);
+    setPreviewHtml(generateInvoiceHTML({ ...params, pageFormat: newFormat }));
+
+    // ✅ Background-e store-wide default hisebe save kora hocche
+    // (PrintPreference.jsx-er moto same endpoint)
+    setIsSavingPrintPref(true);
+    try {
+      const formData = new FormData();
+      formData.append("settings", JSON.stringify({ printMode: newFormat }));
+      const res = await api.put("/store/update-my-store", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      const body = res?.success !== undefined ? res : res?.data;
+      if (body?.success) {
+        toast.success(`Print format set to ${newFormat.toUpperCase()}`);
+        setStoredata((prev) => ({
+          ...prev,
+          settings: { ...(prev?.settings || {}), printMode: newFormat },
+        }));
+      } else {
+        toast.error(body?.message || "Failed to save print preference");
+      }
+    } catch (err) {
+      console.error("Print preference save failed:", err);
+      toast.error("Failed to save print preference");
+    } finally {
+      setIsSavingPrintPref(false);
     }
   };
 
@@ -1087,6 +1215,29 @@ export default function InvoiceListPage({
                   Cancelled
                 </Badge>
               )}
+
+              {/* ✅ A4 / A5 live toggle — select korle instant preview
+                  update hoy ar store-wide default hisebe save-o hoy */}
+              <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1 border border-slate-200 ml-1">
+                {["a4", "a5"].map((fmt) => (
+                  <button
+                    key={fmt}
+                    type="button"
+                    onClick={() => handleChangePrintFormat(fmt)}
+                    disabled={isSavingPrintPref}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-semibold uppercase transition-colors ${
+                      activePreviewPageFormat === fmt
+                        ? "bg-white text-blue-600 shadow-sm"
+                        : "text-slate-500 hover:text-slate-700"
+                    }`}
+                  >
+                    {fmt}
+                  </button>
+                ))}
+                {isSavingPrintPref && (
+                  <Loader2 className="w-3 h-3 animate-spin text-slate-400 mx-1" />
+                )}
+              </div>
             </DialogTitle>
 
             <div className="flex gap-2 flex-wrap">
@@ -1158,6 +1309,16 @@ export default function InvoiceListPage({
                 Thermal Preview
               </Button>
 
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleKOTPreview}
+                className="text-orange-600 border-orange-200 hover:bg-orange-50"
+              >
+                <ChefHat className="w-3.5 h-3.5 mr-1.5" />
+                KOT View
+              </Button>
+
               {hasWebSerial &&
                 (!isPrinterConnected ? (
                   <Button
@@ -1188,7 +1349,22 @@ export default function InvoiceListPage({
                       ) : (
                         <Printer className="w-3.5 h-3.5 mr-1.5" />
                       )}
-                      USB Print
+                      Generate Thermal Bill
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleGenerateKOT}
+                      disabled={isKOTPrinting}
+                      className="text-orange-600 border-orange-200 hover:bg-orange-50"
+                    >
+                      {isKOTPrinting ? (
+                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <ChefHat className="w-3.5 h-3.5 mr-1.5" />
+                      )}
+                      Generate KOT
                     </Button>
 
                     <Button
@@ -1229,15 +1405,6 @@ export default function InvoiceListPage({
             <DialogTitle className="text-base font-semibold text-slate-800">
               Thermal Preview
             </DialogTitle>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleThermalPreviewPrint}
-              className="text-purple-600 border-purple-200 hover:bg-purple-50"
-            >
-              <Printer className="w-3.5 h-3.5 mr-1.5" />
-              Print
-            </Button>
           </DialogHeader>
 
           <div className="flex-1 overflow-auto bg-slate-200 p-4 flex justify-center">
@@ -1253,6 +1420,35 @@ export default function InvoiceListPage({
                 title="thermal-preview"
                 srcDoc={thermalPreviewHtml}
                 onLoad={handleThermalPreviewIframeLoad}
+                className="w-full border-0 bg-white block"
+                style={{ minHeight: "400px" }}
+              />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={kotPreviewOpen} onOpenChange={setKotPreviewOpen}>
+        <DialogContent className="max-w-md w-full h-[92vh] p-0 flex flex-col overflow-hidden gap-0">
+          <DialogHeader className="px-4 py-3 border-b shrink-0 flex-row items-center justify-between space-y-0">
+            <DialogTitle className="text-base font-semibold text-slate-800">
+              KOT Preview
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-auto bg-slate-200 p-4 flex justify-center">
+            <div
+              className="bg-white shadow-md rounded-sm"
+              style={{
+                width: `${resolveDotWidth(THERMAL_PAPER_WIDTH_MM)}px`,
+                maxWidth: "100%",
+              }}
+            >
+              <iframe
+                ref={kotPreviewIframeRef}
+                title="kot-preview"
+                srcDoc={kotPreviewHtml}
+                onLoad={handleKOTPreviewIframeLoad}
                 className="w-full border-0 bg-white block"
                 style={{ minHeight: "400px" }}
               />

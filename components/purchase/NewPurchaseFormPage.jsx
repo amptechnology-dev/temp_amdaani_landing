@@ -1721,7 +1721,7 @@ export default function NewPurchaseFormPage({
 
                       <div>
                         <label className="text-xs font-medium text-slate-500 mb-1 block">
-                          Outstanding
+                          Due
                         </label>
                         <div className="h-9 px-3 flex items-center rounded-lg bg-rose-50 text-rose-600 text-sm font-bold">
                           ₹

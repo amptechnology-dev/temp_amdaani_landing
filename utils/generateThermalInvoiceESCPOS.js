@@ -5,7 +5,7 @@ export function resolveDotWidth(paperWidthMM) {
   return PRINTER_DOT_WIDTH[paperWidthMM] || PRINTER_DOT_WIDTH[58];
 }
 
-async function fetchImageAsDataURL(url) {
+export async function fetchImageAsDataURL(url) {
   if (!url) return null;
   try {
     const proxyUrl = `/api/image-proxy?url=${encodeURIComponent(url)}`;
@@ -31,7 +31,7 @@ async function fetchImageAsDataURL(url) {
 // printer-er moto blocky/square dekhay, ar Font A/B-er charWidth ratio
 // (12:9) follow kori jate spacing/layout RN version-er sathe match kore.
 // ─────────────────────────────────────────────────────────────────
-const FONT_FAMILY =
+export const FONT_FAMILY =
   '"Consolas", "Lucida Console", "Courier New", monospace';
 
 const BASE_WIDTH_PX = 384;
@@ -46,7 +46,7 @@ function getLineCapacity(printerWidthPx = BASE_WIDTH_PX, font = "a", sizeW = 1) 
   return Math.floor(printerWidthPx / (charWidth * sizeW));
 }
 
-function scaleFontFromCharWidth(font, widthPx) {
+export function scaleFontFromCharWidth(font, widthPx) {
   const charWidth = FONT_CHAR_WIDTH_PX[font] || FONT_CHAR_WIDTH_PX.b;
   const scaledCharWidth = charWidth * (widthPx / BASE_WIDTH_PX);
   return Math.max(15, Math.round(scaledCharWidth * 2));
@@ -59,17 +59,17 @@ const BASE_SPACING_PX = {
   lg: 12,
   xl: 18,
 };
-function scaleSpace(key, widthPx) {
+export function scaleSpace(key, widthPx) {
   const base = BASE_SPACING_PX[key] || BASE_SPACING_PX.sm;
   return Math.max(2, Math.round(base * (widthPx / BASE_WIDTH_PX)));
 }
 
 const BASE_IMG_PX = { logo: 200, qr: 180, sig: 150 };
-function scaleImg(key, widthPx) {
+export function scaleImg(key, widthPx) {
   return Math.max(40, Math.round(BASE_IMG_PX[key] * (widthPx / BASE_WIDTH_PX)));
 }
 
-function escapeHtml(str) {
+export function escapeHtml(str) {
   return String(str ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -514,13 +514,13 @@ export async function generateThermalReceiptPreviewHTML(
   return buildThermalReceiptHTML({ ...params, widthPx, paperWidthMM });
 }
 
-const ESC = "\x1B";
-const GS = "\x1D";
-const INIT = `${ESC}\x40`;
-const CUT = `${GS}\x56\x00`;
-const feed = (n = 3) => "\n".repeat(n);
+export const ESC = "\x1B";
+export const GS = "\x1D";
+export const INIT = `${ESC}\x40`;
+export const CUT = `${GS}\x56\x00`;
+export const feed = (n = 3) => "\n".repeat(n);
 
-function canvasToRasterBytes(canvas, threshold = 160) {
+export function canvasToRasterBytes(canvas, threshold = 160) {
   const ctx = canvas.getContext("2d");
   const { width, height } = canvas;
   const { data } = ctx.getImageData(0, 0, width, height);
@@ -563,7 +563,7 @@ function canvasToRasterBytes(canvas, threshold = 160) {
   return { raster, bytesPerRow, height };
 }
 
-function rasterToEscPosString({ raster, bytesPerRow, height }) {
+export function rasterToEscPosString({ raster, bytesPerRow, height }) {
   const xL = bytesPerRow & 0xff;
   const xH = (bytesPerRow >> 8) & 0xff;
   const yL = height & 0xff;
