@@ -188,17 +188,19 @@ export function AppSidebar({ ...props }) {
                                 <SidebarMenuSubButton
                                   onClick={() => router.push(item.url)}
                                   isActive={isSubActive}
-                                  className={`h-8 rounded-lg px-2.5 text-[13px] font-semibold transition-all duration-150 cursor-pointer border ${
+                                  className={`h-auto min-h-8 py-1.5 rounded-lg px-2.5 text-[13px] font-semibold transition-all duration-150 cursor-pointer border items-start ${
                                     isSubActive
                                       ? "bg-blue-50 text-blue-700 border-blue-200 shadow-sm"
                                       : "text-slate-600 border-transparent hover:bg-white hover:border-slate-200 hover:text-slate-900"
                                   }`}
                                 >
                                   <item.icon
-                                    className={`w-[15px] h-[15px] shrink-0 ${isSubActive ? "text-blue-600" : "text-slate-500"}`}
+                                    className={`w-[15px] h-[15px] shrink-0 mt-0.5 ${isSubActive ? "text-blue-600" : "text-slate-500"}`}
                                     strokeWidth={2.2}
                                   />
-                                  <span className="truncate">{item.title}</span>
+                                  <span className="whitespace-normal leading-snug">
+                                    {item.title}
+                                  </span>
                                 </SidebarMenuSubButton>
                               </SidebarMenuSubItem>
                             );

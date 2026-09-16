@@ -183,6 +183,8 @@ function CategorySection({ value, onChange }) {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
   const [editName, setEditName] = useState("");
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const itemRefs = useRef([]);
 
   const fetchCategories = async () => {
     setLoading(true);
@@ -216,6 +218,15 @@ function CategorySection({ value, onChange }) {
 
   const selectedCategory = categories.find((c) => c._id === value);
 
+  // reset highlight whenever list changes or popover opens
+  useEffect(() => {
+    setHighlightedIndex(0);
+  }, [search, open]);
+
+  useEffect(() => {
+    itemRefs.current[highlightedIndex]?.scrollIntoView({ block: "nearest" });
+  }, [highlightedIndex]);
+
   const handleSelect = (cat) => {
     if (value === cat._id) {
       onChange("");
@@ -224,6 +235,32 @@ function CategorySection({ value, onChange }) {
     }
     setOpen(false);
     setSearch("");
+  };
+
+  const handleTriggerKeyDown = (e) => {
+    if (!open && (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ")) {
+      e.preventDefault();
+      setOpen(true);
+    }
+  };
+
+  const handleListKeyDown = (e) => {
+    if (isAddingNew || editTarget) return; // let those inputs handle their own keys
+    if (filtered.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex((i) => Math.min(i + 1, filtered.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const item = filtered[highlightedIndex];
+      if (item) handleSelect(item);
+    } else if (e.key === "Escape") {
+      setOpen(false);
+    }
   };
 
   const handleCreateCategory = async () => {
@@ -309,6 +346,7 @@ function CategorySection({ value, onChange }) {
         <PopoverTrigger asChild>
           <button
             type="button"
+            onKeyDown={handleTriggerKeyDown}
             className="mt-0.5 w-full h-9 px-3 rounded-md border border-slate-200 bg-white flex items-center justify-between text-sm hover:bg-slate-50"
           >
             <span
@@ -320,7 +358,11 @@ function CategorySection({ value, onChange }) {
           </button>
         </PopoverTrigger>
 
-        <PopoverContent className="w-80 p-0" align="start">
+        <PopoverContent
+          className="w-80 p-0"
+          align="start"
+          onKeyDown={handleListKeyDown}
+        >
           <div className="p-2 border-b border-slate-100">
             {!isAddingNew ? (
               <button
@@ -397,8 +439,9 @@ function CategorySection({ value, onChange }) {
                 No categories found
               </p>
             ) : (
-              filtered.map((cat) => {
+              filtered.map((cat, index) => {
                 const selected = value === cat._id;
+                const isHighlighted = highlightedIndex === index && !isAddingNew;
                 const isEditingThis = editTarget?._id === cat._id;
 
                 if (isEditingThis) {
@@ -443,10 +486,16 @@ function CategorySection({ value, onChange }) {
                 return (
                   <div
                     key={cat._id}
+                    ref={(el) => (itemRefs.current[index] = el)}
                     className={`flex items-center justify-between rounded-md px-2 py-2 cursor-pointer group ${
-                      selected ? "bg-blue-50" : "hover:bg-slate-50"
+                      selected
+                        ? "bg-blue-50"
+                        : isHighlighted
+                          ? "bg-slate-100 ring-1 ring-blue-300"
+                          : "hover:bg-slate-50"
                     }`}
                     onClick={() => handleSelect(cat)}
+                    onMouseEnter={() => setHighlightedIndex(index)}
                   >
                     <span
                       className={`text-sm truncate ${
@@ -514,9 +563,6 @@ function CategorySection({ value, onChange }) {
   );
 }
 
-// =========================================================
-// HSN Code inline creator
-// =========================================================
 function HsnCodeSection({ value, gstRate, onHsnSelect }) {
   const [hsnCodes, setHsnCodes] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -529,6 +575,8 @@ function HsnCodeSection({ value, gstRate, onHsnSelect }) {
   const [newGstRate, setNewGstRate] = useState("");
   const [saving, setSaving] = useState(false);
   const [formErrors, setFormErrors] = useState({});
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const itemRefs = useRef([]);
 
   const fetchHsnCodes = async () => {
     setLoading(true);
@@ -556,6 +604,14 @@ function HsnCodeSection({ value, gstRate, onHsnSelect }) {
     );
   }, [hsnCodes, search]);
 
+  useEffect(() => {
+    setHighlightedIndex(0);
+  }, [search, open]);
+
+  useEffect(() => {
+    itemRefs.current[highlightedIndex]?.scrollIntoView({ block: "nearest" });
+  }, [highlightedIndex]);
+
   const handleSelect = (hsn) => {
     onHsnSelect(hsn);
     setOpen(false);
@@ -565,6 +621,32 @@ function HsnCodeSection({ value, gstRate, onHsnSelect }) {
   const handleClear = () => {
     onHsnSelect(null);
     setOpen(false);
+  };
+
+  const handleTriggerKeyDown = (e) => {
+    if (!open && (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ")) {
+      e.preventDefault();
+      setOpen(true);
+    }
+  };
+
+  const handleListKeyDown = (e) => {
+    if (isAddingNew) return;
+    if (filtered.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex((i) => Math.min(i + 1, filtered.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const item = filtered[highlightedIndex];
+      if (item) handleSelect(item);
+    } else if (e.key === "Escape") {
+      setOpen(false);
+    }
   };
 
   const validateNewHsn = () => {
@@ -639,6 +721,7 @@ function HsnCodeSection({ value, gstRate, onHsnSelect }) {
         <PopoverTrigger asChild>
           <button
             type="button"
+            onKeyDown={handleTriggerKeyDown}
             className="mt-0.5 w-full h-9 px-3 rounded-md border border-slate-200 bg-white flex items-center justify-between text-sm hover:bg-slate-50"
           >
             <span
@@ -652,7 +735,11 @@ function HsnCodeSection({ value, gstRate, onHsnSelect }) {
           </button>
         </PopoverTrigger>
 
-        <PopoverContent className="w-96 p-0" align="start">
+        <PopoverContent
+          className="w-96 p-0"
+          align="start"
+          onKeyDown={handleListKeyDown}
+        >
           {!isAddingNew ? (
             <>
               <div className="p-2 border-b border-slate-100 flex items-center gap-2">
@@ -697,14 +784,21 @@ function HsnCodeSection({ value, gstRate, onHsnSelect }) {
                     No HSN codes found
                   </p>
                 ) : (
-                  filtered.map((hsn) => {
+                  filtered.map((hsn, index) => {
                     const selected = value === hsn.code;
+                    const isHighlighted = highlightedIndex === index;
                     return (
                       <div
                         key={hsn._id}
+                        ref={(el) => (itemRefs.current[index] = el)}
                         onClick={() => handleSelect(hsn)}
+                        onMouseEnter={() => setHighlightedIndex(index)}
                         className={`rounded-md px-2.5 py-2 cursor-pointer ${
-                          selected ? "bg-blue-50" : "hover:bg-slate-50"
+                          selected
+                            ? "bg-blue-50"
+                            : isHighlighted
+                              ? "bg-slate-100 ring-1 ring-blue-300"
+                              : "hover:bg-slate-50"
                         }`}
                       >
                         <div className="flex items-center justify-between">
@@ -825,6 +919,8 @@ function HsnCodeSection({ value, gstRate, onHsnSelect }) {
 function UnitSection({ value, onChange }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const itemRefs = useRef([]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return UNITS;
@@ -837,10 +933,43 @@ function UnitSection({ value, onChange }) {
 
   const selectedUnit = UNITS.find((u) => u.name === value);
 
+  useEffect(() => {
+    setHighlightedIndex(0);
+  }, [search, open]);
+
+  useEffect(() => {
+    itemRefs.current[highlightedIndex]?.scrollIntoView({ block: "nearest" });
+  }, [highlightedIndex]);
+
   const handleSelect = (u) => {
     onChange(u.name);
     setOpen(false);
     setSearch("");
+  };
+
+  const handleTriggerKeyDown = (e) => {
+    if (!open && (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ")) {
+      e.preventDefault();
+      setOpen(true);
+    }
+  };
+
+  const handleListKeyDown = (e) => {
+    if (filtered.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex((i) => Math.min(i + 1, filtered.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const item = filtered[highlightedIndex];
+      if (item) handleSelect(item);
+    } else if (e.key === "Escape") {
+      setOpen(false);
+    }
   };
 
   return (
@@ -850,6 +979,7 @@ function UnitSection({ value, onChange }) {
         <PopoverTrigger asChild>
           <button
             type="button"
+            onKeyDown={handleTriggerKeyDown}
             className="mt-0.5 w-full h-9 px-3 rounded-md border border-slate-200 bg-white flex items-center justify-between text-sm hover:bg-slate-50"
           >
             <span
@@ -863,7 +993,11 @@ function UnitSection({ value, onChange }) {
           </button>
         </PopoverTrigger>
 
-        <PopoverContent className="w-72 p-0" align="start">
+        <PopoverContent
+          className="w-72 p-0"
+          align="start"
+          onKeyDown={handleListKeyDown}
+        >
           <div className="p-2 border-b border-slate-100">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
@@ -883,14 +1017,21 @@ function UnitSection({ value, onChange }) {
                 No unit found
               </p>
             ) : (
-              filtered.map((u) => {
+              filtered.map((u, index) => {
                 const selected = value === u.name;
+                const isHighlighted = highlightedIndex === index;
                 return (
                   <div
                     key={u.name}
+                    ref={(el) => (itemRefs.current[index] = el)}
                     onClick={() => handleSelect(u)}
+                    onMouseEnter={() => setHighlightedIndex(index)}
                     className={`flex items-center justify-between rounded-md px-2.5 py-2 cursor-pointer ${
-                      selected ? "bg-blue-50" : "hover:bg-slate-50"
+                      selected
+                        ? "bg-blue-50"
+                        : isHighlighted
+                          ? "bg-slate-100 ring-1 ring-blue-300"
+                          : "hover:bg-slate-50"
                     }`}
                   >
                     <span
@@ -945,18 +1086,25 @@ function TaxOptionSection({ value, onChange }) {
   );
 }
 
-// =========================================================
-// Tax Rate selector
-// =========================================================
 function TaxRateSection({ value, onChange, disabled }) {
   const [open, setOpen] = useState(false);
   const [customRate, setCustomRate] = useState(
     value?.rate != null ? String(value.rate) : "",
   );
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const itemRefs = useRef([]);
 
   useEffect(() => {
     setCustomRate(value?.rate != null ? String(value.rate) : "");
   }, [value]);
+
+  useEffect(() => {
+    setHighlightedIndex(0);
+  }, [open]);
+
+  useEffect(() => {
+    itemRefs.current[highlightedIndex]?.scrollIntoView({ block: "nearest" });
+  }, [highlightedIndex]);
 
   const applyCustomRate = () => {
     const num = parseFloat(customRate);
@@ -968,6 +1116,40 @@ function TaxRateSection({ value, onChange, disabled }) {
     setOpen(false);
   };
 
+  const handleTriggerKeyDown = (e) => {
+    if (
+      !disabled &&
+      !open &&
+      (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ")
+    ) {
+      e.preventDefault();
+      setOpen(true);
+    }
+  };
+
+  const handleListKeyDown = (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex((i) =>
+        Math.min(i + 1, GST_RATE_OPTIONS.length - 1),
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter") {
+      // Only select from list if focus isn't inside the custom-rate input
+      if (e.target?.tagName === "INPUT") return;
+      e.preventDefault();
+      const opt = GST_RATE_OPTIONS[highlightedIndex];
+      if (opt) {
+        onChange({ rate: opt.rate, label: opt.label });
+        setOpen(false);
+      }
+    } else if (e.key === "Escape") {
+      setOpen(false);
+    }
+  };
+
   return (
     <div>
       <Label>Tax Rate (GST %)</Label>
@@ -976,6 +1158,7 @@ function TaxRateSection({ value, onChange, disabled }) {
           <button
             type="button"
             disabled={disabled}
+            onKeyDown={handleTriggerKeyDown}
             className="mt-0.5 w-full h-9 px-3 rounded-md border border-slate-200 bg-white flex items-center justify-between text-sm hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <span
@@ -987,17 +1170,24 @@ function TaxRateSection({ value, onChange, disabled }) {
           </button>
         </PopoverTrigger>
 
-        <PopoverContent className="w-80 p-2" align="start">
+        <PopoverContent
+          className="w-80 p-2"
+          align="start"
+          onKeyDown={handleListKeyDown}
+        >
           <p className="text-xs font-semibold text-slate-500 px-1 pb-1.5">
             Common GST Rates
           </p>
           <div className="space-y-1.5 max-h-56 overflow-y-auto">
-            {GST_RATE_OPTIONS.map((opt) => {
+            {GST_RATE_OPTIONS.map((opt, index) => {
               const isSelected = value?.rate === opt.rate;
+              const isHighlighted = highlightedIndex === index;
               return (
                 <button
                   key={opt.id}
+                  ref={(el) => (itemRefs.current[index] = el)}
                   type="button"
+                  onMouseEnter={() => setHighlightedIndex(index)}
                   onClick={() => {
                     onChange({ rate: opt.rate, label: opt.label });
                     setOpen(false);
@@ -1005,7 +1195,9 @@ function TaxRateSection({ value, onChange, disabled }) {
                   className={`w-full flex items-center justify-between rounded-lg px-3 py-2 border text-left transition-colors ${
                     isSelected
                       ? "bg-blue-50 border-blue-300"
-                      : "bg-white border-slate-200 hover:bg-slate-50"
+                      : isHighlighted
+                        ? "bg-slate-50 border-blue-200 ring-1 ring-blue-300"
+                        : "bg-white border-slate-200 hover:bg-slate-50"
                   }`}
                 >
                   <div className="min-w-0">
@@ -1046,6 +1238,7 @@ function TaxRateSection({ value, onChange, disabled }) {
                 onChange={(e) => setCustomRate(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
+                    e.stopPropagation();
                     e.preventDefault();
                     applyCustomRate();
                   }

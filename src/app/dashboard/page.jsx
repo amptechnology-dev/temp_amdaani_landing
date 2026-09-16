@@ -257,7 +257,6 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* 👇 outer padding + vertical rhythm kome dewa hoyeche (p-4/6 -> p-3/4, space-y-5 -> space-y-3) */}
       <div className="max-w-7xl mx-auto p-3 md:p-4 space-y-3">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
@@ -291,7 +290,6 @@ export default function DashboardPage() {
               Refresh
             </button>
 
-            {/* ✅ Always-glowing animated New Invoice button (self-contained, no external CSS needed) */}
             <button
               onClick={() => router.push("/dashboard/sales?new=true")}
               className="new-invoice-btn relative flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-1.5 text-sm font-semibold transition-all duration-200 hover:scale-[1.05] active:scale-[0.96]"
@@ -324,7 +322,7 @@ export default function DashboardPage() {
           <SkeletonGrid />
         ) : (
           <>
-            {/* Key Metrics — gap-4 -> gap-3 */}
+            {/* Key Metrics */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <MetricCard
                 title="Annual Sales"
@@ -374,17 +372,18 @@ export default function DashboardPage() {
               />
             </div>
 
-            {/* 👇 Ads/Carousel section — height chotoo kore wrap kora holo, border/overflow control korar jonno */}
-            <div className="max-h-[140px] overflow-hidden rounded-xl border-0">
-              <CarouselSlider />
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 items-stretch">
+              <div className="lg:col-span-3">
+                <SummaryPanel
+                  dueSummary={dashboardData?.dueSummary}
+                  receivedSummary={dashboardData?.receivedSummary}
+                />
+              </div>
+              <div className="lg:col-span-2 overflow-hidden rounded-xl border-0 h-full">
+                <CarouselSlider />
+              </div>
             </div>
 
-            <SummaryPanel
-              dueSummary={dashboardData?.dueSummary}
-              receivedSummary={dashboardData?.receivedSummary}
-            />
-
-            {/* gap-5 -> gap-3 */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               <ChartCard
                 title="Monthly Revenue Trend"

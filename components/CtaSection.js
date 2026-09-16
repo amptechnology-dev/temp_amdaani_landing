@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 
 const HERO_BUTTON_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/herobutton/public-hero-button`;
-const LANDING_APP_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/app-version/landing-apk`;
 const PLAY_STORE_FALLBACK_URL =
   process.env.NEXT_PUBLIC_PLAY_STORE_URL ||
   "https://play.google.com/store/apps";
@@ -57,34 +56,8 @@ export default function CTASection() {
     fetchHeroButton();
   }, []);
 
-  useEffect(() => {
-    const fetchLatestRelease = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(LANDING_APP_ENDPOINT, { method: "GET" });
-        const result = await response.json();
-
-        if (!response.ok || !result?.success || !result?.data) {
-          setLatestRelease(null);
-          return;
-        }
-
-        setLatestRelease(result.data);
-      } catch {
-        setLatestRelease(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchLatestRelease();
-  }, []);
-
   const handlePlayStoreOpen = () => {
-    const targetUrl =
-      heroButton?.link ||
-      latestRelease?.playStoreUrl ||
-      PLAY_STORE_FALLBACK_URL;
+    const targetUrl = heroButton?.link || PLAY_STORE_FALLBACK_URL;
     const hasProtocol = /^https?:\/\//i.test(targetUrl);
     const href = hasProtocol ? targetUrl : `https://${targetUrl}`;
     window.open(href, "_blank", "noopener,noreferrer");
