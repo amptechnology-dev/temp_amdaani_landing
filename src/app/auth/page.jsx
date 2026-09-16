@@ -19,6 +19,7 @@ const STEP_OTP = "OTP";
 const STEP_EMAIL = "EMAIL";
 const STEP_EMAIL_OTP = "EMAIL_OTP";
 const STEP_NEW_PHONE = "NEW_PHONE";
+const STEP_SELECT_STORE = "SELECT_STORE";
 
 function TermsModal({ open, onClose }) {
   return (
@@ -61,7 +62,7 @@ export default function LoginScreen() {
   const { theme } = useTheme();
   const currentTheme = themeConfig[theme];
   const {
-    sendOtp, verifyOtp, sendEmailOtp, verifyEmailOtp, changePhoneNumber,
+    sendOtp, verifyOtp, sendEmailOtp, verifyEmailOtp, changePhoneNumber, selectStore,
   } = useAuth();
 
   const [step, setStep] = useState(STEP_PHONE);
@@ -76,6 +77,10 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [termsOpen, setTermsOpen] = useState(false);
+
+  const [storeSelectionToken, setStoreSelectionToken] = useState("");
+  const [stores, setStores] = useState([]);
+  const [selectedStoreId, setSelectedStoreId] = useState("");
 
   const isPhoneValid = /^[6-9]\d{9}$/.test(phone);
   const isNewPhoneValid = /^[6-9]\d{9}$/.test(newPhone);
@@ -130,10 +135,22 @@ export default function LoginScreen() {
     setError("");
     try {
       const res = await verifyOtp(phone, otp);
+
       if (!res.success) {
         setOtp("");
         setError(res.message || "Invalid OTP");
+        setIsLoading(false);
+        return;
       }
+
+      // Multiple stores → move to selection step
+      if (res.data?.storeSelectionToken) {
+        setStoreSelectionToken(res.data.storeSelectionToken);
+        setStores(res.data.stores || []);
+        setSelectedStoreId("");
+        setStep(STEP_SELECT_STORE);
+      }
+      // single-store login / new-user redirect ইতিমধ্যে AuthContext.verifyOtp এর ভেতরেই হয়ে যায়
     } catch (err) {
       setOtp("");
       setError(err.message || "Invalid OTP");
@@ -211,12 +228,29 @@ export default function LoginScreen() {
     setIsLoading(false);
   };
 
+  const handleSelectStore = async () => {
+    if (!selectedStoreId) return;
+    setIsLoading(true);
+    setError("");
+    try {
+      const res = await selectStore(storeSelectionToken, selectedStoreId);
+      if (!res.success) {
+        setError(res.message || "Failed to select store");
+      }
+      // success হলে selectStore ভেতরেই redirect হয়ে যাবে (router.push("/dashboard"))
+    } catch (err) {
+      setError(err.message || "Failed to select store");
+    }
+    setIsLoading(false);
+  };
+
   const subtitle = {
     [STEP_PHONE]: "Sign in to continue",
     [STEP_OTP]: `Verify the OTP sent to ${maskedPhone(phone)}`,
     [STEP_EMAIL]: "Verify your email to change number",
     [STEP_EMAIL_OTP]: `Enter the OTP sent to ${maskedEmail(email)}`,
     [STEP_NEW_PHONE]: "Enter your new phone number",
+    [STEP_SELECT_STORE]: "Select a store to continue",
   }[step];
 
   return (
@@ -248,6 +282,7 @@ export default function LoginScreen() {
                   if (step === STEP_EMAIL) setStep(STEP_PHONE);
                   if (step === STEP_EMAIL_OTP) setStep(STEP_EMAIL);
                   if (step === STEP_NEW_PHONE) setStep(STEP_EMAIL_OTP);
+                  if (step === STEP_SELECT_STORE) setStep(STEP_PHONE);
                   setError("");
                 }}
                 className={`absolute top-5 left-5 flex items-center gap-2 p-2 rounded-lg transition-colors cursor-pointer ${currentTheme.textSecondary} hover:${currentTheme.text}`}
@@ -445,6 +480,52 @@ export default function LoginScreen() {
                     className={`w-full h-12 text-base font-semibold rounded-xl cursor-pointer ${currentTheme.buttonPrimary} ${(!isNewPhoneValid || isLoading) ? "opacity-50 cursor-not-allowed" : ""}`}
                   >
                     {isLoading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Updating...</>) : "Update Number"}
+                  </Button>
+                </motion.div>
+              )}
+
+              {/* SELECT STORE */}
+              {step === STEP_SELECT_STORE && (
+                <motion.div key="selectStore" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }} className="space-y-4 pt-6">
+                  <div className="space-y-2 max-h-72 overflow-y-auto">
+                    {stores.map((store) => (
+                      <button
+                        key={store.storeId}
+                        onClick={() => setSelectedStoreId(store.storeId)}
+                        disabled={isLoading}
+                        className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-colors cursor-pointer ${
+                          selectedStoreId === store.storeId
+                            ? "border-blue-500 bg-blue-500/5"
+                            : `${currentTheme.outline} ${currentTheme.surface}`
+                        }`}
+                      >
+                        <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden shrink-0 relative">
+                          {store.logoUrl ? (
+                            <Image src={store.logoUrl} alt={store.name} fill className="object-contain" />
+                          ) : (
+                            <span className="text-xs font-bold opacity-50">{store.name?.[0]}</span>
+                          )}
+                        </div>
+                        <div className="text-left flex-1">
+                          <p className={`text-sm font-semibold ${currentTheme.text}`}>{store.name}</p>
+                          <p className={`text-xs capitalize ${currentTheme.textSecondary}`}>{store.role}</p>
+                        </div>
+                        {selectedStoreId === store.storeId && (
+                          <Check className="w-5 h-5 text-blue-500 shrink-0" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+
+                  {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+
+                  <Button
+                    onClick={handleSelectStore}
+                    disabled={!selectedStoreId || isLoading}
+                    className={`w-full h-12 text-base font-semibold rounded-xl cursor-pointer ${currentTheme.buttonPrimary} ${(!selectedStoreId || isLoading) ? "opacity-50 cursor-not-allowed" : ""}`}
+                  >
+                    {isLoading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Logging in...</>) : "Continue"}
                   </Button>
                 </motion.div>
               )}

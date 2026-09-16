@@ -313,13 +313,12 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // OTP Verify
   const verifyOtp = async (phone, otp) => {
     try {
       const res = await api.post("/auth/verify-otp", { phone, otp });
 
       if (res.success) {
-        // 1️⃣ USER EXISTS → DIRECT LOGIN
+        // 1️⃣ USER EXISTS (single store) → DIRECT LOGIN
         if (res.data?.user) {
           const newAuth = {
             isAuthenticated: true,
@@ -341,7 +340,12 @@ export const AuthProvider = ({ children }) => {
           return res;
         }
 
-        // 2️⃣ NEW USER → REGISTRATION FLOW
+        // 2️⃣ MULTIPLE STORES → STORE SELECTION REQUIRED
+        if (res.data?.storeSelectionToken) {
+          return res;
+        }
+
+        // 3️⃣ NEW USER → REGISTRATION FLOW
         if (res.data?.tempToken) {
           await updateAuthState({
             isAuthenticated: false,
@@ -354,6 +358,42 @@ export const AuthProvider = ({ children }) => {
           router.push(`/auth/register?phone=${phone}`);
           return res;
         }
+      }
+
+      return res;
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  };
+
+  const selectStore = async (storeSelectionToken, storeId) => {
+    try {
+      const res = await api.post(
+        "/auth/select-store",
+        { storeId },
+        {
+          headers: { Authorization: `Bearer ${storeSelectionToken}` },
+        },
+      );
+
+      if (res.success && res.data?.user) {
+        const newAuth = {
+          isAuthenticated: true,
+          user: res.data.user,
+          accessToken: res.data.tokens.accessToken,
+          refreshToken: res.data.tokens.refreshToken,
+          tempToken: null,
+        };
+
+        await updateAuthState(newAuth);
+
+        Cookies.set("access_token", res.data.tokens.accessToken);
+        Cookies.set("refresh_token", res.data.tokens.refreshToken);
+        Cookies.set("user", JSON.stringify(res.data.user));
+
+        scheduleProactiveRefresh(newAuth.accessToken);
+
+        router.push("/dashboard");
       }
 
       return res;
@@ -390,6 +430,55 @@ export const AuthProvider = ({ children }) => {
       }
 
       return res;
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  };
+
+  // Get all stores for the logged-in user (for switch-store modal)
+  const getMyStores = async () => {
+    try {
+      return await api.get("/auth/my-stores");
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  };
+
+  // Switch to a different store (already logged in)
+  const switchStore = async (storeId) => {
+    try {
+      const res = await api.post("/auth/switch-store", { storeId });
+
+      if (res.success && res.data?.user) {
+        const newAuth = {
+          isAuthenticated: true,
+          user: res.data.user,
+          accessToken: res.data.tokens.accessToken,
+          refreshToken: res.data.tokens.refreshToken,
+          tempToken: null,
+        };
+
+        await updateAuthState(newAuth);
+
+        Cookies.set("access_token", res.data.tokens.accessToken);
+        Cookies.set("refresh_token", res.data.tokens.refreshToken);
+        Cookies.set("user", JSON.stringify(res.data.user));
+
+        scheduleProactiveRefresh(newAuth.accessToken);
+      }
+
+      return res;
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  };
+
+  // Create an additional store for the logged-in user (multipart form-data)
+  const createStore = async (formData) => {
+    try {
+      return await api.post("/auth/create-store", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
     } catch (err) {
       return { success: false, message: err.message };
     }
@@ -456,6 +545,11 @@ export const AuthProvider = ({ children }) => {
       updateAuthState,
       sendOtp,
       verifyOtp,
+      selectStore,
+      selectStore,
+      getMyStores,
+      switchStore,
+      createStore,
       completeRegistration,
       logout,
       refreshAccessToken,
