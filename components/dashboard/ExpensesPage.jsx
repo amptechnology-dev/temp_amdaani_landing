@@ -37,6 +37,7 @@ import {
   Smartphone,
   Hash,
   Landmark,
+  FolderPlus,
 } from "lucide-react";
 
 // shadcn components
@@ -77,6 +78,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+
+// NEW: head dialog (path adjust koro)
+import AddExpenseHeadDialog from "../../components/expenses/AddExpenseHeadDialog";
 
 // Helper: debounce hook
 function useDebounce(value, delay) {
@@ -195,6 +199,11 @@ export default function ExpensesPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isUpdate, setIsUpdate] = useState(false);
 
+  // NEW: expense head states
+  const [isHeadDialogOpen, setIsHeadDialogOpen] = useState(false);
+  const [reopenExpenseAfterHead, setReopenExpenseAfterHead] = useState(false);
+  const [newHeadId, setNewHeadId] = useState("");
+
   const [allExpenses, setAllExpenses] = useState([]);
   const [expenseHeads, setExpenseHeads] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -220,8 +229,10 @@ export default function ExpensesPage() {
     try {
       const heads = await fetchExpenseHeads();
       setExpenseHeads(heads);
+      return heads;
     } catch (error) {
       // silent — heads are optional for select dropdown
+      return [];
     }
   }, []);
 
@@ -234,7 +245,7 @@ export default function ExpensesPage() {
   const refreshData = async () => {
     setIsRefreshing(true);
     try {
-      await loadExpenses();
+      await Promise.all([loadExpenses(), loadExpenseHeads()]);
       toast.success("Expenses refreshed successfully!");
     } catch {
       toast.error("Failed to refresh expenses");
@@ -288,9 +299,7 @@ export default function ExpensesPage() {
             : "Expense added successfully!",
         );
         resetForm();
-        setIsExpenseDialogOpen(false);
-        setSelectedExpense(null);
-        setIsUpdate(false);
+        closeExpenseDialog();
         await loadExpenses();
       } else {
         throw new Error(
@@ -307,15 +316,24 @@ export default function ExpensesPage() {
   const handleSearchChange = (e) => setSearchTerm(e.target.value);
   const handleClearSearch = () => setSearchTerm("");
 
+  const closeExpenseDialog = () => {
+    setIsExpenseDialogOpen(false);
+    setSelectedExpense(null);
+    setIsUpdate(false);
+    setNewHeadId("");
+  };
+
   const handleAddExpense = () => {
     setSelectedExpense(null);
     setIsUpdate(false);
+    setNewHeadId("");
     setIsExpenseDialogOpen(true);
   };
 
   const handleEditExpense = (expense) => {
     setSelectedExpense(expense);
     setIsUpdate(true);
+    setNewHeadId("");
     setIsExpenseDialogOpen(true);
   };
 
@@ -324,8 +342,39 @@ export default function ExpensesPage() {
     setIsDeleteDialogOpen(true);
   };
 
+  // ---------- NEW: Expense Head handlers ----------
+  // Header button theke: shudhu head add hobe
+  const handleOpenAddHead = () => {
+    setReopenExpenseAfterHead(false);
+    setIsHeadDialogOpen(true);
+  };
+
+  // Expense form er bhitor theke: head add korar por abar expense form khulbe
+  const handleOpenAddHeadFromExpense = () => {
+    setReopenExpenseAfterHead(true);
+    setIsExpenseDialogOpen(false);
+    setIsHeadDialogOpen(true);
+  };
+
+  const handleHeadCreated = async (head) => {
+    await loadExpenseHeads();
+    if (head?._id) setNewHeadId(head._id); // notun head auto-select
+  };
+
+  const handleHeadDialogChange = (open) => {
+    setIsHeadDialogOpen(open);
+    if (!open && reopenExpenseAfterHead) {
+      setReopenExpenseAfterHead(false);
+      setIsExpenseDialogOpen(true); // save ba cancel — dutoi te expense form ferot
+    }
+  };
+
   const initialValues = {
-    headId: selectedExpense?.head?.[0]?._id || selectedExpense?.headId || "",
+    headId:
+      newHeadId ||
+      selectedExpense?.head?.[0]?._id ||
+      selectedExpense?.headId ||
+      "",
     amount: selectedExpense?.amount || "",
     paidTo: selectedExpense?.paidTo || "",
     paymentMethod: selectedExpense?.paymentMethod || "",
@@ -382,10 +431,7 @@ export default function ExpensesPage() {
     }).format(amount || 0);
 
   // Combined chip list: date chips + payment-method chips (Items-page pattern)
-  const chips = [
-    ...DATE_FILTERS,
-    ...PAYMENT_METHOD_FILTERS,
-  ];
+  const chips = [...DATE_FILTERS, ...PAYMENT_METHOD_FILTERS];
 
   const isChipActive = (chip) => {
     const isDateChip = DATE_FILTERS.some((f) => f.value === chip.value);
@@ -398,7 +444,9 @@ export default function ExpensesPage() {
     if (isDateChip) {
       setActiveDateFilter(chip.value);
     } else {
-      setActivePaymentFilter((prev) => (prev === chip.value ? "all" : chip.value));
+      setActivePaymentFilter((prev) =>
+        prev === chip.value ? "all" : chip.value,
+      );
     }
   };
 
@@ -426,6 +474,16 @@ export default function ExpensesPage() {
               className={`w-4 h-4 mr-1.5 ${isRefreshing ? "animate-spin" : ""}`}
             />
             Refresh
+          </Button>
+          {/* NEW: Add Head button */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-sm h-9"
+            onClick={handleOpenAddHead}
+          >
+            <FolderPlus className="w-4 h-4 mr-1.5" />
+            Add Head
           </Button>
           <Button
             onClick={handleAddExpense}
@@ -456,13 +514,20 @@ export default function ExpensesPage() {
           )}
         </div>
 
-        <Select value={limit} onValueChange={(v) => setLimit(Number(v))}>
+        {/* FIX: shadcn Select string value chay */}
+        <Select
+          value={String(limit)}
+          onValueChange={(v) => {
+            setLimit(Number(v));
+            setPage(1);
+          }}
+        >
           <SelectTrigger className="w-[110px] h-9 text-sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {[10, 25, 50, 100].map((x) => (
-              <SelectItem key={x} value={x} className="text-sm">
+              <SelectItem key={x} value={String(x)} className="text-sm">
                 {x} / page
               </SelectItem>
             ))}
@@ -498,7 +563,9 @@ export default function ExpensesPage() {
       {/* ===== Excel-style dense table ===== */}
       <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
         <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-200 bg-slate-50">
-          <span className="text-base font-semibold text-slate-700">Expenses</span>
+          <span className="text-base font-semibold text-slate-700">
+            Expenses
+          </span>
           <span className="text-sm text-slate-400">
             Showing {pagedExpenses.length} of {filteredExpenses.length}
           </span>
@@ -521,7 +588,11 @@ export default function ExpensesPage() {
                 : "Add your first expense to begin tracking spending."}
             </p>
             {!searchTerm && (
-              <Button onClick={handleAddExpense} size="sm" className="text-sm h-9">
+              <Button
+                onClick={handleAddExpense}
+                size="sm"
+                className="text-sm h-9"
+              >
                 <Plus className="w-4 h-4 mr-1.5" />
                 Add Expense
               </Button>
@@ -537,9 +608,13 @@ export default function ExpensesPage() {
                   <th className="text-left font-semibold px-3 py-2">Paid To</th>
                   <th className="text-left font-semibold px-3 py-2">Method</th>
                   <th className="text-left font-semibold px-3 py-2">Date</th>
-                  <th className="text-left font-semibold px-3 py-2">Ref / Notes</th>
+                  <th className="text-left font-semibold px-3 py-2">
+                    Ref / Notes
+                  </th>
                   <th className="text-right font-semibold px-3 py-2">Amount</th>
-                  <th className="text-center font-semibold px-3 py-2 w-16">Actions</th>
+                  <th className="text-center font-semibold px-3 py-2 w-16">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -690,11 +765,7 @@ export default function ExpensesPage() {
       <Dialog
         open={isExpenseDialogOpen}
         onOpenChange={(open) => {
-          if (!open) {
-            setIsExpenseDialogOpen(false);
-            setSelectedExpense(null);
-            setIsUpdate(false);
-          }
+          if (!open) closeExpenseDialog();
         }}
       >
         <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
@@ -727,7 +798,18 @@ export default function ExpensesPage() {
               <Form className="space-y-4">
                 <div className="space-y-4">
                   <div>
-                    <Label htmlFor="headId">Expense Head *</Label>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="headId">Expense Head *</Label>
+                      {/* NEW: form er bhitor theke head add */}
+                      <button
+                        type="button"
+                        onClick={handleOpenAddHeadFromExpense}
+                        className="text-xs font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Add Head
+                      </button>
+                    </div>
                     <Select
                       value={values.headId}
                       onValueChange={(val) => setFieldValue("headId", val)}
@@ -739,11 +821,17 @@ export default function ExpensesPage() {
                         <SelectValue placeholder="Select expense head" />
                       </SelectTrigger>
                       <SelectContent>
-                        {expenseHeads.map((h) => (
-                          <SelectItem key={h._id} value={h._id}>
-                            {h.name}
-                          </SelectItem>
-                        ))}
+                        {expenseHeads.length === 0 ? (
+                          <div className="px-3 py-2 text-sm text-slate-400">
+                            No heads yet. Click “Add Head”.
+                          </div>
+                        ) : (
+                          expenseHeads.map((h) => (
+                            <SelectItem key={h._id} value={h._id}>
+                              {h.name}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                     <ErrorMessage
@@ -870,7 +958,7 @@ export default function ExpensesPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setIsExpenseDialogOpen(false)}
+                    onClick={closeExpenseDialog}
                   >
                     Cancel
                   </Button>
@@ -890,6 +978,13 @@ export default function ExpensesPage() {
           </Formik>
         </DialogContent>
       </Dialog>
+
+      {/* ---------------- NEW: Add Expense Head Dialog ---------------- */}
+      <AddExpenseHeadDialog
+        open={isHeadDialogOpen}
+        onOpenChange={handleHeadDialogChange}
+        onSuccess={handleHeadCreated}
+      />
 
       {/* ---------------- Delete Confirmation Dialog ---------------- */}
       <AlertDialog
@@ -916,9 +1011,9 @@ export default function ExpensesPage() {
                 selectedExpense && deleteMutation.mutate(selectedExpense._id)
               }
               className="bg-red-600 hover:bg-red-700 text-white"
-              disabled={deleteMutation.isLoading}
+              disabled={deleteMutation.isPending}
             >
-              {deleteMutation.isLoading ? (
+              {deleteMutation.isPending ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
                 <Trash className="w-4 h-4 mr-2" />
