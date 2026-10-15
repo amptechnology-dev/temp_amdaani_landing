@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useTheme } from "../../context/ThemeContext";
 import { themeConfig } from "../../utils/ThemeConfig";
@@ -38,6 +38,8 @@ import {
   Hash,
   Landmark,
   FolderPlus,
+  Check,
+  ChevronDown,
 } from "lucide-react";
 
 // shadcn components
@@ -78,8 +80,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
-// NEW: head dialog (path adjust koro)
+// Head dialog (path adjust koro)
 import AddExpenseHeadDialog from "../../components/expenses/AddExpenseHeadDialog";
 
 // Helper: debounce hook
@@ -184,6 +191,147 @@ const filterByPaymentMethod = (expenses, method) => {
   );
 };
 
+/* ------------------------------------------------------------------ */
+/* Expense Head picker: select + edit + delete + add (RN selector er   */
+/* web equivalent)                                                     */
+/* ------------------------------------------------------------------ */
+function ExpenseHeadPicker({
+  id,
+  heads,
+  value,
+  hasError,
+  onSelect,
+  onAdd,
+  onEdit,
+  onDelete,
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+
+  const selected = heads.find((h) => h._id === value);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return q ? heads.filter((h) => h.name?.toLowerCase().includes(q)) : heads;
+  }, [heads, query]);
+
+  const close = () => {
+    setOpen(false);
+    setQuery("");
+  };
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) setQuery("");
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          id={id}
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className={`mt-1 w-full justify-between font-normal ${
+            hasError ? "border-red-500" : ""
+          }`}
+        >
+          <span className={selected ? "truncate" : "text-slate-400"}>
+            {selected ? selected.name : "Select expense head"}
+          </span>
+          <ChevronDown className="w-4 h-4 opacity-50 shrink-0" />
+        </Button>
+      </PopoverTrigger>
+
+      <PopoverContent
+        align="start"
+        className="w-[var(--radix-popover-trigger-width)] p-2"
+      >
+        <Input
+          autoFocus
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search head..."
+          className="h-8 text-sm mb-2"
+        />
+
+        {/* onWheel: Dialog er bhitor Popover e scroll atke jay, tai stopPropagation */}
+        <div
+          className="max-h-56 overflow-y-auto"
+          onWheel={(e) => e.stopPropagation()}
+        >
+          {filtered.length === 0 ? (
+            <p className="px-2 py-3 text-sm text-slate-400 text-center">
+              {heads.length === 0 ? "No heads yet." : "No matching head."}
+            </p>
+          ) : (
+            filtered.map((h) => (
+              <div
+                key={h._id}
+                onClick={() => {
+                  onSelect(h);
+                  close();
+                }}
+                className="flex items-center gap-1.5 rounded-md px-2 py-1.5 cursor-pointer hover:bg-slate-100"
+              >
+                <Check
+                  className={`w-4 h-4 shrink-0 ${
+                    h._id === value
+                      ? "text-blue-600 opacity-100"
+                      : "opacity-0"
+                  }`}
+                />
+                <span className="flex-1 truncate text-sm">{h.name}</span>
+                <button
+                  type="button"
+                  title="Edit head"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    close();
+                    onEdit(h);
+                  }}
+                  className="p-1 rounded text-slate-500 hover:bg-slate-200"
+                >
+                  <Edit className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  title="Delete head"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    close();
+                    onDelete(h);
+                  }}
+                  className="p-1 rounded text-red-500 hover:bg-red-50"
+                >
+                  <Trash className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="border-t mt-2 pt-2">
+          <button
+            type="button"
+            onClick={() => {
+              close();
+              onAdd();
+            }}
+            className="w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50"
+          >
+            <Plus className="w-4 h-4" />
+            Add new head
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export default function ExpensesPage() {
   const { theme } = useTheme();
   const currentTheme = themeConfig[theme];
@@ -199,10 +347,13 @@ export default function ExpensesPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isUpdate, setIsUpdate] = useState(false);
 
-  // NEW: expense head states
+  // Expense head states
   const [isHeadDialogOpen, setIsHeadDialogOpen] = useState(false);
-  const [reopenExpenseAfterHead, setReopenExpenseAfterHead] = useState(false);
-  const [newHeadId, setNewHeadId] = useState("");
+  const [editingHead, setEditingHead] = useState(null);
+  const [headToDelete, setHeadToDelete] = useState(null);
+
+  // Expense form er Formik instance (head select/clear korar jonno)
+  const formikRef = useRef(null);
 
   const [allExpenses, setAllExpenses] = useState([]);
   const [expenseHeads, setExpenseHeads] = useState([]);
@@ -231,7 +382,6 @@ export default function ExpensesPage() {
       setExpenseHeads(heads);
       return heads;
     } catch (error) {
-      // silent — heads are optional for select dropdown
       return [];
     }
   }, []);
@@ -254,7 +404,7 @@ export default function ExpensesPage() {
     }
   };
 
-  // Delete mutation
+  // Delete expense mutation
   const deleteMutation = useMutation({
     mutationFn: (id) => api.delete(`/expense/id/${id}`),
     onSuccess: () => {
@@ -267,6 +417,24 @@ export default function ExpensesPage() {
     },
     onError: (error) => {
       toast.error(extractErrorMessage(error) || "Failed to delete expense.");
+    },
+  });
+
+  // Delete expense head mutation
+  const deleteHeadMutation = useMutation({
+    mutationFn: (id) => api.delete(`/expense-head/id/${id}`),
+    onSuccess: async (_data, deletedId) => {
+      // deleted head jodi form e selected thake, clear kore dao
+      if (formikRef.current?.values?.headId === deletedId) {
+        formikRef.current.setFieldValue("headId", "");
+      }
+      setHeadToDelete(null);
+      toast.success("Expense head deleted successfully!");
+      await Promise.all([loadExpenseHeads(), loadExpenses()]);
+    },
+    onError: (error) => {
+      // e.g. head jodi expense e use hoye thake, backend er message dekhabe
+      toast.error(extractErrorMessage(error) || "Failed to delete head.");
     },
   });
 
@@ -320,20 +488,17 @@ export default function ExpensesPage() {
     setIsExpenseDialogOpen(false);
     setSelectedExpense(null);
     setIsUpdate(false);
-    setNewHeadId("");
   };
 
   const handleAddExpense = () => {
     setSelectedExpense(null);
     setIsUpdate(false);
-    setNewHeadId("");
     setIsExpenseDialogOpen(true);
   };
 
   const handleEditExpense = (expense) => {
     setSelectedExpense(expense);
     setIsUpdate(true);
-    setNewHeadId("");
     setIsExpenseDialogOpen(true);
   };
 
@@ -342,39 +507,47 @@ export default function ExpensesPage() {
     setIsDeleteDialogOpen(true);
   };
 
-  // ---------- NEW: Expense Head handlers ----------
-  // Header button theke: shudhu head add hobe
+  // ---------- Expense Head handlers ----------
   const handleOpenAddHead = () => {
-    setReopenExpenseAfterHead(false);
+    setEditingHead(null);
     setIsHeadDialogOpen(true);
   };
 
-  // Expense form er bhitor theke: head add korar por abar expense form khulbe
-  const handleOpenAddHeadFromExpense = () => {
-    setReopenExpenseAfterHead(true);
-    setIsExpenseDialogOpen(false);
+  const handleOpenEditHead = (head) => {
+    setEditingHead(head);
     setIsHeadDialogOpen(true);
-  };
-
-  const handleHeadCreated = async (head) => {
-    await loadExpenseHeads();
-    if (head?._id) setNewHeadId(head._id); // notun head auto-select
   };
 
   const handleHeadDialogChange = (open) => {
     setIsHeadDialogOpen(open);
-    if (!open && reopenExpenseAfterHead) {
-      setReopenExpenseAfterHead(false);
-      setIsExpenseDialogOpen(true); // save ba cancel — dutoi te expense form ferot
+    if (!open) setEditingHead(null);
+  };
+
+  // Create / update dutoi er por ekhane ashe
+  const handleHeadSaved = async (head) => {
+    const wasEdit = Boolean(editingHead);
+    const prevIds = new Set(expenseHeads.map((h) => h._id));
+
+    // Head name table e dekhay, tai expenses-o reload
+    const [freshHeads] = await Promise.all([
+      loadExpenseHeads(),
+      loadExpenses(),
+    ]);
+
+    if (wasEdit) return;
+
+    // Notun head: response theke _id, na pele list diff kore ber koro
+    const created =
+      head?._id ? head : freshHeads.find((h) => !prevIds.has(h._id));
+
+    // Expense form khola thakle notun head auto-select
+    if (created?._id) {
+      formikRef.current?.setFieldValue("headId", created._id);
     }
   };
 
   const initialValues = {
-    headId:
-      newHeadId ||
-      selectedExpense?.head?.[0]?._id ||
-      selectedExpense?.headId ||
-      "",
+    headId: selectedExpense?.head?.[0]?._id || selectedExpense?.headId || "",
     amount: selectedExpense?.amount || "",
     paidTo: selectedExpense?.paidTo || "",
     paymentMethod: selectedExpense?.paymentMethod || "",
@@ -385,7 +558,7 @@ export default function ExpensesPage() {
     notes: selectedExpense?.notes || "",
   };
 
-  // Filtering pipeline: date -> payment method -> search (fuzzy)
+  // Filtering pipeline: date -> payment method -> search
   const filteredExpenses = useMemo(() => {
     const dateFiltered = filterByDate(allExpenses, activeDateFilter);
     const methodFiltered = filterByPaymentMethod(
@@ -430,7 +603,7 @@ export default function ExpensesPage() {
       maximumFractionDigits: 0,
     }).format(amount || 0);
 
-  // Combined chip list: date chips + payment-method chips (Items-page pattern)
+  // Combined chip list: date chips + payment-method chips
   const chips = [...DATE_FILTERS, ...PAYMENT_METHOD_FILTERS];
 
   const isChipActive = (chip) => {
@@ -475,7 +648,6 @@ export default function ExpensesPage() {
             />
             Refresh
           </Button>
-          {/* NEW: Add Head button */}
           <Button
             variant="outline"
             size="sm"
@@ -514,7 +686,6 @@ export default function ExpensesPage() {
           )}
         </div>
 
-        {/* FIX: shadcn Select string value chay */}
         <Select
           value={String(limit)}
           onValueChange={(v) => {
@@ -781,6 +952,7 @@ export default function ExpensesPage() {
           </DialogHeader>
 
           <Formik
+            innerRef={formikRef}
             initialValues={initialValues}
             validationSchema={expenseSchema}
             onSubmit={handleSubmit}
@@ -794,46 +966,26 @@ export default function ExpensesPage() {
               errors,
               touched,
               setFieldValue,
+              setFieldTouched,
             }) => (
               <Form className="space-y-4">
                 <div className="space-y-4">
+                  {/* Expense Head — custom picker with edit/delete */}
                   <div>
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="headId">Expense Head *</Label>
-                      {/* NEW: form er bhitor theke head add */}
-                      <button
-                        type="button"
-                        onClick={handleOpenAddHeadFromExpense}
-                        className="text-xs font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        Add Head
-                      </button>
-                    </div>
-                    <Select
+                    <Label htmlFor="headId">Expense Head *</Label>
+                    <ExpenseHeadPicker
+                      id="headId"
+                      heads={expenseHeads}
                       value={values.headId}
-                      onValueChange={(val) => setFieldValue("headId", val)}
-                    >
-                      <SelectTrigger
-                        id="headId"
-                        className={`mt-1 ${errors.headId && touched.headId ? "border-red-500" : ""}`}
-                      >
-                        <SelectValue placeholder="Select expense head" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {expenseHeads.length === 0 ? (
-                          <div className="px-3 py-2 text-sm text-slate-400">
-                            No heads yet. Click “Add Head”.
-                          </div>
-                        ) : (
-                          expenseHeads.map((h) => (
-                            <SelectItem key={h._id} value={h._id}>
-                              {h.name}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
+                      hasError={Boolean(errors.headId && touched.headId)}
+                      onSelect={(h) => {
+                        setFieldValue("headId", h._id);
+                        setFieldTouched("headId", true, false);
+                      }}
+                      onAdd={handleOpenAddHead}
+                      onEdit={handleOpenEditHead}
+                      onDelete={setHeadToDelete}
+                    />
                     <ErrorMessage
                       name="headId"
                       component="div"
@@ -979,14 +1131,54 @@ export default function ExpensesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ---------------- NEW: Add Expense Head Dialog ---------------- */}
+      {/* ---------------- Add / Edit Expense Head Dialog ---------------- */}
       <AddExpenseHeadDialog
         open={isHeadDialogOpen}
         onOpenChange={handleHeadDialogChange}
-        onSuccess={handleHeadCreated}
+        editData={editingHead}
+        onSuccess={handleHeadSaved}
       />
 
-      {/* ---------------- Delete Confirmation Dialog ---------------- */}
+      {/* ---------------- Delete Expense Head Confirmation ---------------- */}
+      <AlertDialog
+        open={Boolean(headToDelete)}
+        onOpenChange={(open) => {
+          if (!open && !deleteHeadMutation.isPending) setHeadToDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Expense Head</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the head{" "}
+              <strong>{headToDelete?.name}</strong>? This action cannot be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteHeadMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault(); // success hole tobei dialog bondho hobe
+                if (headToDelete) deleteHeadMutation.mutate(headToDelete._id);
+              }}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={deleteHeadMutation.isPending}
+            >
+              {deleteHeadMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Trash className="w-4 h-4 mr-2" />
+              )}
+              Delete Head
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ---------------- Delete Expense Confirmation Dialog ---------------- */}
       <AlertDialog
         open={isDeleteDialogOpen}
         onOpenChange={setIsDeleteDialogOpen}
