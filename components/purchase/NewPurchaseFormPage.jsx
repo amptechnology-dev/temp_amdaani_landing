@@ -1107,10 +1107,7 @@ export default function NewPurchaseFormPage({
   }, 0);
 
   // Grand total for purchase — subtotal + tax - order-level discount
-  const grandTotal =
-    Number(invoiceCalculations.subtotal || 0) +
-    Number(invoiceCalculations.totalTax || 0) -
-    Number(invoiceCalculations.discountTotal || 0);
+    const grandTotal = Number(payment?.grandTotal ?? 0);
 
   // NEW: wraps setPaidAmount so partial-amount entry is blocked by the
   // "Vendor Required" popup instead of silently failing / relying on

@@ -437,6 +437,28 @@ export const AuthProvider = ({ children }) => {
     return userPerms.includes(permissions.ALL) || userPerms.includes(perm);
   };
 
+  // ---- Role helpers ----
+  // role string ba object (name/slug/key) duto-i handle kore
+  const roleValue = authState?.user?.role;
+  const roleName = String(
+    typeof roleValue === "string"
+      ? roleValue
+      : roleValue?.name || roleValue?.slug || roleValue?.key || "",
+  )
+    .toLowerCase()
+    .trim();
+  const isStaff = roleName === roles.STAFF;
+
+  // Staff: shudhu view. Baki role-er jonno permission check.
+  const canViewPurchases =
+    isStaff || hasPermission(permissions.CAN_VIEW_PURCHASES);
+  const canCreatePurchases =
+    !isStaff && hasPermission(permissions.CAN_CREATE_PURCHASES);
+  const canEditPurchases =
+    !isStaff && hasPermission(permissions.CAN_EDIT_PURCHASES);
+  const canCancelPurchases =
+    !isStaff && hasPermission(permissions.CAN_CANCEL_PURCHASES);
+
   const storeSettings = authState?.user?.store?.settings || {};
   const isStockEnabled = !!storeSettings.stockManagement;
   const isPurchaseOrderEnabled = !!storeSettings.purchaseOrderManagement;
@@ -469,9 +491,20 @@ export const AuthProvider = ({ children }) => {
       isStockEnabled,
       isPurchaseOrderEnabled,
       isMrpEnabled,
-      hasCompletedOnboarding,
+      isStaff,
+      canViewPurchases,
+      canCreatePurchases,
+      canEditPurchases,
+      canCancelPurchases,
     }),
-    [authState, loading, subscription, usage, subLoading],
+    [
+      authState,
+      loading,
+      hasCompletedOnboarding,
+      subscription,
+      usage,
+      subLoading,
+    ],
   );
 
   return (
