@@ -19,10 +19,13 @@ import {
   MessageSquareHeart,
   LifeBuoy,
   ShieldCheck,
+  HandCoins,
+  ClipboardList,
 } from "lucide-react";
 
 // -----------------------------------------
 // Reports sub-items (single source of truth)
+// hideForStaff: true  ->  role STAFF hole sidebar-e dekhabe na
 // -----------------------------------------
 export const reportSubItems = [
   {
@@ -74,6 +77,7 @@ export const reportSubItems = [
     icon: ShoppingCart,
     key: "purchase",
     requiresPurchaseOrder: true,
+    hideForStaff: true,
   },
   {
     title: "Creditors Report",
@@ -86,6 +90,12 @@ export const reportSubItems = [
     url: "/dashboard/reports/debtors",
     icon: UserCheck,
     key: "debtors",
+  },
+  {
+    key: "due-collection-report",
+    title: "Due Collection Report",
+    url: "/dashboard/reports/due-collection-report",
+    icon: HandCoins,
   },
 ];
 
@@ -106,6 +116,7 @@ export const sections = [
         url: "/dashboard/vendors",
         icon: Users,
         requiresPurchaseOrder: true,
+        hideForStaff: true,
       },
       { title: "Customers", url: "/dashboard/customers", icon: Users },
     ],
@@ -118,7 +129,9 @@ export const sections = [
         url: "/dashboard/purchase",
         icon: ShoppingCart,
         requiresPurchaseOrder: true,
+        hideForStaff: true,
       },
+      { title: "Orders", url: "/dashboard/orders", icon: ClipboardList },
       { title: "Sales", url: "/dashboard/sales", icon: Receipt },
       { title: "Other Expenses", url: "/dashboard/expenses", icon: Wallet },
     ],
@@ -179,12 +192,15 @@ export const sections = [
   },
 ];
 
+// isStaff default false, tai jekhane isStaff pass kora hoy ni
+// (jemon purono call) segulo age-er moto-i kaj korbe.
 export function isItemVisible(
   item,
-  { isStockEnabled, isPurchaseOrderEnabled },
+  { isStockEnabled, isPurchaseOrderEnabled, isStaff = false },
 ) {
   if (item.requiresStock && !isStockEnabled) return false;
   if (item.requiresPurchaseOrder && !isPurchaseOrderEnabled) return false;
+  if (item.hideForStaff && isStaff) return false;
   return true;
 }
 

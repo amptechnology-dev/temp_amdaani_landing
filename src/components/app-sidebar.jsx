@@ -42,6 +42,7 @@ const user = { name: "AMDAANI", email: "m@example.com" };
 
 // STAFF role-er jonno ei item gulo sidebar-e dekhabe na.
 // Item-er url ba title e ei word thakle hide hobe.
+// (Vendors / Purchase navigation.js-e `hideForStaff: true` diye handle kora)
 const STAFF_HIDDEN_PATTERNS = [/staff/i, /login[-_\s]?activit/i];
 
 const isHiddenForStaff = (item) =>
@@ -54,7 +55,7 @@ export function AppSidebar({ ...props }) {
   const router = useRouter();
   const { isStockEnabled, isPurchaseOrderEnabled, isStaff } = useAuth();
 
-  const flags = { isStockEnabled, isPurchaseOrderEnabled };
+  const flags = { isStockEnabled, isPurchaseOrderEnabled, isStaff };
 
   const canSee = React.useCallback(
     (item) => isItemVisible(item, flags) && !(isStaff && isHiddenForStaff(item)),
