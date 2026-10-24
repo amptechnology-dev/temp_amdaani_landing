@@ -114,6 +114,9 @@ export default function SalesFlow() {
   const [editInvoiceStoredata, setEditInvoiceStoredata] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sourceOrderId, setSourceOrderId] = useState(null);
+  // Order-er original customer id — user form-e customer field edit korle
+  // selectedCustomer._id clear hoye jay, tai eta alada rakha hoy.
+  const [sourceCustomerId, setSourceCustomerId] = useState(null);
 
   const isIgst = useMemo(() => {
     return determineGstType(
@@ -402,6 +405,7 @@ export default function SalesFlow() {
 
   const resetFormState = async () => {
     setSourceOrderId(null);
+    setSourceCustomerId(null);
     setSelectedCustomer(null);
     setCartItems([]);
     setPaidAmount(0);
@@ -470,8 +474,12 @@ export default function SalesFlow() {
       }
 
       const st = String(order.status || "").toLowerCase();
-      if (st === "invoiced" || st === "delivered") {
-        toast.error("This order is already invoiced");
+      if (st !== "approved") {
+        toast.error(
+          st === "invoiced" || st === "delivered"
+            ? "This order is already invoiced"
+            : "Order must be approved before creating an invoice",
+        );
         return;
       }
 
@@ -502,6 +510,8 @@ export default function SalesFlow() {
               mobile: order.customerMobile || "",
             },
       );
+      // Original customer id preserve kore rakho
+      setSourceCustomerId(custId ? String(custId) : null);
 
       const orderItems = await Promise.all(
         (order.items || []).map(buildCartItemFromOrderItem),
@@ -599,6 +609,7 @@ export default function SalesFlow() {
 
   const handleBackToList = () => {
     setSourceOrderId(null);
+    setSourceCustomerId(null);
     setStep("list");
   };
 
@@ -752,10 +763,11 @@ export default function SalesFlow() {
         res = await api.put(`/invoice/id/${existingInvoiceId}`, invoiceData);
       } else if (sourceOrderId) {
         // ✅ Order theke invoice: /order/create-invoice/:orderId
+        // NOTE: `invoiceDate` ekhane pathano hocche na — normal invoice-er
+        // moto backend nijei date set kore. (ISO string validator-e fail korchilo.)
         res = await api.post(`/order/create-invoice/${sourceOrderId}`, {
           ...invoiceData,
-          customer: selectedCustomer._id || undefined,
-          invoiceDate: new Date().toISOString(),
+          customer: selectedCustomer._id || sourceCustomerId || undefined,
           status: "active",
         });
       } else {
@@ -763,7 +775,10 @@ export default function SalesFlow() {
       }
 
       // Order theke invoice hoye gele abar same order-e duplicate invoice na hoy
-      if (sourceOrderId) setSourceOrderId(null);
+      if (sourceOrderId) {
+        setSourceOrderId(null);
+        setSourceCustomerId(null);
+      }
 
       const createdDoc = res?.data?.invoice || res?.data;
       const savedInvoiceId = isEditMode ? existingInvoiceId : createdDoc?._id;

@@ -17,6 +17,8 @@ import {
   Truck,
   FileText,
   Repeat,
+  CheckCircle2,
+  User,
 } from "lucide-react";
 
 import api from "../../utils/api";
@@ -48,8 +50,20 @@ const STATUS_META = {
   delivered: { label: "Delivered", cls: "bg-green-600 text-white" },
 };
 
-// Ei status gulo-te order edit / invoice create kora jay
+// Ei status gulo-te order edit kora jay
 const EDITABLE_STATUS = ["order_taken", "approved"];
+
+// Sudhu approved order theke invoice create kora jay
+const INVOICEABLE_STATUS = ["approved"];
+
+// Manually je status-e jawa jay (backend statusFlow-er sathe match).
+// "invoiced" kokhono manual na — invoice create korle automatically hoy.
+const NEXT_STATUS = {
+  order_taken: ["approved"],
+  approved: [],
+  invoiced: ["delivered"],
+  delivered: [],
+};
 
 // ── helpers ─────────────────────────────────────────────────────────────
 const currency = (v) => `₹${Number(v || 0).toFixed(2)}`;
@@ -75,11 +89,17 @@ const getCustomerName = (o) =>
 const getCustomerMobile = (o) =>
   o?.customerMobile || o?.customerDetails?.mobile || o?.customer?.mobile || "";
 
+// Kon user order-ta nilo
+const getCreatedByName = (o) => o?.createdBy?.name || "-";
+
 // Delivered hole actual date, noile expected delivery date
 const getDeliveryDate = (o) => o?.actualDeliveryDate || o?.deliveryDate;
 
 const getItemName = (it) =>
   it?.name || (typeof it?.product === "object" ? it?.product?.name : "") || "-";
+
+// Purono order-e productPrice na thakle order price-i dekhabo
+const getItemProductPrice = (it) => Number(it?.productPrice ?? it?.sellingPrice ?? 0);
 
 const getOrderTotal = (o) => {
   const direct = o?.grandTotal ?? o?.totalAmount ?? o?.total;
@@ -102,7 +122,7 @@ const STATUS_FILTERS = ORDER_STATUS.map((s) => ({
 
 // ── Status change dialog ────────────────────────────────────────────────
 function StatusDialog({ open, onClose, order, saving, onSubmit }) {
-  const [status, setStatus] = useState("order_taken");
+  const [status, setStatus] = useState(null);
   const [form, setForm] = useState({
     deliveredBy: "",
     challanNo: "",
@@ -113,7 +133,7 @@ function StatusDialog({ open, onClose, order, saving, onSubmit }) {
 
   useEffect(() => {
     if (!open || !order) return;
-    setStatus(getStatus(order));
+    setStatus(null);
     setForm({
       deliveredBy: order.deliveredBy || "",
       challanNo: order.challanNo || "",
@@ -125,11 +145,18 @@ function StatusDialog({ open, onClose, order, saving, onSubmit }) {
 
   if (!order) return null;
 
+  const current = getStatus(order);
+  const allowed = NEXT_STATUS[current] || [];
+
   const setField = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
 
   const submit = () => {
-    if (status === getStatus(order) && status !== "delivered") {
-      toast.info("Please select a different status");
+    if (!status) {
+      toast.info("Please select a status");
+      return;
+    }
+    if (!allowed.includes(status)) {
+      toast.error("This status change is not allowed");
       return;
     }
     const payload = { status };
@@ -159,21 +186,39 @@ function StatusDialog({ open, onClose, order, saving, onSubmit }) {
 
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-2">
-            {ORDER_STATUS.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setStatus(s)}
-                className={`h-10 rounded-lg border text-sm font-semibold transition-colors ${
-                  status === s
-                    ? "bg-blue-600 border-blue-600 text-white"
-                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                {STATUS_META[s].label}
-              </button>
-            ))}
+            {ORDER_STATUS.map((s) => {
+              const isCurrent = s === current;
+              const isAllowed = allowed.includes(s);
+              const isSelected = status === s;
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  disabled={!isAllowed}
+                  onClick={() => setStatus(s)}
+                  className={`h-10 rounded-lg border text-sm font-semibold transition-colors ${
+                    isSelected
+                      ? "bg-blue-600 border-blue-600 text-white"
+                      : isCurrent
+                        ? "bg-slate-100 border-slate-300 text-slate-700 cursor-default"
+                        : isAllowed
+                          ? "border-slate-200 text-slate-600 hover:bg-slate-50"
+                          : "border-slate-100 text-slate-300 bg-slate-50/60 cursor-not-allowed"
+                  }`}
+                >
+                  {STATUS_META[s].label}
+                  {isCurrent && (
+                    <span className="ml-1 text-[10px] font-medium opacity-70">(current)</span>
+                  )}
+                </button>
+              );
+            })}
           </div>
+
+          <p className="text-xs text-slate-400 leading-relaxed">
+            "Invoiced" status manually set kora jay na — approved order theke invoice create
+            korle automatically hoy.
+          </p>
 
           {status === "delivered" && (
             <div className="grid grid-cols-2 gap-3">
@@ -244,7 +289,7 @@ function StatusDialog({ open, onClose, order, saving, onSubmit }) {
           </Button>
           <Button
             onClick={submit}
-            disabled={saving}
+            disabled={saving || !status}
             className="bg-blue-600 hover:bg-blue-700 text-white"
           >
             {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
@@ -285,6 +330,7 @@ export default function OrderListPage({
         !q ||
         getCustomerName(o).toLowerCase().includes(q) ||
         getCustomerMobile(o).includes(q) ||
+        getCreatedByName(o).toLowerCase().includes(q) ||
         String(o.orderNumber || "").toLowerCase().includes(q);
       if (!matchesSearch) return false;
       if (statusFilter !== "all" && getStatus(o) !== statusFilter) return false;
@@ -345,6 +391,8 @@ export default function OrderListPage({
 
   const detailStatus = getStatus(detail);
   const canEditDetail = EDITABLE_STATUS.includes(detailStatus);
+  const canInvoiceDetail = INVOICEABLE_STATUS.includes(detailStatus);
+  const canChangeStatus = (NEXT_STATUS[detailStatus] || []).length > 0;
 
   return (
     <div className="min-h-screen p-3 md:p-4 bg-slate-50">
@@ -380,7 +428,7 @@ export default function OrderListPage({
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
-            placeholder="Search by customer, phone or order number…"
+            placeholder="Search by customer, phone, order number or created by…"
             className="pl-9 h-9 text-sm rounded-lg"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -466,6 +514,7 @@ export default function OrderListPage({
                   <th className="text-left font-semibold px-3 py-2 w-8">#</th>
                   <th className="text-left font-semibold px-3 py-2">Order #</th>
                   <th className="text-left font-semibold px-3 py-2">Customer</th>
+                  <th className="text-left font-semibold px-3 py-2">Created By</th>
                   <th className="text-left font-semibold px-3 py-2">Order Date</th>
                   <th className="text-left font-semibold px-3 py-2">Delivery Date</th>
                   <th className="text-center font-semibold px-3 py-2">Status</th>
@@ -500,6 +549,12 @@ export default function OrderListPage({
                             {getCustomerMobile(o)}
                           </div>
                         )}
+                      </td>
+                      <td className="px-3 py-2 text-slate-600 text-sm align-middle whitespace-nowrap">
+                        <span className="flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5 text-slate-400" />
+                          {getCreatedByName(o)}
+                        </span>
                       </td>
                       <td className="px-3 py-2 text-slate-500 text-sm align-middle whitespace-nowrap">
                         <span className="flex items-center gap-1.5">
@@ -596,9 +651,29 @@ export default function OrderListPage({
                 <Pencil className="w-3.5 h-3.5 mr-1.5" />
                 Edit
               </Button>
+
+              {/* Quick approve — sudhu order_taken hole */}
+              {detailStatus === "order_taken" && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={statusSaving}
+                  onClick={() => handleStatusSubmit({ status: "approved" })}
+                  className="text-green-700 border-green-200 hover:bg-green-50"
+                >
+                  {statusSaving ? (
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                  )}
+                  Approve
+                </Button>
+              )}
+
               <Button
                 size="sm"
                 variant="outline"
+                disabled={!canChangeStatus}
                 onClick={() => setStatusOpen(true)}
                 className="text-purple-600 border-purple-200 hover:bg-purple-50"
               >
@@ -607,7 +682,7 @@ export default function OrderListPage({
               </Button>
               <Button
                 size="sm"
-                disabled={!canEditDetail}
+                disabled={!canInvoiceDetail}
                 onClick={() => handleCreateInvoice(detail._id)}
                 className="bg-blue-600 hover:bg-blue-700 text-white"
               >
@@ -615,6 +690,12 @@ export default function OrderListPage({
                 Create Invoice
               </Button>
             </div>
+
+            {detail && detailStatus === "order_taken" && (
+              <p className="text-xs text-amber-600">
+                Invoice can possiable after approaved order
+              </p>
+            )}
           </DialogHeader>
 
           {detail && (
@@ -624,6 +705,8 @@ export default function OrderListPage({
                 <Info label="Mobile" value={safe(getCustomerMobile(detail))} />
                 <Info label="Order Date" value={fmtDate(detail.orderDate || detail.createdAt)} />
                 <Info label="Delivery Date" value={fmtDate(getDeliveryDate(detail))} />
+                <Info label="Created By" value={safe(detail.createdBy?.name)} />
+                <Info label="Created At" value={fmtDate(detail.createdAt)} />
               </div>
 
               {detailStatus === "delivered" && (
@@ -646,7 +729,8 @@ export default function OrderListPage({
                         <th className="text-left font-semibold px-4 py-2.5 w-10">#</th>
                         <th className="text-left font-semibold px-4 py-2.5">Product</th>
                         <th className="text-right font-semibold px-4 py-2.5">Qty</th>
-                        <th className="text-right font-semibold px-4 py-2.5">Price</th>
+                        <th className="text-right font-semibold px-4 py-2.5">Product Price</th>
+                        <th className="text-right font-semibold px-4 py-2.5">Order Price</th>
                         <th className="text-right font-semibold px-4 py-2.5">Total</th>
                       </tr>
                     </thead>
@@ -660,7 +744,10 @@ export default function OrderListPage({
                           <td className="px-4 py-2.5 text-right text-slate-600">
                             {Number(it.quantity || 0)}
                           </td>
-                          <td className="px-4 py-2.5 text-right text-slate-600">
+                          <td className="px-4 py-2.5 text-right text-slate-500">
+                            {currency(getItemProductPrice(it))}
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-slate-700 font-medium">
                             {currency(it.sellingPrice)}
                           </td>
                           <td className="px-4 py-2.5 text-right font-semibold text-blue-600">
@@ -671,7 +758,7 @@ export default function OrderListPage({
                     </tbody>
                     <tfoot>
                       <tr className="bg-slate-50 font-semibold text-slate-800">
-                        <td colSpan={4} className="px-4 py-3 text-right">
+                        <td colSpan={5} className="px-4 py-3 text-right">
                           TOTAL
                         </td>
                         <td className="px-4 py-3 text-right">

@@ -898,6 +898,7 @@ export default function NewInvoiceFormPage({
   const [chargeName, setChargeName] = useState("");
   const [chargeAmount, setChargeAmount] = useState("");
   const [quickReceivedAmount, setQuickReceivedAmount] = useState("");
+  const [isEditingReceived, setIsEditingReceived] = useState(false);
 
   const handleAddCharge = () => {
     if (!chargeName.trim() || !chargeAmount || Number(chargeAmount) <= 0)
@@ -915,18 +916,32 @@ export default function NewInvoiceFormPage({
     setAdditionalCharges?.((prev) => (prev || []).filter((c) => c.id !== id));
   };
 
+  const handleQuickReceivedFocus = (e) => {
+    if (!hasCustomer) {
+      e.target.blur();
+      setShowCustomerRequiredModal(true);
+      return;
+    }
+    setIsEditingReceived(true);
+    setQuickReceivedAmount(paidAmount ? String(paidAmount) : "");
+    e.target.select();
+  };
+
   const handleQuickReceivedChange = (e) => {
     let v = e.target.value.replace(/[^\d.]/g, "");
     const parts = v.split(".");
     if (parts.length > 2) v = parts[0] + "." + parts.slice(1).join("");
+
+    const cap = invoiceCalculations.netTotal || 0;
+    if (Number(v) > cap) v = String(cap);
+
     setQuickReceivedAmount(v);
+    setPaidAmount(Number(v) || 0);
   };
 
   const handleQuickReceivedBlur = () => {
-    const cap = invoiceCalculations.netTotal || 0;
-    const n = Math.min(Number(quickReceivedAmount) || 0, cap);
-    setPaidAmount(n);
-    setQuickReceivedAmount(n > 0 ? String(n) : "");
+    setIsEditingReceived(false);
+    setQuickReceivedAmount("");
   };
 
   useEffect(() => {
@@ -1660,16 +1675,14 @@ export default function NewInvoiceFormPage({
                         </label>
                         <input
                           value={
-                            quickReceivedAmount ||
-                            (paidAmount ? String(paidAmount) : "")
+                            isEditingReceived
+                              ? quickReceivedAmount
+                              : paidAmount
+                                ? String(paidAmount)
+                                : ""
                           }
                           onChange={handleQuickReceivedChange}
-                          onFocus={(e) => {
-                            if (!hasCustomer) {
-                              e.target.blur();
-                              setShowCustomerRequiredModal(true);
-                            }
-                          }}
+                          onFocus={handleQuickReceivedFocus}
                           onBlur={handleQuickReceivedBlur}
                           readOnly={!hasCustomer}
                           inputMode="decimal"

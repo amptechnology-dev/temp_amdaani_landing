@@ -52,6 +52,14 @@ export default function OrdersFlow() {
     }
   };
 
+  const handleCustomerCreated = (newCustomer) => {
+    if (!newCustomer?._id) return;
+    setCustomers((prev) => [
+      newCustomer,
+      ...prev.filter((c) => c._id !== newCustomer._id),
+    ]);
+  };
+
   useEffect(() => {
     fetchOrders();
     fetchCustomers();
@@ -128,6 +136,7 @@ export default function OrdersFlow() {
         nextOrderNumber={nextOrderNumber}
         onBack={handleBack}
         onSaved={handleSaved}
+        onCustomerCreated={handleCustomerCreated}
       />
     );
   }
