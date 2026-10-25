@@ -26,8 +26,7 @@ function determineGstType(storeGst, vendorGst, storeState, vendorState) {
 }
 
 export default function PurchaseFlow() {
-  // step: "list" | "form" | "items"
-  const { isMrpEnabled } = useAuth();
+  const { isMrpEnabled, canCreatePurchases, canEditPurchases } = useAuth();
   const [step, setStep] = useState("list");
   const [purchaseRefreshKey, setPurchaseRefreshKey] = useState(0);
 
@@ -44,6 +43,7 @@ export default function PurchaseFlow() {
   const [discount, setDiscount] = useState({ type: "flat", value: 0 });
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [paymentNote, setPaymentNote] = useState("");
+  const [remarks, setRemarks] = useState("");
   const [paidAmount, setPaidAmount] = useState(0);
   const hasUserEditedPaid = useRef(false);
 
@@ -288,6 +288,10 @@ export default function PurchaseFlow() {
     setSelectedVendor(null);
     setCartItems([]);
     setPaidAmount(0);
+    setRemarks("");
+    setPaymentMethod("cash");
+    setPaymentNote("");
+    setDiscount({ type: "flat", value: 0 });
     hasUserEditedPaid.current = false;
     setIsEditMode(false);
     setExistingPurchaseId(null);
@@ -299,6 +303,7 @@ export default function PurchaseFlow() {
   };
 
   const handleStartNewPurchase = async () => {
+    if (!canCreatePurchases) return;
     setIsFormLoading(true);
     await resetFormState();
     setIsFormLoading(false);
@@ -357,6 +362,9 @@ export default function PurchaseFlow() {
       });
       setPaidAmount(Number(full.amountPaid ?? full.grandTotal ?? 0));
       hasUserEditedPaid.current = true;
+      setRemarks(full.remarks || "");
+      setPaymentMethod(full.paymentMethod || "cash");
+      setPaymentNote(full.paymentNote || "");
       setIsEditMode(true);
     } catch {
       toast.error("Failed to load purchase for editing");
@@ -445,7 +453,10 @@ export default function PurchaseFlow() {
   // Create / Update
   // -------------------------------
   const handleCreatePurchase = async () => {
-    // ✅ vendor mandatory na — shudhu cart empty check thakbe
+    if (isEditMode ? !canEditPurchases : !canCreatePurchases) {
+      toast.error("Permission denied");
+      return null;
+    }
     if (cartItems.length === 0) return null;
 
     const isValidObjectId = (id) => /^[0-9a-fA-F]{24}$/.test(String(id || ""));
@@ -524,6 +535,7 @@ export default function PurchaseFlow() {
         paymentStatus,
         paymentMethod,
         paymentNote: paymentNote || "",
+        remarks: remarks || "",
       };
 
       const res = isEditMode
@@ -633,6 +645,9 @@ export default function PurchaseFlow() {
       onRefreshProducts={fetchAllProducts}
       discount={discount}
       setDiscount={setDiscount}
+      remarks={remarks}
+      setRemarks={setRemarks}
+
     />
   );
 }

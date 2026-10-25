@@ -558,7 +558,7 @@ function StoreSwitchModal({ open, onClose, theme }) {
 
 export default function Topbar({ theme, pageTitle }) {
   const { theme: currentTheme, toggleTheme } = useTheme();
-  const { user, logout } = useAuth();
+  const { user, logout, isStaff } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -785,16 +785,6 @@ export default function Topbar({ theme, pageTitle }) {
                 >
                   <User size={15} className={theme.textSecondary} />
                   Profile
-                </button>
-                <button
-                  onClick={() => {
-                    setShowUserMenu(false);
-                    setShowStoreSwitch(true);
-                  }}
-                  className={`w-[calc(100%-8px)] flex items-center gap-2.5 text-left px-3.5 py-2 rounded-lg mx-1 hover:${theme.surfaceVariant} ${theme.text} text-[13px] font-medium transition-colors cursor-pointer`}
-                >
-                  <Repeat size={15} className={theme.textSecondary} />
-                  Switch Store
                 </button>
                 <button
                   onClick={() => {

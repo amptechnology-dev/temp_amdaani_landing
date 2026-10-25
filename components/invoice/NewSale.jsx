@@ -113,6 +113,10 @@ export default function SalesFlow() {
   const [afterStoredata, setAfterStoredata] = useState({});
   const [editInvoiceStoredata, setEditInvoiceStoredata] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [sourceOrderId, setSourceOrderId] = useState(null);
+  // Order-er original customer id — user form-e customer field edit korle
+  // selectedCustomer._id clear hoye jay, tai eta alada rakha hoy.
+  const [sourceCustomerId, setSourceCustomerId] = useState(null);
 
   const isIgst = useMemo(() => {
     return determineGstType(
@@ -400,6 +404,8 @@ export default function SalesFlow() {
   }, [allProducts, isEditMode]);
 
   const resetFormState = async () => {
+    setSourceOrderId(null);
+    setSourceCustomerId(null);
     setSelectedCustomer(null);
     setCartItems([]);
     setPaidAmount(0);
@@ -423,17 +429,118 @@ export default function SalesFlow() {
     setStep("form");
   };
 
+  // Order-er ek ta item ke cart item-e convert kore
+  const buildCartItemFromOrderItem = async (it) => {
+    const prodObj =
+      it.product && typeof it.product === "object" ? it.product : null;
+    const productId = String(prodObj?._id || it.product || it.productId || "");
+
+    let p = prodObj || allProducts.find((x) => x._id === productId);
+    if (!p && productId) {
+      try {
+        const r = await api.get(`/product/id/${productId}`);
+        p = r?.data?.data || r?.data;
+      } catch {
+        /* silent */
+      }
+    }
+    p = p || {};
+
+    return {
+      _id: productId || `${it.name}-${Math.random()}`,
+      name: it.name || p.name || "Item",
+      sellingPrice: Number(it.sellingPrice ?? p.sellingPrice ?? 0),
+      gstRate: Number(it.gstRate ?? p.gstRate ?? 0),
+      isTaxInclusive: Boolean(it.isTaxInclusive ?? p.isTaxInclusive ?? false),
+      unit: it.unit || p.unit || "PCS",
+      hsn: it.hsn || p.hsn || "",
+      mrp: Number(it.mrp ?? p.mrp ?? 0),
+      discount: 0,
+      discountType: "amount",
+      qty: Number(it.quantity ?? it.qty ?? 0),
+    };
+  };
+
+  const handleStartFromOrder = async (orderId) => {
+    setIsFormLoading(true);
+    try {
+      await resetFormState();
+
+      const res = await api.get(`/order/id/${orderId}`);
+      const order = res?.data?.data || res?.data;
+      if (!order) {
+        toast.error("Order not found");
+        return;
+      }
+
+      const st = String(order.status || "").toLowerCase();
+      if (st !== "approved") {
+        toast.error(
+          st === "invoiced" || st === "delivered"
+            ? "This order is already invoiced"
+            : "Order must be approved before creating an invoice",
+        );
+        return;
+      }
+
+      // Customer resolve (populated object / customers list / API)
+      let customer =
+        order.customer && typeof order.customer === "object"
+          ? order.customer
+          : null;
+      const custId = customer?._id || order.customer;
+
+      if (!customer) customer = customers.find((c) => c._id === custId) || null;
+      if (!customer && custId) {
+        try {
+          const r = await api.get("/customer?limit=500");
+          customer =
+            (r?.data?.docs || []).find((c) => c._id === custId) || null;
+        } catch {
+          /* silent */
+        }
+      }
+
+      setSelectedCustomer(
+        customer
+          ? { ...customer }
+          : {
+              _id: custId,
+              name: order.customerName || "",
+              mobile: order.customerMobile || "",
+            },
+      );
+      // Original customer id preserve kore rakho
+      setSourceCustomerId(custId ? String(custId) : null);
+
+      const orderItems = await Promise.all(
+        (order.items || []).map(buildCartItemFromOrderItem),
+      );
+      setCartItems(orderItems);
+      setRemarks(`Created from order ${order.orderNumber || ""}`.trim());
+      setSourceOrderId(order._id);
+
+      // Sob data ready hoye gele tarpor form dekhao
+      setStep("form");
+    } catch {
+      toast.error("Failed to load order");
+    } finally {
+      setIsFormLoading(false);
+    }
+  };
+
   const autoStartHandledRef = useRef(false);
 
   useEffect(() => {
     if (autoStartHandledRef.current) return;
+    const orderId = searchParams.get("fromOrder");
     const shouldAutoStart = searchParams.get("new") === "true";
-    if (!shouldAutoStart) return;
+    if (!orderId && !shouldAutoStart) return;
 
     autoStartHandledRef.current = true;
-    handleStartNewInvoice();
+    if (orderId) handleStartFromOrder(orderId);
+    else handleStartNewInvoice();
     router.replace("/dashboard/sales");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   const handleEditInvoice = async (invoiceId, targetStep = "form") => {
@@ -500,7 +607,11 @@ export default function SalesFlow() {
     }
   };
 
-  const handleBackToList = () => setStep("list");
+  const handleBackToList = () => {
+    setSourceOrderId(null);
+    setSourceCustomerId(null);
+    setStep("list");
+  };
 
   const addToCart = (product) => {
     setCartItems((prev) => {
@@ -589,10 +700,6 @@ export default function SalesFlow() {
     try {
       const finalGrandTotal = Number(invoiceCalculations.netTotal || 0);
 
-      // ✅ race-condition fix — submit-er thik muhurte netTotal/paidAmount
-      // shorasori use koro, stale `payment` memoized object er upor bhorosa
-      // na kore (item/discount ekhoni edit kore turant Create Invoice
-      // click korle useEffect tokhono paidAmount sync kore ni thakte pare).
       const finalPaid = hasUserEditedPaid.current
         ? Math.min(Math.max(0, Number(paidAmount) || 0), finalGrandTotal)
         : finalGrandTotal;
@@ -616,6 +723,7 @@ export default function SalesFlow() {
         isIgst,
         items: invoiceCalculations.computedItems.map((item) => ({
           productId: item._id,
+          product: item._id, // order-create-invoice API `product` field-o expect kore
           name: item.name,
           hsn: item.hsn || "",
           unit: item.unit || "PCS",
@@ -623,10 +731,6 @@ export default function SalesFlow() {
           gstRate: item.gstRate,
           isTaxInclusive: !!item.isTaxInclusive,
           quantity: item.qty,
-          // ✅ FIX: shomoyi RUPEE-AMOUNT pathao, percent hok ba amount UI-te
-          // — exactly mobile-er moto. Backend discountType save kore na
-          // (access nei fix korar), tai eituku frontend-e resolve kore
-          // dile edit/view korar shomoy r kokhono mismatch hobe na.
           discount: item.discountInRupees,
           discountType: "amount",
           mrp: item.mrp > 0 ? item.mrp : null,
@@ -654,17 +758,37 @@ export default function SalesFlow() {
         remarks: remarks || "",
       };
 
-      const res = isEditMode
-        ? await api.put(`/invoice/id/${existingInvoiceId}`, invoiceData)
-        : await api.post("/invoice", invoiceData);
+      let res;
+      if (isEditMode) {
+        res = await api.put(`/invoice/id/${existingInvoiceId}`, invoiceData);
+      } else if (sourceOrderId) {
+        // ✅ Order theke invoice: /order/create-invoice/:orderId
+        // NOTE: `invoiceDate` ekhane pathano hocche na — normal invoice-er
+        // moto backend nijei date set kore. (ISO string validator-e fail korchilo.)
+        res = await api.post(`/order/create-invoice/${sourceOrderId}`, {
+          ...invoiceData,
+          customer: selectedCustomer._id || sourceCustomerId || undefined,
+          status: "active",
+        });
+      } else {
+        res = await api.post("/invoice", invoiceData);
+      }
 
-      const savedInvoiceId = isEditMode ? existingInvoiceId : res?.data?._id;
-      let freshInvoiceDoc = res.data;
+      // Order theke invoice hoye gele abar same order-e duplicate invoice na hoy
+      if (sourceOrderId) {
+        setSourceOrderId(null);
+        setSourceCustomerId(null);
+      }
+
+      const createdDoc = res?.data?.invoice || res?.data;
+      const savedInvoiceId = isEditMode ? existingInvoiceId : createdDoc?._id;
+      let freshInvoiceDoc = createdDoc;
 
       if (savedInvoiceId) {
         try {
           const freshRes = await api.get(`/invoice/id/${savedInvoiceId}`);
-          freshInvoiceDoc = freshRes?.data?.data || freshRes?.data || res.data;
+          freshInvoiceDoc =
+            freshRes?.data?.data || freshRes?.data || createdDoc;
         } catch (fetchErr) {
           console.error("Failed to fetch fresh invoice for preview:", fetchErr);
         }
@@ -704,11 +828,6 @@ export default function SalesFlow() {
       setInvoiceRefreshKey((k) => k + 1);
 
       return { html, printParams };
-
-      toast.success(isEditMode ? "Invoice updated!" : "Invoice created!");
-      setInvoiceRefreshKey((k) => k + 1);
-
-      return html;
     } catch {
       toast.error(
         isEditMode ? "Invoice update failed" : "Invoice creation failed",
@@ -719,7 +838,7 @@ export default function SalesFlow() {
     }
   };
 
- const handleSaveAndContinue = async () => {
+  const handleSaveAndContinue = async () => {
     const result = await handleCreateInvoice();
     if (!result) return null;
     await resetFormState();
@@ -730,6 +849,14 @@ export default function SalesFlow() {
     await resetFormState();
     setStep("list");
   };
+
+  if (isFormLoading && step === "list") {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (step === "list") {
     return (

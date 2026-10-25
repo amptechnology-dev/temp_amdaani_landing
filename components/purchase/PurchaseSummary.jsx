@@ -2,7 +2,14 @@
 
 import { useState, useRef } from "react";
 import { format } from "date-fns";
-import { FileText, Check, Loader2, Printer, MessageCircle, Download } from "lucide-react";
+import {
+  FileText,
+  Check,
+  Loader2,
+  Printer,
+  MessageCircle,
+  Download,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,12 +19,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+import { useAuth } from "../../context/AuthContext";
 import { generatePurchaseHTML } from "../../utils/purchaseTemplate";
 
 export default function PurchaseSummary({
   invoiceCalculations,
   paymentMethod,
   paymentNote,
+  remarks = "",
   handleCreatePurchase,
   onPurchaseModalClose,
   isLoading,
@@ -32,6 +41,12 @@ export default function PurchaseSummary({
   isMrpEnabled = true,
   submitLabel = "Create Purchase",
 }) {
+  const auth = useAuth();
+  const isEdit = submitLabel === "Update Purchase";
+  const canSubmit = isEdit
+    ? Boolean(auth?.canEditPurchases)
+    : Boolean(auth?.canCreatePurchases);
+
   const [previewHtml, setPreviewHtml] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [isCreatedPurchase, setIsCreatedPurchase] = useState(false);
@@ -42,38 +57,41 @@ export default function PurchaseSummary({
 
   const pageFormat = storedata?.settings?.printMode === "a5" ? "a5" : "a4";
 
+  // "yyyy-MM-dd" ke local date hishebe parse kore (UTC shift avoid)
+  const parseLocalDate = (value) => {
+    if (!value) return new Date();
+    const d = new Date(`${value}T00:00:00`);
+    return isNaN(d.getTime()) ? new Date() : d;
+  };
+
   const buildPreviewHtml = () => {
-  const now = new Date();
-  // ✅ FIX — use the user-selected purchaseDate for the printed date,
-  // keep "now" only for the printed time (matches invoice preview pattern)
-  const effectiveDate = purchaseDate ? new Date(purchaseDate) : now;
-  return generatePurchaseHTML({
-    // ✅ FIX (issue 1) — "Preview" ekhon `preview: true` pathay, tai
-    // store header (company logo/address/GSTIN), bank details + signature
-    // footer, ar invoice terms — kono kichui purchase create howar
-    // aage-r preview-e dekhabe na. Items, vendor details, totals ar
-    // Tax Summary thik moto dekhabe.
-    preview: true,
-    createdInvoice: false,
-    invoiceData: { paymentMethod, paymentNote },
-    formValues,
-    cartItems,
-    invoiceCalculations,
-    invoiceNumber: purchaseNumber,
-    currentDate: format(effectiveDate, "dd-MMM-yyyy"), // ✅ CHANGED — was format(now, ...)
-    currentTime: format(now, "hh:mm a"),
-    storedata,
-    invoiceDate: effectiveDate, // ✅ CHANGED — was: now
-    isGstInvoice,
-    isMrpEnabled,
-    pageFormat,
-    payment: {
-      paid: payment?.paid ?? 0,
-      due: payment?.due ?? 0,
-      status: payment?.status ?? "unpaid",
-    },
-  });
-};
+    const now = new Date();
+    const effectiveDate = parseLocalDate(purchaseDate);
+
+    return generatePurchaseHTML({
+      // preview: true → store header, bank details, signature, terms
+      // create howar aage preview-e dekhabe na
+      preview: true,
+      createdInvoice: false,
+      invoiceData: { paymentMethod, paymentNote, remarks },
+      formValues,
+      cartItems,
+      invoiceCalculations,
+      invoiceNumber: purchaseNumber,
+      currentDate: format(effectiveDate, "dd-MMM-yyyy"),
+      currentTime: format(now, "hh:mm a"),
+      storedata,
+      invoiceDate: effectiveDate,
+      isGstInvoice,
+      isMrpEnabled,
+      pageFormat,
+      payment: {
+        paid: payment?.paid ?? 0,
+        due: payment?.due ?? 0,
+        status: payment?.status ?? "unpaid",
+      },
+    });
+  };
 
   const handlePreview = () => {
     if (!cartItems?.length) return;
@@ -83,6 +101,13 @@ export default function PurchaseSummary({
   };
 
   const handleCreateClick = async () => {
+    if (!canSubmit) {
+      toast.error(
+        `Permission denied: you can't ${isEdit ? "edit" : "create"} purchases`,
+      );
+      return;
+    }
+
     try {
       setIsCreating(true);
       const html = await handleCreatePurchase();
@@ -94,7 +119,7 @@ export default function PurchaseSummary({
       setPreviewOpen(true);
     } catch (err) {
       console.error("Create purchase failed:", err);
-      toast.error("Purchase create korte problem hoyeche");
+      toast.error("Failed to save purchase");
     } finally {
       setIsCreating(false);
     }
@@ -228,12 +253,11 @@ export default function PurchaseSummary({
     try {
       setIsDownloading(true);
       const blob = await generatePdfBlob();
-      const filename = `Purchase-${purchaseNumber}.pdf`;
-      downloadBlob(blob, filename);
-      toast.success("Purchase PDF download successfully");
+      downloadBlob(blob, `Purchase-${purchaseNumber}.pdf`);
+      toast.success("Purchase PDF downloaded successfully");
     } catch (err) {
       console.error("Download error:", err);
-      toast.error("PDF download korte problem hoyeche");
+      toast.error("Failed to download PDF");
     } finally {
       setIsDownloading(false);
     }
@@ -247,10 +271,10 @@ export default function PurchaseSummary({
       formValues?.vendorNumber ||
       formValues?.vendorMobile ||
       "";
-    const phoneDigits = rawNumber.replace(/\D/g, "");
+    const phoneDigits = String(rawNumber).replace(/\D/g, "");
 
     if (!phoneDigits) {
-      toast.error("Ei bill-e vendor-er phone number pawa jayni");
+      toast.error("Vendor-er phone number pawa jayni");
       return;
     }
 
@@ -258,11 +282,20 @@ export default function PurchaseSummary({
       setSendingWhatsApp(true);
       const blob = await generatePdfBlob();
       const filename = `Purchase-${purchaseNumber}.pdf`;
+
+      // rounded final total use hobe (invoice-er total-er sathe milbe)
+      const finalTotal = Number(
+        payment?.grandTotal ??
+          invoiceCalculations?.roundedTotal ??
+          invoiceCalculations?.netTotal ??
+          0,
+      );
+
       const message = `Hello ${
         formValues?.vendorName || formValues?.partyName || "Vendor"
-      },\nHere is the purchase invoice #${purchaseNumber}.\nTotal Amount: ₹${
-        invoiceCalculations?.grandTotal ?? 0
-      }`;
+      },\nHere is the purchase invoice #${purchaseNumber}.\nTotal Amount: ₹${finalTotal.toFixed(
+        2,
+      )}`;
       const waNumber =
         phoneDigits.length === 10 ? `91${phoneDigits}` : phoneDigits;
 
@@ -278,7 +311,7 @@ export default function PurchaseSummary({
       }
 
       downloadBlob(blob, filename);
-      toast.success("Purchase PDF download successfully");
+      toast.success("PDF downloaded — WhatsApp-e attach kore pathan");
       window.open(
         `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`,
         "_blank",
@@ -307,31 +340,36 @@ export default function PurchaseSummary({
           Preview
         </Button>
 
-        <Button
-          onClick={handleCreateClick}
-          disabled={disabled || isLoading || isCreating}
-          className="flex-1"
-        >
-          {isLoading || isCreating ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              {submitLabel === "Update Purchase" ? "Updating..." : "Creating..."}
-            </>
-          ) : (
-            <>
-              <Check className="w-4 h-4 mr-2" />
-              {submitLabel}
-            </>
-          )}
-        </Button>
+        {canSubmit && (
+          <Button
+            onClick={handleCreateClick}
+            disabled={disabled || isLoading || isCreating}
+            className="flex-1"
+          >
+            {isLoading || isCreating ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                {isEdit ? "Updating..." : "Creating..."}
+              </>
+            ) : (
+              <>
+                <Check className="w-4 h-4 mr-2" />
+                {submitLabel}
+              </>
+            )}
+          </Button>
+        )}
       </div>
 
-      {/* ✅ REDESIGNED — same larger dialog + gray viewer frame as Invoice */}
       <Dialog open={previewOpen} onOpenChange={handleModalOpenChange}>
         <DialogContent className="max-w-5xl w-full h-[92vh] p-0 flex flex-col overflow-hidden gap-0">
           <DialogHeader className="px-5 py-3 border-b shrink-0 space-y-2.5">
             <DialogTitle className="text-base md:text-lg font-semibold text-slate-800">
-              {isCreatedPurchase ? "Purchase Created" : "Purchase Preview"}
+              {isCreatedPurchase
+                ? isEdit
+                  ? "Purchase Updated"
+                  : "Purchase Created"
+                : "Purchase Preview"}
             </DialogTitle>
 
             <div className="flex gap-2 flex-wrap">

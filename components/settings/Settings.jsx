@@ -13,7 +13,7 @@ import {
   ChevronRight,
   Settings as SettingsIcon,
 } from "lucide-react";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth, permissions } from "../../context/AuthContext";
 import api from "../../utils/api";
 
 // ---------------- Reusable UI bits ----------------
@@ -133,11 +133,9 @@ export default function Settings() {
     isMrpEnabled,
     fetchUserProfile,
     hasPermission,
-    permissions,
     updateAuthState,
+    isStaff,
   } = useAuth();
-
-  const appVersion = "1.0.0";
 
   const getCurrentEmail = () =>
     authState?.user?.email ||
@@ -150,6 +148,13 @@ export default function Settings() {
   const [stockLoading, setStockLoading] = useState(false);
   const [poLoading, setPoLoading] = useState(false);
   const [mrpLoading, setMrpLoading] = useState(false);
+
+  // ── Toast ──
+  const [toast, setToast] = useState(null);
+  const showToast = (type, text) => {
+    setToast({ type, text });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   const updateStoreSettings = async (patch, successMsg, setLoading) => {
     try {
@@ -196,24 +201,19 @@ export default function Settings() {
       setMrpLoading,
     );
 
-  // ── Toast ──
-  const [toast, setToast] = useState(null);
-  const showToast = (type, text) => {
-    setToast({ type, text });
-    setTimeout(() => setToast(null), 3000);
-  };
-
   // ── Change Email Modal ──
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   const [emailLoading, setEmailLoading] = useState(false);
 
   const openEmailModal = () => {
+    if (isStaff) return; // staff email change korte parbe na
     setNewEmail(getCurrentEmail());
     setEmailModalOpen(true);
   };
 
   const handleUpdateEmail = async () => {
+    if (isStaff) return showToast("error", "You can't change your email");
     if (!newEmail?.trim()) return showToast("error", "Email is required");
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(newEmail.trim()))
@@ -301,7 +301,8 @@ export default function Settings() {
     }
   };
 
-  const canManageSettings = hasPermission?.(permissions?.CAN_MANAGE_SETTINGS);
+  // `permissions` AuthContext theke direct import kora (context value-te chhilo na)
+  const canManageSettings = hasPermission?.(permissions.CAN_MANAGE_SETTINGS);
 
   return (
     <div className="h-full bg-slate-50/50 overflow-hidden">
@@ -371,15 +372,24 @@ export default function Settings() {
           {/* ── Account ── */}
           <SectionCard
             title="Account"
-            description="Update your login credentials"
+            description={
+              isStaff
+                ? "You can update your phone number"
+                : "Update your login credentials"
+            }
           >
+            {/* Email: staff-er jonno shudhu dekha jabe, edit na */}
             <SettingsRow
               icon={MailIcon}
-              title="Change Email"
+              title={isStaff ? "Email" : "Change Email"}
               description={getCurrentEmail() || "Update your email address"}
-              clickable
+              clickable={!isStaff}
               onClick={openEmailModal}
-              right={<ChevronRight size={16} className="text-slate-300" />}
+              right={
+                isStaff ? null : (
+                  <ChevronRight size={16} className="text-slate-300" />
+                )
+              }
             />
             <SettingsRow
               icon={Phone}
@@ -407,7 +417,7 @@ export default function Settings() {
 
       {/* ── Change Email Modal ── */}
       <Modal
-        open={emailModalOpen}
+        open={emailModalOpen && !isStaff}
         onClose={() => !emailLoading && setEmailModalOpen(false)}
         title="Change Email"
         subtitle="Update your email address below"

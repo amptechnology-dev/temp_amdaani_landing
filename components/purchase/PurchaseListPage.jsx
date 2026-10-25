@@ -22,6 +22,7 @@ import {
   MessageCircle,
   Download,
   Ban,
+  ShieldAlert,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,31 @@ import { useAuth } from "../../context/AuthContext";
 
 import { generatePurchaseHTML } from "../../utils/purchaseTemplate";
 
+function PermissionDeniedModal({ open, onOpenChange, action }) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+            <ShieldAlert className="w-5 h-5" />
+            Permission Denied
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            You don&apos;t have permission to {action || "perform this action"}.
+            You can only view purchases. Please contact your store owner for
+            access.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogAction onClick={() => onOpenChange(false)}>
+            Okay
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 const statusStyles = {
   paid: "bg-green-600 hover:bg-green-600 text-white",
   partial: "bg-orange-500 hover:bg-orange-500 text-white",
@@ -72,6 +98,13 @@ export default function PurchaseListPage({
   const auth = useAuth();
   const contextStoredata =
     auth?.storedata || auth?.store || auth?.storeData || null;
+
+  const canCreatePurchases = Boolean(auth?.canCreatePurchases);
+  const canEditPurchases = Boolean(auth?.canEditPurchases);
+  const canCancelPurchases = Boolean(auth?.canCancelPurchases);
+
+  const [showPermissionDenied, setShowPermissionDenied] = useState(false);
+  const [deniedAction, setDeniedAction] = useState("");
 
   const [purchases, setPurchases] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -341,7 +374,7 @@ export default function PurchaseListPage({
         vendorGstNumber: doc.vendorGstNumber,
       };
 
-      const dateObj = new Date(doc.date || doc.createdAt); 
+      const dateObj = new Date(doc.date || doc.createdAt);
 
       const html = generatePurchaseHTML({
         preview: false,
@@ -558,7 +591,9 @@ export default function PurchaseListPage({
       }
 
       downloadBlob(blob, filename);
-      toast.success("Purchase PDF download hoyeche — WhatsApp-e attach kore dao");
+      toast.success(
+        "Purchase PDF download hoyeche — WhatsApp-e attach kore dao",
+      );
       window.open(
         `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`,
         "_blank",
@@ -573,13 +608,29 @@ export default function PurchaseListPage({
     }
   };
 
+  const denyPermission = (action) => {
+    setDeniedAction(action);
+    setShowPermissionDenied(true);
+  };
+
+  const handleCreateClick = () => {
+    if (!canCreatePurchases) return denyPermission("create a purchase");
+    onCreateNew();
+  };
+
+  const handleEditClick = (id) => {
+    if (!canEditPurchases) return denyPermission("edit a purchase");
+    onEditPurchase(id);
+  };
+
   const handleEditFromPreview = () => {
-    if (!activePreviewId) return;
+    if (!activePreviewId || !canEditPurchases) return;
     setPreviewOpen(false);
     onEditPurchase(activePreviewId);
   };
 
   const handleCancelClick = () => {
+    if (!canCancelPurchases) return;
     setShowCancelConfirm(true);
   };
 
@@ -612,10 +663,12 @@ export default function PurchaseListPage({
           </h1>
           <p className="text-sm text-slate-400">Manage your vendor purchases</p>
         </div>
-        <Button onClick={onCreateNew} size="sm" className="text-sm h-9 px-4">
-          <Plus className="w-4 h-4 mr-1.5" />
-          New Purchase
-        </Button>
+        {canCreatePurchases && (
+          <Button onClick={onCreateNew} size="sm" className="text-sm h-9 px-4">
+            <Plus className="w-4 h-4 mr-1.5" />
+            New Purchase
+          </Button>
+        )}
       </div>
 
       {/* Search + limit */}
@@ -698,9 +751,11 @@ export default function PurchaseListPage({
             <p className="text-sm text-slate-400 max-w-xs mt-0.5 mb-3">
               {searchTerm
                 ? `No purchases match "${searchTerm}".`
-                : "Start by creating your first purchase."}
+                : canCreatePurchases
+                  ? "Start by creating your first purchase."
+                  : "No purchases have been recorded yet."}
             </p>
-            {!searchTerm && (
+            {!searchTerm && canCreatePurchases && (
               <Button onClick={onCreateNew} size="sm" className="text-sm h-9">
                 <Plus className="w-4 h-4 mr-1.5" />
                 New Purchase
@@ -713,9 +768,7 @@ export default function PurchaseListPage({
               <thead>
                 <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide border-b border-slate-200">
                   <th className="text-left font-semibold px-3 py-2 w-8">#</th>
-                  <th className="text-left font-semibold px-3 py-2">
-                    Vendor
-                  </th>
+                  <th className="text-left font-semibold px-3 py-2">Vendor</th>
                   <th className="text-left font-semibold px-3 py-2">Phone</th>
                   <th className="text-left font-semibold px-3 py-2">
                     Invoice #
@@ -724,12 +777,12 @@ export default function PurchaseListPage({
                   <th className="text-center font-semibold px-3 py-2">
                     Status
                   </th>
-                  <th className="text-right font-semibold px-3 py-2">
-                    Amount
-                  </th>
-                  <th className="text-center font-semibold px-3 py-2 w-20">
-                    Action
-                  </th>
+                  <th className="text-right font-semibold px-3 py-2">Amount</th>
+                  {canEditPurchases && (
+                    <th className="text-center font-semibold px-3 py-2 w-20">
+                      Action
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -797,26 +850,28 @@ export default function PurchaseListPage({
                       </span>
                     </td>
 
-                    <td
-                      className="px-3 py-2 text-center align-middle whitespace-nowrap"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 px-3 text-sm"
-                        onClick={() => onEditPurchase(p._id)}
+                    {canEditPurchases && (
+                      <td
+                        className="px-3 py-2 text-center align-middle whitespace-nowrap"
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        {previewLoadingId === p._id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <>
-                            <Pencil className="w-3.5 h-3.5 mr-1" />
-                            Edit
-                          </>
-                        )}
-                      </Button>
-                    </td>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 px-3 text-sm"
+                          onClick={() => onEditPurchase(p._id)}
+                        >
+                          {previewLoadingId === p._id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <>
+                              <Pencil className="w-3.5 h-3.5 mr-1" />
+                              Edit
+                            </>
+                          )}
+                        </Button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -871,28 +926,32 @@ export default function PurchaseListPage({
             </DialogTitle>
 
             <div className="flex gap-2 flex-wrap">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleEditFromPreview}
-                className="text-slate-700 border-slate-200 hover:bg-slate-50"
-              >
-                <Pencil className="w-3.5 h-3.5 mr-1.5" />
-                Edit
-              </Button>
+              {canEditPurchases && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleEditFromPreview}
+                  className="text-slate-700 border-slate-200 hover:bg-slate-50"
+                >
+                  <Pencil className="w-3.5 h-3.5 mr-1.5" />
+                  Edit
+                </Button>
+              )}
 
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleCancelClick}
-                disabled={activePreviewStatus === "cancelled"}
-                className="text-red-600 border-red-200 hover:bg-red-50 disabled:opacity-50"
-              >
-                <Ban className="w-3.5 h-3.5 mr-1.5" />
-                {activePreviewStatus === "cancelled"
-                  ? "Cancelled"
-                  : "Cancel Purchase"}
-              </Button>
+              {canCancelPurchases && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleCancelClick}
+                  disabled={activePreviewStatus === "cancelled"}
+                  className="text-red-600 border-red-200 hover:bg-red-50 disabled:opacity-50"
+                >
+                  <Ban className="w-3.5 h-3.5 mr-1.5" />
+                  {activePreviewStatus === "cancelled"
+                    ? "Cancelled"
+                    : "Cancel Purchase"}
+                </Button>
+              )}
 
               <Button
                 size="sm"
@@ -948,8 +1007,8 @@ export default function PurchaseListPage({
           <AlertDialogHeader>
             <AlertDialogTitle>Cancel Purchase?</AlertDialogTitle>
             <AlertDialogDescription>
-              Purchase #{activePreviewNumber} will be marked as cancelled.
-              This action can affect reports and cannot be easily undone.
+              Purchase #{activePreviewNumber} will be marked as cancelled. This
+              action can affect reports and cannot be easily undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

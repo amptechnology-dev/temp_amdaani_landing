@@ -4,7 +4,6 @@ import * as React from "react";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  LayoutDashboard,
   FileBarChart,
   Settings,
   LogOut,
@@ -41,16 +40,32 @@ import { sections, reportSubItems, isItemVisible } from "../lib/navigation";
 
 const user = { name: "AMDAANI", email: "m@example.com" };
 
+// STAFF role-er jonno ei item gulo sidebar-e dekhabe na.
+// Item-er url ba title e ei word thakle hide hobe.
+// (Vendors / Purchase navigation.js-e `hideForStaff: true` diye handle kora)
+const STAFF_HIDDEN_PATTERNS = [/staff/i, /login[-_\s]?activit/i];
+
+const isHiddenForStaff = (item) =>
+  STAFF_HIDDEN_PATTERNS.some(
+    (re) => re.test(item?.url || "") || re.test(item?.title || ""),
+  );
+
 export function AppSidebar({ ...props }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { isStockEnabled, isPurchaseOrderEnabled } = useAuth();
+  const { isStockEnabled, isPurchaseOrderEnabled, isStaff } = useAuth();
 
-  const flags = { isStockEnabled, isPurchaseOrderEnabled };
+  const flags = { isStockEnabled, isPurchaseOrderEnabled, isStaff };
+
+  const canSee = React.useCallback(
+    (item) => isItemVisible(item, flags) && !(isStaff && isHiddenForStaff(item)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isStockEnabled, isPurchaseOrderEnabled, isStaff],
+  );
 
   const visibleReportItems = React.useMemo(
-    () => reportSubItems.filter((item) => isItemVisible(item, flags)),
-    [isStockEnabled, isPurchaseOrderEnabled],
+    () => reportSubItems.filter(canSee),
+    [canSee],
   );
 
   const isReportsActive = pathname?.startsWith("/dashboard/reports");
@@ -93,9 +108,7 @@ export function AppSidebar({ ...props }) {
       {/* ---------------- NAV ---------------- */}
       <SidebarContent className="px-2.5 py-3 gap-0.5">
         {sections.map((section, sIdx) => {
-          const visibleItems = section.items.filter((item) =>
-            isItemVisible(item, flags),
-          );
+          const visibleItems = section.items.filter(canSee);
           const showReportsRow = section.label === "Reports & Insights";
           const hasReportsContent = showReportsRow;
 
@@ -188,17 +201,19 @@ export function AppSidebar({ ...props }) {
                                 <SidebarMenuSubButton
                                   onClick={() => router.push(item.url)}
                                   isActive={isSubActive}
-                                  className={`h-8 rounded-lg px-2.5 text-[13px] font-semibold transition-all duration-150 cursor-pointer border ${
+                                  className={`h-auto min-h-8 py-1.5 rounded-lg px-2.5 text-[13px] font-semibold transition-all duration-150 cursor-pointer border items-start ${
                                     isSubActive
                                       ? "bg-blue-50 text-blue-700 border-blue-200 shadow-sm"
                                       : "text-slate-600 border-transparent hover:bg-white hover:border-slate-200 hover:text-slate-900"
                                   }`}
                                 >
                                   <item.icon
-                                    className={`w-[15px] h-[15px] shrink-0 ${isSubActive ? "text-blue-600" : "text-slate-500"}`}
+                                    className={`w-[15px] h-[15px] shrink-0 mt-0.5 ${isSubActive ? "text-blue-600" : "text-slate-500"}`}
                                     strokeWidth={2.2}
                                   />
-                                  <span className="truncate">{item.title}</span>
+                                  <span className="whitespace-normal leading-snug">
+                                    {item.title}
+                                  </span>
                                 </SidebarMenuSubButton>
                               </SidebarMenuSubItem>
                             );
