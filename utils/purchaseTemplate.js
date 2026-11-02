@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import numberToWords from "number-to-words";
-
+import { formatQty } from "./qtyFormat";
 /* ============================================================
    Shared helpers (used by both A4 and A5 branches)
    ============================================================ */
@@ -227,7 +227,7 @@ function buildA5ItemsHTML(pageItems, startIndex, isGstInvoice, isMrpEnabled, isI
           <td class="c">${index + 1}</td>
           <td class="l"><div class="iname">${item.name}</div></td>
           <td class="c">${hsn}</td>
-          <td class="c">${qty}</td>
+          <td class="c">${formatQty(qty)}</td>
           <td class="c">${unit}</td>
           ${isMrpEnabled ? `<td class="r">₹${mrp.toFixed(2)}</td>` : ""}
           <td class="r">₹${costPrice.toFixed(2)}</td>
@@ -532,7 +532,7 @@ function generateA5PurchaseHTML({
       <td></td>
       <td class="l bold">${isLastPage ? "Total" : `Page ${pageNum} Total`}</td>
       <td></td>
-      <td class="c bold">${isLastPage ? totalQty : pageQty}</td>
+      <td class="c bold">${formatQty(isLastPage ? totalQty : pageQty)}</td>
       <td></td>
       ${isMrpEnabled ? "<td></td>" : ""}
       <td></td>
@@ -715,7 +715,7 @@ function generateA4PurchaseHTML({
         <div class="item-name">${item.name}</div>
         ${item.hsn ? `<div class="item-code">HSN: ${item.hsn}</div>` : ""}
       </td>
-      <td class="qty">${qty}</td>
+      <td class="qty">${formatQty(qty)}</td>
       <td class="unit">${item.unit || "PCS"}</td>
       ${isMrpEnabled ? `<td class="mrp">&#8377;${mrp ? mrp.toFixed(2) : "&#8212;"}</td>` : ""}
       <td class="rate">&#8377;${costPrice.toFixed(2)}</td>
@@ -1014,7 +1014,7 @@ function generateA4PurchaseHTML({
                     <tr class="summary-total-row" style="font-weight:bold; background:#f8f8f8;">
                       <td></td>
                       <td style="text-align:left;">Total</td>
-                      <td>${totalQty}</td>
+                      <td>${formatQty(totalQty)}</td>
                       <td></td>
                       ${isMrpEnabled ? `<td></td>` : ""}
                       <td></td>

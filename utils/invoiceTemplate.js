@@ -1,5 +1,6 @@
 import { format } from "date-fns";
 import numberToWords from "number-to-words";
+import { formatQty } from "./qtyFormat";
 
 // ── Per-item discount resolver (amount vs percent) ─────────────────────────
 function resolveItemDiscountInRupees(item) {
@@ -240,7 +241,7 @@ function buildA4Html(args, shared) {
           <div class="item-name">${item.name}</div>
           ${item.hsn ? `<div class="item-code">HSN: ${item.hsn}</div>` : ""}
         </td>
-        <td class="qty">${qty}</td>
+        <td class="qty">${formatQty(qty)}</td>
         <td class="unit">${item.unit || "PCS"}</td>
         ${
           isMrpEnabled
@@ -469,7 +470,7 @@ function buildA4Html(args, shared) {
                   <tr class="summary-total-row" style="font-weight:bold; background:#f8f8f8;">
                     <td></td>
                     <td style="text-align:left;">Total</td>
-                    <td>${totalQty}</td>
+                    <td>${formatQty(totalQty)}</td>
                     <td></td>
                     ${isMrpEnabled ? `<td></td>` : ""}
                     <td></td>
@@ -719,7 +720,7 @@ function buildItemsHTMLA5(cartItems, isGstInvoice, isMrpEnabled) {
           <td class="c">${index + 1}</td>
           <td class="l"><div class="iname">${item.name}</div></td>
           <td class="c">${hsn}</td>
-          <td class="c">${qty}</td>
+          <td class="c">${formatQty(qty)}</td>
           <td class="c">${item.unit || "PCS"}</td>
           ${isMrpEnabled ? `<td class="r">₹${Number(item.mrp || 0).toFixed(2)}</td>` : ""}
           <td class="r">₹${baseRate.toFixed(2)}</td>
@@ -956,7 +957,7 @@ function buildA5Html(args, shared) {
 
   const sumRow = `<tr class="sum-row">
     <td></td><td class="l bold">Total</td><td></td>
-    <td class="c bold">${totalQty}</td><td></td>
+    <td class="c bold">${formatQty(totalQty)}</td>
     ${isMrpEnabled ? "<td></td>" : ""}
     <td></td>
     <td class="r bold">₹${totalDiscount.toFixed(2)}</td>

@@ -13,6 +13,7 @@ import {
   CUT,
   feed,
 } from "./generateThermalInvoiceESCPOS";
+import { formatQty } from "./qtyFormat";
 
 // ─────────────────────────────────────────────────────────────────
 // KOT (Kitchen Order Ticket) — mirrors the RN app's generateKOTHTML.js
@@ -55,7 +56,7 @@ async function buildThermalKOTHTML({
             ${escapeHtml(item.name || "")}
             ${note ? `<br/><span class="note">${escapeHtml(note)}</span>` : ""}
           </td>
-          <td class="right nowrap">${qty}</td>
+          <td class="right nowrap">${formatQty(qty)}</td>
         </tr>`;
     })
     .join("");
@@ -223,7 +224,7 @@ async function buildThermalKOTHTML({
             <tr class="total-row">
               <td></td>
               <td class="right">Total Qty:</td>
-              <td class="right">${totalQty}</td>
+              <td class="right">${formatQty(totalQty)}</td>
             </tr>
           </tfoot>
         </table>

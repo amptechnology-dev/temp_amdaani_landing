@@ -2,8 +2,9 @@
 import { useTheme } from "../context/ThemeContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { themeConfig } from "../utils/ThemeConfig";
-import { Sun, Moon, Menu, X } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { Sun, Moon, Menu, X, ArrowRight } from "lucide-react";
+import { useState, useRef, useEffect, useId } from "react";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 
 const GoogleTranslate = dynamic(() => import("./GoogleTranslate"), {
@@ -11,20 +12,7 @@ const GoogleTranslate = dynamic(() => import("./GoogleTranslate"), {
 });
 
 const HERO_BUTTON_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/herobutton/public-hero-button`;
-
-function TranslateWidget() {
-  return (
-    <div
-      suppressHydrationWarning
-      className="flex items-center gap-1.5 px-2.5 h-9 rounded-full border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-visible min-w-[140px]"
-    >
-      <span className="text-[12px] leading-none flex-shrink-0">🌐</span>
-      <div className="translate-mini flex-1 min-w-0">
-        <GoogleTranslate />
-      </div>
-    </div>
-  );
-}
+const START_BILLING_ROUTE = "/auth";
 
 function IconHome() {
   return (
@@ -82,72 +70,51 @@ function IconContact() {
   );
 }
 
-// Play Store badge — same as before, untouched
-function PlayStoreBadge({ compact = false }) {
-  if (compact) {
-    return (
-      <div style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "6px",
-        background: "linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%)",
-        borderRadius: "10px",
-        padding: "5px 10px 5px 8px",
-        border: "1px solid rgba(255,255,255,0.15)",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
-        cursor: "pointer",
-        whiteSpace: "nowrap",
-      }}>
-        <svg width="18" height="18" viewBox="0 0 26 26" fill="none" style={{ flexShrink: 0 }}>
-          <defs>
-            <linearGradient id="c_tl" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#00E5FF" /><stop offset="1" stopColor="#2979FF" /></linearGradient>
-            <linearGradient id="c_bl" x1="0" y1="1" x2="1" y2="0"><stop stopColor="#00E676" /><stop offset="1" stopColor="#76FF03" /></linearGradient>
-            <linearGradient id="c_tr" x1="1" y1="0" x2="0" y2="1"><stop stopColor="#FF6D00" /><stop offset="1" stopColor="#FFAB00" /></linearGradient>
-            <linearGradient id="c_br" x1="1" y1="1" x2="0" y2="0"><stop stopColor="#FF1744" /><stop offset="1" stopColor="#FF6D00" /></linearGradient>
-          </defs>
-          <path d="M3 3L13.5 13L3 13V3Z" fill="url(#c_tl)" />
-          <path d="M3 23L13.5 13L3 13V23Z" fill="url(#c_bl)" />
-          <path d="M3 3L13.5 13L20 9.5L3 3Z" fill="url(#c_tr)" />
-          <path d="M3 23L13.5 13L20 16.5L3 23Z" fill="url(#c_br)" />
-          <path d="M20 9.5L13.5 13L20 16.5L23 13L20 9.5Z" fill="#FFD740" />
-        </svg>
-        <div style={{ display: "flex", flexDirection: "column", lineHeight: 1 }}>
-          <span style={{ color: "rgba(255,255,255,0.55)", fontSize: "7px", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" }}>GET IT ON</span>
-          <span style={{ color: "#fff", fontSize: "11px", fontWeight: 700, marginTop: "2px" }}>Google Play</span>
-        </div>
-      </div>
-    );
-  }
+// Play Store badge — slim, professional. size: "md" (desktop) | "sm" (mobile)
+function PlayStoreBadge({ size = "md" }) {
+  const uid = useId().replace(/:/g, "");
+  const isSmall = size === "sm";
 
   return (
-    <div style={{
-      display: "inline-flex",
-      alignItems: "center",
-      gap: "10px",
-      background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
-      borderRadius: "14px",
-      padding: "8px 16px 8px 12px",
-      border: "1px solid rgba(255,255,255,0.15)",
-      boxShadow: "0 4px 15px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)",
-      cursor: "pointer",
-      whiteSpace: "nowrap",
-    }}>
-      <svg width="26" height="26" viewBox="0 0 26 26" fill="none" style={{ flexShrink: 0 }}>
+    <div
+      className={`inline-flex items-center rounded-lg bg-slate-900 border border-slate-700/70 hover:bg-slate-800 hover:border-slate-600 transition-colors duration-200 cursor-pointer whitespace-nowrap ${
+        isSmall ? "h-9 gap-1.5 px-2.5" : "h-10 gap-2 px-3"
+      }`}
+    >
+      <svg
+        width={isSmall ? 16 : 20}
+        height={isSmall ? 16 : 20}
+        viewBox="0 0 26 26"
+        fill="none"
+        className="flex-shrink-0"
+      >
         <defs>
-          <linearGradient id="ps_tl" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#00E5FF" /><stop offset="1" stopColor="#2979FF" /></linearGradient>
-          <linearGradient id="ps_bl" x1="0" y1="1" x2="1" y2="0"><stop stopColor="#00E676" /><stop offset="1" stopColor="#76FF03" /></linearGradient>
-          <linearGradient id="ps_tr" x1="1" y1="0" x2="0" y2="1"><stop stopColor="#FF6D00" /><stop offset="1" stopColor="#FFAB00" /></linearGradient>
-          <linearGradient id="ps_br" x1="1" y1="1" x2="0" y2="0"><stop stopColor="#FF1744" /><stop offset="1" stopColor="#FF6D00" /></linearGradient>
+          <linearGradient id={`${uid}tl`} x1="0" y1="0" x2="1" y2="1"><stop stopColor="#00E5FF" /><stop offset="1" stopColor="#2979FF" /></linearGradient>
+          <linearGradient id={`${uid}bl`} x1="0" y1="1" x2="1" y2="0"><stop stopColor="#00E676" /><stop offset="1" stopColor="#76FF03" /></linearGradient>
+          <linearGradient id={`${uid}tr`} x1="1" y1="0" x2="0" y2="1"><stop stopColor="#FF6D00" /><stop offset="1" stopColor="#FFAB00" /></linearGradient>
+          <linearGradient id={`${uid}br`} x1="1" y1="1" x2="0" y2="0"><stop stopColor="#FF1744" /><stop offset="1" stopColor="#FF6D00" /></linearGradient>
         </defs>
-        <path d="M3 3L13.5 13L3 13V3Z" fill="url(#ps_tl)" />
-        <path d="M3 23L13.5 13L3 13V23Z" fill="url(#ps_bl)" />
-        <path d="M3 3L13.5 13L20 9.5L3 3Z" fill="url(#ps_tr)" />
-        <path d="M3 23L13.5 13L20 16.5L3 23Z" fill="url(#ps_br)" />
+        <path d="M3 3L13.5 13L3 13V3Z" fill={`url(#${uid}tl)`} />
+        <path d="M3 23L13.5 13L3 13V23Z" fill={`url(#${uid}bl)`} />
+        <path d="M3 3L13.5 13L20 9.5L3 3Z" fill={`url(#${uid}tr)`} />
+        <path d="M3 23L13.5 13L20 16.5L3 23Z" fill={`url(#${uid}br)`} />
         <path d="M20 9.5L13.5 13L20 16.5L23 13L20 9.5Z" fill="#FFD740" />
       </svg>
-      <div style={{ display: "flex", flexDirection: "column", lineHeight: 1 }}>
-        <span style={{ color: "rgba(255,255,255,0.6)", fontSize: "9px", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "3px" }}>GET IT ON</span>
-        <span style={{ color: "#ffffff", fontSize: "15px", fontWeight: 700, letterSpacing: "-0.01em" }}>Google Play</span>
+      <div className="flex flex-col leading-none">
+        <span
+          className={`text-white/60 font-semibold uppercase tracking-[0.1em] ${
+            isSmall ? "text-[6.5px]" : "text-[8px]"
+          }`}
+        >
+          Get it on
+        </span>
+        <span
+          className={`text-white font-bold tracking-tight ${
+            isSmall ? "text-[11px] mt-[2px]" : "text-[13px] mt-[3px]"
+          }`}
+        >
+          Google Play
+        </span>
       </div>
     </div>
   );
@@ -181,6 +148,7 @@ export default function Navigation({
   activeSection = "home",
   noLanding = false,
 }) {
+  const router = useRouter();
   const { theme, toggleTheme } = useTheme();
   const [localActive, setLocalActive] = useState(activeSection);
   const [userClicked, setUserClicked] = useState(false);
@@ -188,7 +156,7 @@ export default function Navigation({
   const [isScrolled, setIsScrolled] = useState(false);
   const [heroButton, setHeroButton] = useState(null);
   const [heroButtonLoading, setHeroButtonLoading] = useState(true);
-  const dropdownRef = useRef(null);
+  const navContainerRef = useRef(null);
   const currentTheme = themeConfig[theme];
   const clickLockTimer = useRef(null);
 
@@ -228,14 +196,17 @@ export default function Navigation({
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
     handleScroll();
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+      if (
+        navContainerRef.current &&
+        !navContainerRef.current.contains(event.target)
+      ) {
         setIsMobileMenuOpen(false);
       }
     };
@@ -285,21 +256,24 @@ export default function Navigation({
     window.open(href, "_blank", "noopener,noreferrer");
   };
 
-  // ---- Demo-style clean nav background ----
+  const handleStartBillingClick = () => {
+    setIsMobileMenuOpen(false);
+    router.push(START_BILLING_ROUTE);
+  };
+
   const navBg =
     theme === "light"
       ? isScrolled
-        ? "bg-white shadow-[0_2px_12px_rgba(15,23,42,0.06)] border-b border-gray-200"
+        ? "bg-white/90 backdrop-blur-md shadow-[0_2px_16px_rgba(15,23,42,0.07)] border-b border-gray-200"
         : "bg-white border-b border-gray-100"
       : isScrolled
-        ? "bg-slate-950 shadow-[0_2px_12px_rgba(2,6,23,0.5)] border-b border-slate-800"
+        ? "bg-slate-950/90 backdrop-blur-md shadow-[0_2px_16px_rgba(2,6,23,0.55)] border-b border-slate-800"
         : "bg-slate-950 border-b border-slate-900";
 
-  // ---- Demo-style plain text links w/ blue accent ----
   const getItemClass = (active) =>
     [
-      "relative px-3.5 py-2 rounded-md font-semibold text-[14px] transition-colors duration-200",
-      "flex items-center gap-2",
+      "relative px-3 py-2 rounded-md font-semibold text-[14px] transition-colors duration-200",
+      "flex items-center gap-2 whitespace-nowrap",
       active
         ? "text-[#2563eb]"
         : theme === "light"
@@ -312,24 +286,32 @@ export default function Navigation({
       ? "text-[#2563eb]"
       : theme === "light" ? "text-slate-400" : "text-slate-500";
 
+  const iconBtnClass =
+    theme === "light"
+      ? "bg-white border-gray-200 hover:bg-slate-50 text-slate-700"
+      : "bg-slate-900 border-slate-700 hover:bg-slate-800 text-slate-300";
+
   return (
     <div className="sticky top-0 z-50">
       <nav
         className={`w-full transition-all duration-300 ${navBg} ${
-          isScrolled ? "py-2.5" : "py-3.5"
+          isScrolled ? "py-2" : "py-3"
         }`}
       >
-        <div className="w-full px-4 sm:px-6 lg:px-10 overflow-hidden">
-          <div className="flex items-center justify-between gap-2">
+        <div
+          ref={navContainerRef}
+          className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 xl:px-8"
+        >
+          <div className="flex items-center justify-between gap-3">
 
-            {/* Logo — demo-style bold blue wordmark */}
+            {/* Logo */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              className="flex items-center gap-2 flex-shrink-0 cursor-pointer min-w-0"
+              className="flex items-center gap-2.5 flex-shrink-0 cursor-pointer min-w-0"
               onClick={() => handleNavigationClick(heroRef, "Home")}
             >
-              <div className="w-11 h-11 rounded-xl overflow-hidden flex-shrink-0 ring-1 ring-[#2563eb]/10 bg-white">
+              <div className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 ring-1 ring-[#2563eb]/15 bg-white shadow-sm">
                 <img
                   src="/images/Tapplogo.png"
                   alt="Amdaani Logo"
@@ -337,21 +319,18 @@ export default function Navigation({
                 />
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="text-[22px] font-extrabold tracking-tight leading-none text-[#2563eb] whitespace-nowrap">
+                <span className="text-[21px] font-extrabold tracking-tight leading-none text-[#2563eb] whitespace-nowrap">
                   Amdaani
                 </span>
-                <span className={`text-[10px] mt-[3px] tracking-[0.1em] font-semibold uppercase ${currentTheme.textTertiary} hidden sm:block whitespace-nowrap`}>
+                <span className={`text-[9.5px] mt-[3px] tracking-[0.12em] font-semibold uppercase ${currentTheme.textTertiary} hidden sm:block whitespace-nowrap`}>
                   Smart Business Solutions
                 </span>
               </div>
             </motion.div>
 
-            {/* Desktop Nav — center, plain links like demo */}
+            {/* Desktop Nav (xl+) */}
             {!noLanding && (
-              <div
-                className="hidden lg:flex items-center gap-1 flex-shrink-0"
-                ref={dropdownRef}
-              >
+              <div className="hidden xl:flex items-center gap-0.5 flex-shrink-0">
                 {navigationItems.map((item) => {
                   const active = isItemActive(item.name);
                   const { Icon } = item;
@@ -361,12 +340,12 @@ export default function Navigation({
                       onClick={() => handleNavigationClick(item.ref, item.name)}
                       className={getItemClass(active)}
                     >
-                      <span className={`flex-shrink-0 transition-colors duration-200 ${getIconClass(active)}`}>
+                      <span className={`hidden 2xl:inline-flex flex-shrink-0 transition-colors duration-200 ${getIconClass(active)}`}>
                         <Icon />
                       </span>
                       <span>{item.name}</span>
                       {active && (
-                        <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-[2px] rounded-full bg-[#2563eb]" />
+                        <span className="absolute -bottom-[3px] left-1/2 -translate-x-1/2 w-5 h-[2px] rounded-full bg-[#2563eb]" />
                       )}
                     </button>
                   );
@@ -374,51 +353,60 @@ export default function Navigation({
               </div>
             )}
 
-            {/* Desktop Right */}
-            <div className="hidden lg:flex items-center gap-3 flex-shrink-0">
-              <TranslateWidget />
+            {/* Desktop Right (xl+) */}
+            <div className="hidden xl:flex items-center gap-2.5 flex-shrink-0">
+              <GoogleTranslate theme={theme} />
+
               {!heroButtonLoading && heroButton?.isActive && (
                 <button
                   onClick={handleHeroButtonClick}
                   className="p-0 bg-transparent border-0 inline-flex"
                   aria-label="Get it on Google Play"
                 >
-                  <PlayStoreBadge compact={false} />
+                  <PlayStoreBadge size="md" />
                 </button>
               )}
+
+              <span
+                className={`w-px h-6 mx-1 ${
+                  theme === "light" ? "bg-gray-200" : "bg-slate-700"
+                }`}
+              />
+
+              <button
+                onClick={handleStartBillingClick}
+                className="group inline-flex items-center gap-2 h-10 px-5 rounded-lg bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-[14px] font-semibold shadow-sm hover:shadow-md transition-all duration-200 whitespace-nowrap"
+                aria-label="Start Billing"
+              >
+                <span>Start Billing</span>
+                <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+              </button>
+
               <button
                 onClick={toggleTheme}
-                className={`p-2.5 rounded-lg transition-all duration-200 border flex-shrink-0 ${
-                  theme === "light"
-                    ? "bg-white border-gray-200 hover:bg-slate-50 text-slate-700"
-                    : "bg-slate-900 border-slate-700 hover:bg-slate-800 text-slate-300"
-                }`}
+                className={`w-10 h-10 flex items-center justify-center rounded-lg transition-all duration-200 border flex-shrink-0 ${iconBtnClass}`}
                 aria-label="Toggle theme"
               >
                 {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
               </button>
             </div>
 
-            {/* Mobile Right */}
-            <div className="flex lg:hidden items-center gap-1.5 flex-shrink-0">
+            {/* Mobile / Tablet Right (below xl) */}
+            <div className="flex xl:hidden items-center gap-1.5 flex-shrink-0">
               {!heroButtonLoading && heroButton?.isActive && (
                 <button
                   onClick={handleHeroButtonClick}
                   className="p-0 bg-transparent border-0 inline-flex flex-shrink-0"
                   aria-label="Get it on Google Play"
                 >
-                  <PlayStoreBadge compact={true} />
+                  <PlayStoreBadge size="sm" />
                 </button>
               )}
 
               {!noLanding && (
                 <button
                   onClick={toggleTheme}
-                  className={`w-9 h-9 flex items-center justify-center rounded-lg border flex-shrink-0 transition-all duration-200 ${
-                    theme === "light"
-                      ? "bg-white border-gray-200 hover:bg-slate-50 text-slate-700"
-                      : "bg-slate-900 border-slate-700 hover:bg-slate-800 text-slate-300"
-                  }`}
+                  className={`w-9 h-9 flex items-center justify-center rounded-lg border flex-shrink-0 transition-all duration-200 ${iconBtnClass}`}
                   aria-label="Toggle theme"
                 >
                   {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
@@ -434,6 +422,7 @@ export default function Navigation({
                       : "bg-slate-900 border-slate-700 hover:bg-slate-800 text-slate-300"
                   }`}
                   aria-label="Toggle menu"
+                  aria-expanded={isMobileMenuOpen}
                 >
                   {isMobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
                 </button>
@@ -450,7 +439,7 @@ export default function Navigation({
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
                   transition={{ duration: 0.25 }}
-                  className={`lg:hidden border mt-2 rounded-xl overflow-hidden ${
+                  className={`xl:hidden border mt-2 rounded-xl overflow-hidden shadow-lg ${
                     theme === "light"
                       ? "bg-white border-gray-200"
                       : "bg-slate-900 border-slate-800"
@@ -466,7 +455,9 @@ export default function Navigation({
                           onClick={() => handleNavigationClick(item.ref, item.name)}
                           className={`w-full text-left px-4 py-3 rounded-lg font-semibold transition-all duration-200 flex items-center gap-3 ${
                             active
-                              ? "bg-blue-50 text-[#2563eb] dark:bg-blue-950/40 dark:text-blue-400"
+                              ? theme === "light"
+                                ? "bg-blue-50 text-[#2563eb]"
+                                : "bg-blue-950/40 text-blue-400"
                               : theme === "light"
                                 ? "text-slate-700 hover:bg-slate-50 hover:text-[#2563eb]"
                                 : "text-slate-300 hover:bg-slate-800 hover:text-white"
@@ -479,6 +470,16 @@ export default function Navigation({
                         </button>
                       );
                     })}
+
+                    {/* Start Billing CTA (Mobile) */}
+                    <button
+                      onClick={handleStartBillingClick}
+                      className="mt-1 w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-semibold transition-colors duration-200"
+                      aria-label="Start Billing"
+                    >
+                      <span>Start Billing</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
                   </div>
                 </motion.div>
               )}
