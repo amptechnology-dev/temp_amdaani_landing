@@ -154,9 +154,13 @@ const getRow = (item, gstType) => {
     cgstPct: num(item.cgstPercent),
     sgstPct: num(item.sgstPercent),
     igstPct: num(item.igstPercent),
-    lineTotal: taxableValue + cgst + sgst + igst,
+    totalGst: cgst + sgst + igst,
   };
 };
+
+// Item label: "Item (unit)" — same as mobile
+const itemLabel = (r) =>
+  `${safe(r.item)}${r.unit ? ` (${r.unit})` : ""}`;
 
 export default function GstReportPage() {
   const [gstType, setGstType] = useState("sales"); // "sales" | "purchase"
@@ -358,13 +362,13 @@ export default function GstReportPage() {
         <td style="${td}">${r.isFirst ? escapeHtml(safe(r.invoiceNo)) : "↳"}</td>
         <td style="${td}">${r.isFirst ? escapeHtml(safe(r.partyName)) : ""}</td>
         <td style="${td}">${r.isFirst ? escapeHtml(safe(r.partyGst)) : ""}</td>
-        <td style="${td}">${escapeHtml(safe(r.item))}${r.gstRate ? ` (${r.gstRate}%)` : ""}</td>
+        <td style="${td}">${escapeHtml(itemLabel(r))}</td>
         <td style="${td}">${escapeHtml(safe(r.hsn))}</td>
-        <td style="${td}text-align:right;">${qtyFmt(r.quantity)} ${escapeHtml(r.unit || "")}</td>
+        <td style="${td}text-align:right;">${qtyFmt(r.quantity)}</td>
         <td style="${td}text-align:right;">${currency(r.taxableValue)}</td>
-        <td style="${td}text-align:right;">${currency(r.cgst)}</td>
-        <td style="${td}text-align:right;">${currency(r.sgst)}</td>
-        <td style="${td}text-align:right;">${r.isIgst || r.igst ? currency(r.igst) : "-"}</td>
+        <td style="${td}text-align:right;">${currency(r.cgst)}<br/><span style="color:#888;font-size:8px;">${r.cgstPct}%</span></td>
+        <td style="${td}text-align:right;">${currency(r.sgst)}<br/><span style="color:#888;font-size:8px;">${r.sgstPct}%</span></td>
+        <td style="${td}text-align:right;font-weight:700;">${currency(r.totalGst)}</td>
         <td style="${td}text-align:right;font-weight:700;">${r.isFirst ? currency(r.invoiceAmount) : ""}</td>
       </tr>`,
       )
@@ -389,11 +393,10 @@ export default function GstReportPage() {
         <h1>GST ${gstType === "sales" ? "Sales" : "Purchase"} Report</h1>
         <div class="sub">Period: ${formattedRange}</div>
         <div class="chips">
-          <div class="chip">Invoices: ${totals.count} · Items: ${totals.lines}</div>
+          <div class="chip">Count: ${totals.count}</div>
           <div class="chip">Taxable: ${currency(totals.taxableValue)}</div>
           <div class="chip">CGST: ${currency(totals.cgst)}</div>
           <div class="chip">SGST: ${currency(totals.sgst)}</div>
-          <div class="chip">IGST: ${currency(totals.igst)}</div>
           <div class="chip" style="background:#e8f0fe;border-color:#3b5bdb;">
             <b>Total GST: ${currency(totals.totalGst)}</b>
           </div>
@@ -414,8 +417,8 @@ export default function GstReportPage() {
               <th style="${th}text-align:right;">Taxable</th>
               <th style="${th}text-align:right;">CGST</th>
               <th style="${th}text-align:right;">SGST</th>
-              <th style="${th}text-align:right;">IGST</th>
-              <th style="${th}text-align:right;">Invoice Amt</th>
+              <th style="${th}text-align:right;">Total GST</th>
+              <th style="${th}text-align:right;">Amount</th>
             </tr>
           </thead>
           <tbody>
@@ -425,7 +428,7 @@ export default function GstReportPage() {
               <td style="${tf}">${currency(totals.taxableValue)}</td>
               <td style="${tf}">${currency(totals.cgst)}</td>
               <td style="${tf}">${currency(totals.sgst)}</td>
-              <td style="${tf}">${currency(totals.igst)}</td>
+              <td style="${tf}">${currency(totals.totalGst)}</td>
               <td style="${tf}">${currency(totals.totalAmount)}</td>
             </tr>
           </tbody>
@@ -461,32 +464,27 @@ export default function GstReportPage() {
       return;
     }
     try {
-      const sheet = normalizedRows.map((r, i) => ({
-        "#": i + 1,
-        Date: formatDDMMYY(r.date),
-        [invoiceLabel]: safe(r.invoiceNo),
-        [partyLabel]: safe(r.partyName),
-        GSTIN: safe(r.partyGst),
-        Item: safe(r.item),
+      const sheet = normalizedRows.map((r) => ({
+        Date: r.isFirst ? formatDDMMYY(r.date) : "",
+        [invoiceLabel]: r.isFirst ? safe(r.invoiceNo) : "",
+        [partyLabel]: r.isFirst ? safe(r.partyName) : "",
+        GSTIN: r.isFirst ? safe(r.partyGst) : "",
+        Item: itemLabel(r),
         HSN: safe(r.hsn),
         Qty: r.quantity,
-        Unit: safe(r.unit),
-        "Taxable Value": r.taxableValue,
-        "GST %": r.gstRate,
+        Taxable: r.taxableValue,
         CGST: r.cgst,
         SGST: r.sgst,
-        IGST: r.igst,
-        "Line Total": Number(r.lineTotal.toFixed(2)),
-        "Invoice Amount": r.isFirst ? r.invoiceAmount : "", // once per invoice
+        "Total GST": Number(r.totalGst.toFixed(2)),
+        Amount: r.isFirst ? r.invoiceAmount : "", // once per invoice
       }));
 
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(sheet);
       ws["!cols"] = [
-        { wch: 5 }, { wch: 12 }, { wch: 16 }, { wch: 22 }, { wch: 18 },
-        { wch: 18 }, { wch: 14 }, { wch: 8 }, { wch: 8 }, { wch: 14 },
-        { wch: 7 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 14 },
-        { wch: 14 },
+        { wch: 12 }, { wch: 16 }, { wch: 22 }, { wch: 18 },
+        { wch: 24 }, { wch: 14 }, { wch: 8 }, { wch: 14 },
+        { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 14 },
       ];
       XLSX.utils.book_append_sheet(
         wb,
@@ -880,19 +878,17 @@ export default function GstReportPage() {
           </div>
         ) : (
           <>
-            {/* Compact summary */}
+            {/* Compact summary — same fields as mobile */}
             <div className="shrink-0 min-w-0 bg-white border border-slate-200/80 rounded-2xl px-4 py-2.5">
               <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] text-slate-400">Range</span>
                 <span className="text-[11px] text-slate-400">
                   {formattedRange}
-                </span>
-                <span className="text-[11px] text-slate-400">
-                  {totals.count} invoices · {totals.lines} items
                 </span>
               </div>
               <div className="grid grid-cols-3 lg:grid-cols-6 gap-x-4 gap-y-2">
                 <SummaryStat
-                  label="Invoice Amt"
+                  label="Total Amount"
                   value={currency(totals.totalAmount)}
                   bold
                 />
@@ -900,6 +896,7 @@ export default function GstReportPage() {
                   label="Taxable"
                   value={currency(totals.taxableValue)}
                 />
+                <SummaryStat label="Count" value={String(totals.count)} />
                 <SummaryStat
                   label="CGST"
                   value={currency(totals.cgst)}
@@ -908,11 +905,6 @@ export default function GstReportPage() {
                 <SummaryStat
                   label="SGST"
                   value={currency(totals.sgst)}
-                  accent="text-orange-600"
-                />
-                <SummaryStat
-                  label="IGST"
-                  value={currency(totals.igst)}
                   accent="text-orange-600"
                 />
                 <SummaryStat
@@ -931,7 +923,7 @@ export default function GstReportPage() {
                   {gstType === "sales" ? "Sales" : "Purchase"} GST Entries
                 </h2>
                 <span className="text-xs text-slate-400">
-                  {totals.count} invoices · {totals.lines} items
+                  {totals.count} records
                 </span>
               </div>
 
@@ -950,8 +942,8 @@ export default function GstReportPage() {
                         ["Taxable", "right"],
                         ["CGST", "right"],
                         ["SGST", "right"],
-                        ["IGST", "right"],
-                        ["Invoice Amt", "right"],
+                        ["Total GST", "right"],
+                        ["Amount", "right"],
                       ].map(([label, align]) => (
                         <th
                           key={label}
@@ -994,34 +986,31 @@ export default function GstReportPage() {
                             {r.isFirst ? safe(r.partyGst) : ""}
                           </td>
                           <td className={`${cell} text-slate-700`}>
-                            {safe(r.item)}
-                            <span className="ml-1.5 text-[11px] text-slate-400">
-                              {r.gstRate ? `${r.gstRate}%` : ""}
-                            </span>
+                            {itemLabel(r)}
                           </td>
                           <td className={`${cell} text-slate-500`}>
                             {safe(r.hsn)}
                           </td>
                           <td className={`${cell} text-right text-slate-600 whitespace-nowrap`}>
                             {qtyFmt(r.quantity)}
-                            {r.unit ? (
-                              <span className="text-slate-400 text-xs">
-                                {" "}
-                                {r.unit}
-                              </span>
-                            ) : null}
                           </td>
                           <td className={`${cell} text-right text-slate-600 tabular-nums`}>
                             {currency(r.taxableValue)}
                           </td>
                           <td className={`${cell} text-right text-orange-600 tabular-nums`}>
                             {currency(r.cgst)}
+                            <div className="text-[10px] text-slate-400">
+                              {r.cgstPct}%
+                            </div>
                           </td>
                           <td className={`${cell} text-right text-orange-600 tabular-nums`}>
                             {currency(r.sgst)}
+                            <div className="text-[10px] text-slate-400">
+                              {r.sgstPct}%
+                            </div>
                           </td>
-                          <td className={`${cell} text-right text-orange-600 tabular-nums`}>
-                            {r.isIgst || r.igst ? currency(r.igst) : "-"}
+                          <td className={`${cell} text-right font-semibold text-blue-600 tabular-nums`}>
+                            {currency(r.totalGst)}
                           </td>
                           <td className={`${cell} text-right font-semibold text-slate-800 tabular-nums`}>
                             {r.isFirst ? currency(r.invoiceAmount) : ""}
@@ -1043,7 +1032,7 @@ export default function GstReportPage() {
                         totals.taxableValue,
                         totals.cgst,
                         totals.sgst,
-                        totals.igst,
+                        totals.totalGst,
                         totals.totalAmount,
                       ].map((v, i) => (
                         <td
