@@ -551,6 +551,7 @@ export default function PurchaseFlow() {
         invoiceCalculations,
         invoiceNumber: purchaseNumber,
         storedata,
+        pageFormat: storedata?.settings?.printMode === "a5" ? "a5" : "a4",
         invoiceDate: new Date(purchaseDate),
         isGstInvoice,
         isMrpEnabled,

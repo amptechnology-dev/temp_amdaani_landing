@@ -776,7 +776,7 @@ export default function InvoiceListPage({
     const pdf = new jsPDF({
       unit: "mm",
       format: pageFormat === "a5" ? "a5" : "a4",
-      orientation: "portrait",
+      orientation: pageFormat === "a5" ? "landscape" : "portrait",
     });
 
     const pageWidth = pdf.internal.pageSize.getWidth();

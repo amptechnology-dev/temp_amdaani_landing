@@ -209,7 +209,7 @@ export default function Settings() {
   const handleGstPerUnitToggle = () =>
     updateStoreSettings(
       { showGstPerUnit: !isGstPerUnitEnabled },
-      `GST rate per unit column ${!isGstPerUnitEnabled ? "enabled" : "disabled"}`,
+      `Net Rate column ${!isGstPerUnitEnabled ? "enabled" : "disabled"}`,
       setGstUnitLoading,
     );
 
@@ -380,8 +380,8 @@ export default function Settings() {
               />
               <SettingsRow
                 icon={Percent}
-                title="GST Rate Per Unit"
-                description="Show rate including GST per unit in sale invoice"
+                title="Net Rate"
+                description="Show Net Rate (per unit, incl. GST, after discount) in sale and purchase invoice"
                 right={
                   <Switch
                     checked={isGstPerUnitEnabled}

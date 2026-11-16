@@ -90,7 +90,11 @@ const parseInputDate = (str) => {
 
 const GSTIN_REGEX = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
 const isValidGstin = (v) =>
-  GSTIN_REGEX.test(String(v || "").trim().toUpperCase());
+  GSTIN_REGEX.test(
+    String(v || "")
+      .trim()
+      .toUpperCase(),
+  );
 
 const UQC_MAP = {
   piece: "PCS",
@@ -109,7 +113,12 @@ const UQC_MAP = {
   pair: "PRS",
   set: "SET",
 };
-const toUqc = (u) => UQC_MAP[String(u || "").trim().toLowerCase()] || "OTH";
+const toUqc = (u) =>
+  UQC_MAP[
+    String(u || "")
+      .trim()
+      .toLowerCase()
+  ] || "OTH";
 
 const downloadBlob = (blob, filename) => {
   const url = URL.createObjectURL(blob);
@@ -120,6 +129,142 @@ const downloadBlob = (blob, filename) => {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+};
+
+// ── GST JSON structure-er moto table definition (Excel + PDF dutoi eta use kore) ──
+const gstCol = (key, label, type = "text", sum = false) => ({
+  key,
+  type,
+  sum,
+  header: `${label} (${key})`,
+});
+
+const GST_TAX_COLS = [
+  gstCol("txval", "Taxable Value", "money", true),
+  gstCol("iamt", "Integrated Tax", "money", true),
+  gstCol("camt", "Central Tax", "money", true),
+  gstCol("samt", "State/UT Tax", "money", true),
+  gstCol("csamt", "Cess", "money", true),
+];
+
+const GST_TABLE_DEFS = {
+  b2b: {
+    title: "B2B Invoices",
+    sheet: "B2B",
+    cols: [
+      gstCol("ctin", "GSTIN/UIN"),
+      gstCol("inum", "Invoice No"),
+      gstCol("idt", "Invoice Date"),
+      gstCol("val", "Invoice Value", "money", true),
+      gstCol("pos", "Place of Supply"),
+      gstCol("rchrg", "Reverse Charge"),
+      gstCol("inv_typ", "Invoice Type"),
+      gstCol("num", "Item No", "int"),
+      gstCol("rt", "Rate", "rate"),
+      ...GST_TAX_COLS,
+    ],
+  },
+  b2bur: {
+    title: "B2B Unregistered (Purchase)",
+    sheet: "B2BUR",
+    cols: [
+      gstCol("inum", "Invoice No"),
+      gstCol("idt", "Invoice Date"),
+      gstCol("val", "Invoice Value", "money", true),
+      gstCol("pos", "Place of Supply"),
+      gstCol("sply_ty", "Supply Type"),
+      gstCol("num", "Item No", "int"),
+      gstCol("rt", "Rate", "rate"),
+      ...GST_TAX_COLS,
+    ],
+  },
+  b2cs: {
+    title: "B2C Small (Consolidated)",
+    sheet: "B2CS",
+    cols: [
+      gstCol("sply_ty", "Supply Type"),
+      gstCol("pos", "Place of Supply"),
+      gstCol("typ", "Type"),
+      gstCol("rt", "Rate", "rate"),
+      ...GST_TAX_COLS,
+    ],
+  },
+  hsn: {
+    title: "HSN Summary",
+    sheet: "HSN",
+    cols: [
+      gstCol("num", "S.No", "int"),
+      gstCol("hsn_sc", "HSN Code"),
+      gstCol("uqc", "UQC"),
+      gstCol("rt", "Rate", "rate"),
+      gstCol("qty", "Quantity", "qty", true),
+      ...GST_TAX_COLS,
+    ],
+  },
+};
+
+// invoice-er item gulo ke flat row banay. Invoice-level field shudhu prothom row-e thake.
+const flattenInvItems = (inv) =>
+  (inv.itms || []).map((it, idx) => ({
+    ...(idx === 0
+      ? {
+          inum: inv.inum,
+          idt: inv.idt,
+          val: inv.val,
+          pos: inv.pos,
+          rchrg: inv.rchrg,
+          inv_typ: inv.inv_typ,
+          sply_ty: inv.sply_ty,
+        }
+      : {}),
+    num: it.num,
+    rt: it.itm_det?.rt,
+    txval: it.itm_det?.txval,
+    iamt: it.itm_det?.iamt,
+    camt: it.itm_det?.camt,
+    samt: it.itm_det?.samt,
+    csamt: it.itm_det?.csamt,
+  }));
+
+// JSON payload theke table list banay
+const buildGstTables = (payload, gstType) => {
+  const b2bRows = [];
+  (payload.b2b || []).forEach((party) => {
+    const start = b2bRows.length;
+    (party.inv || []).forEach((inv) => b2bRows.push(...flattenInvItems(inv)));
+    if (b2bRows[start]) b2bRows[start].ctin = party.ctin;
+  });
+
+  const defs = [{ id: "b2b", rows: b2bRows }];
+  if (gstType === "sales") {
+    defs.push({ id: "b2cs", rows: payload.b2cs || [] });
+    defs.push({ id: "hsn", rows: payload.hsn?.data || [] });
+  } else {
+    defs.push({
+      id: "b2bur",
+      rows: (payload.b2bur || []).flatMap((inv) => flattenInvItems(inv)),
+    });
+  }
+
+  return defs
+    .filter((d) => d.rows.length > 0)
+    .map((d) => ({ ...GST_TABLE_DEFS[d.id], id: d.id, rows: d.rows }));
+};
+
+const fmtGstCell = (c, v, forExcel = false) => {
+  if (v === undefined || v === null || v === "") return "";
+  if (c.type === "money") return forExcel ? r2(v) : num(v).toFixed(2);
+  if (c.type === "qty") return forExcel ? Number(num(v).toFixed(3)) : qtyFmt(v);
+  if (c.type === "rate" || c.type === "int") return num(v);
+  return String(v);
+};
+
+const gstTableTotals = (t) => {
+  const tot = {};
+  t.cols.forEach((c) => {
+    if (c.sum) tot[c.key] = t.rows.reduce((s, r) => s + num(r[c.key]), 0);
+  });
+  return tot;
 };
 
 // Normalizes a row regardless of sales/purchase shape
@@ -159,8 +304,7 @@ const getRow = (item, gstType) => {
 };
 
 // Item label: "Item (unit)" — same as mobile
-const itemLabel = (r) =>
-  `${safe(r.item)}${r.unit ? ` (${r.unit})` : ""}`;
+const itemLabel = (r) => `${safe(r.item)}${r.unit ? ` (${r.unit})` : ""}`;
 
 export default function GstReportPage() {
   const [gstType, setGstType] = useState("sales"); // "sales" | "purchase"
@@ -347,32 +491,59 @@ export default function GstReportPage() {
   const partyLabel = gstType === "sales" ? "Customer" : "Vendor";
   const invoiceLabel = gstType === "sales" ? "Invoice No" : "Bill No";
 
-  // ── PDF export ───────────────────────────────────────────────────────
   const buildHTML = () => {
-    const td = "padding:5px 6px;border-bottom:1px solid #eee;font-size:9.5px;";
-    const th = "padding:6px;border-bottom:1px solid #ddd;font-size:10.5px;";
-    const tf =
-      "padding:6px;text-align:right;font-weight:bold;border-top:2px solid #333;";
+    const payload = buildGstJson();
+    const tables = buildGstTables(payload, gstType);
 
-    const rowsHTML = normalizedRows
-      .map(
-        (r) => `
-      <tr style="${r.isFirst ? "border-top:1px solid #ccc;" : ""}">
-        <td style="${td}">${r.isFirst ? formatDDMMYY(r.date) : ""}</td>
-        <td style="${td}">${r.isFirst ? escapeHtml(safe(r.invoiceNo)) : "↳"}</td>
-        <td style="${td}">${r.isFirst ? escapeHtml(safe(r.partyName)) : ""}</td>
-        <td style="${td}">${r.isFirst ? escapeHtml(safe(r.partyGst)) : ""}</td>
-        <td style="${td}">${escapeHtml(itemLabel(r))}</td>
-        <td style="${td}">${escapeHtml(safe(r.hsn))}</td>
-        <td style="${td}text-align:right;">${qtyFmt(r.quantity)}</td>
-        <td style="${td}text-align:right;">${currency(r.taxableValue)}</td>
-        <td style="${td}text-align:right;">${currency(r.cgst)}<br/><span style="color:#888;font-size:8px;">${r.cgstPct}%</span></td>
-        <td style="${td}text-align:right;">${currency(r.sgst)}<br/><span style="color:#888;font-size:8px;">${r.sgstPct}%</span></td>
-        <td style="${td}text-align:right;font-weight:700;">${currency(r.totalGst)}</td>
-        <td style="${td}text-align:right;font-weight:700;">${r.isFirst ? currency(r.invoiceAmount) : ""}</td>
-      </tr>`,
-      )
-      .join("");
+    const th =
+      "padding:5px 4px;border-bottom:1px solid #ddd;font-size:8.5px;background:#f0f4ff;";
+    const td = "padding:4px;border-bottom:1px solid #eee;font-size:9px;";
+    const tf =
+      "padding:5px 4px;font-weight:bold;border-top:2px solid #333;font-size:9px;";
+    const alignOf = (c) => (c.type === "text" ? "left" : "right");
+
+    const tablesHTML = tables.length
+      ? tables
+          .map((t) => {
+            const tot = gstTableTotals(t);
+            const head = t.cols
+              .map(
+                (c) =>
+                  `<th style="${th}text-align:${alignOf(c)};">${escapeHtml(c.header)}</th>`,
+              )
+              .join("");
+            const body = t.rows
+              .map(
+                (r) =>
+                  `<tr>${t.cols
+                    .map(
+                      (c) =>
+                        `<td style="${td}text-align:${alignOf(c)};">${escapeHtml(fmtGstCell(c, r[c.key]))}</td>`,
+                    )
+                    .join("")}</tr>`,
+              )
+              .join("");
+            const foot = `<tr>${t.cols
+              .map(
+                (c, i) =>
+                  `<td style="${tf}text-align:${i === 0 ? "left" : "right"};">${
+                    i === 0
+                      ? "Total"
+                      : c.sum
+                        ? escapeHtml(fmtGstCell(c, tot[c.key]))
+                        : ""
+                  }</td>`,
+              )
+              .join("")}</tr>`;
+            return `
+              <h3 style="font-size:12px;margin:16px 0 6px;color:#2c5aa0;">${escapeHtml(t.title)} <span style="color:#888;font-weight:normal;">(${t.id})</span></h3>
+              <table style="width:100%;border-collapse:collapse;">
+                <thead><tr>${head}</tr></thead>
+                <tbody>${body}${foot}</tbody>
+              </table>`;
+          })
+          .join("")
+      : `<p style="margin-top:16px;">No GST data found.</p>`;
 
     return `
       <html><head><meta charset="utf-8"/>
@@ -381,7 +552,7 @@ export default function GstReportPage() {
         body { font-family:Roboto,Arial; margin:0; padding:16px; color:#111; font-size:11px; }
         h1   { font-size:18px; margin-bottom:2px; }
         .sub { color:#666; margin-bottom:14px; }
-        .chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
+        .chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; }
         .chip  { background:#f0f0f0; border:1px solid #ddd; border-radius:12px; padding:4px 10px; font-size:10px; }
         .footer{ margin-top:14px; color:#888; font-size:9px; display:flex; justify-content:space-between; }
         thead { display: table-header-group; }
@@ -391,7 +562,7 @@ export default function GstReportPage() {
         ${address ? `<p style="text-align:center;">${escapeHtml(address)}</p>` : ""}
         ${gstin ? `<p style="text-align:center;">GSTIN: ${escapeHtml(gstin)}</p>` : ""}
         <h1>GST ${gstType === "sales" ? "Sales" : "Purchase"} Report</h1>
-        <div class="sub">Period: ${formattedRange}</div>
+        <div class="sub">Period: ${formattedRange} &nbsp;|&nbsp; Filing Period (fp): ${escapeHtml(payload.fp)}</div>
         <div class="chips">
           <div class="chip">Count: ${totals.count}</div>
           <div class="chip">Taxable: ${currency(totals.taxableValue)}</div>
@@ -404,35 +575,7 @@ export default function GstReportPage() {
             <b>Total Amount: ${currency(totals.totalAmount)}</b>
           </div>
         </div>
-        <table style="width:100%;border-collapse:collapse;">
-          <thead>
-            <tr style="background:#f0f4ff;">
-              <th style="${th}text-align:left;">Date</th>
-              <th style="${th}text-align:left;">${invoiceLabel}</th>
-              <th style="${th}text-align:left;">${partyLabel}</th>
-              <th style="${th}text-align:left;">GSTIN</th>
-              <th style="${th}text-align:left;">Item</th>
-              <th style="${th}text-align:left;">HSN</th>
-              <th style="${th}text-align:right;">Qty</th>
-              <th style="${th}text-align:right;">Taxable</th>
-              <th style="${th}text-align:right;">CGST</th>
-              <th style="${th}text-align:right;">SGST</th>
-              <th style="${th}text-align:right;">Total GST</th>
-              <th style="${th}text-align:right;">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rowsHTML}
-            <tr>
-              <td colspan="7" style="${tf}">Total:</td>
-              <td style="${tf}">${currency(totals.taxableValue)}</td>
-              <td style="${tf}">${currency(totals.cgst)}</td>
-              <td style="${tf}">${currency(totals.sgst)}</td>
-              <td style="${tf}">${currency(totals.totalGst)}</td>
-              <td style="${tf}">${currency(totals.totalAmount)}</td>
-            </tr>
-          </tbody>
-        </table>
+        ${tablesHTML}
         <div class="footer">
           <span>AMDAANI — Smart Business Management</span>
           <span>Generated ${new Date().toLocaleString("en-IN")}</span>
@@ -457,40 +600,55 @@ export default function GstReportPage() {
     setTimeout(() => w.print(), 400);
   };
 
-  // ── Excel export ─────────────────────────────────────────────────────
-  const exportExcel = () => {
+    const exportExcel = () => {
     if (!hasData) {
       toast.error("Generate a report first.");
       return;
     }
     try {
-      const sheet = normalizedRows.map((r) => ({
-        Date: r.isFirst ? formatDDMMYY(r.date) : "",
-        [invoiceLabel]: r.isFirst ? safe(r.invoiceNo) : "",
-        [partyLabel]: r.isFirst ? safe(r.partyName) : "",
-        GSTIN: r.isFirst ? safe(r.partyGst) : "",
-        Item: itemLabel(r),
-        HSN: safe(r.hsn),
-        Qty: r.quantity,
-        Taxable: r.taxableValue,
-        CGST: r.cgst,
-        SGST: r.sgst,
-        "Total GST": Number(r.totalGst.toFixed(2)),
-        Amount: r.isFirst ? r.invoiceAmount : "", // once per invoice
-      }));
+      const payload = buildGstJson();
+      const tables = buildGstTables(payload, gstType);
+      if (!tables.length) {
+        toast.error("No GST data to export.");
+        return;
+      }
 
       const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(sheet);
-      ws["!cols"] = [
-        { wch: 12 }, { wch: 16 }, { wch: 22 }, { wch: 18 },
-        { wch: 24 }, { wch: 14 }, { wch: 8 }, { wch: 14 },
-        { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 14 },
+
+      // Summary sheet
+      const summaryRows = [
+        ["Report", gstType === "sales" ? "GST Sales" : "GST Purchase"],
+        ["gstin", payload.gstin || ""],
+        ["fp", payload.fp],
+        ["Period", formattedRange],
+        ["Invoices", totals.count],
+        ["Taxable Value", r2(totals.taxableValue)],
+        ["Central Tax (CGST)", r2(totals.cgst)],
+        ["State/UT Tax (SGST)", r2(totals.sgst)],
+        ["Integrated Tax (IGST)", r2(totals.igst)],
+        ["Total GST", r2(totals.totalGst)],
+        ["Total Amount", r2(totals.totalAmount)],
       ];
-      XLSX.utils.book_append_sheet(
-        wb,
-        ws,
-        gstType === "sales" ? "GST Sales" : "GST Purchase",
-      );
+      const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
+      wsSummary["!cols"] = [{ wch: 24 }, { wch: 28 }];
+      XLSX.utils.book_append_sheet(wb, wsSummary, "Summary");
+
+      // JSON-er prottek section-er jonno ekta sheet
+      tables.forEach((t) => {
+        const tot = gstTableTotals(t);
+        const header = t.cols.map((c) => c.header);
+        const body = t.rows.map((r) =>
+          t.cols.map((c) => fmtGstCell(c, r[c.key], true)),
+        );
+        const footer = t.cols.map((c, i) =>
+          i === 0 ? "Total" : c.sum ? fmtGstCell(c, tot[c.key], true) : "",
+        );
+        const ws = XLSX.utils.aoa_to_sheet([header, ...body, footer]);
+        ws["!cols"] = t.cols.map((c) => ({
+          wch: Math.max(14, c.header.length + 2),
+        }));
+        XLSX.utils.book_append_sheet(wb, ws, t.sheet);
+      });
 
       const wbout = XLSX.write(wb, { type: "array", bookType: "xlsx" });
       const blob = new Blob([wbout], { type: "application/octet-stream" });
@@ -525,7 +683,9 @@ export default function GstReportPage() {
           inum: String(r.invoiceNo ?? ""),
           idt: formatGstDate(r.date),
           val: r2(r.invoiceAmount),
-          ctin: String(r.partyGst || "").trim().toUpperCase(),
+          ctin: String(r.partyGst || "")
+            .trim()
+            .toUpperCase(),
           partyName: r.partyName || "",
           lines: [],
         });
@@ -688,7 +848,9 @@ export default function GstReportPage() {
       return;
     }
     if (!isValidGstin(gstin)) {
-      toast.error("Store GSTIN missing or invalid — update store profile first.");
+      toast.error(
+        "Store GSTIN missing or invalid — update store profile first.",
+      );
       return;
     }
     if (
@@ -969,20 +1131,28 @@ export default function GstReportPage() {
                           key={`${r.id || "row"}-${i}`}
                           className="hover:bg-slate-50 transition-colors"
                         >
-                          <td className={`${cell} text-slate-600 whitespace-nowrap`}>
+                          <td
+                            className={`${cell} text-slate-600 whitespace-nowrap`}
+                          >
                             {r.isFirst ? formatDDMMYY(r.date) : ""}
                           </td>
-                          <td className={`${cell} font-medium text-slate-800 whitespace-nowrap`}>
+                          <td
+                            className={`${cell} font-medium text-slate-800 whitespace-nowrap`}
+                          >
                             {r.isFirst ? (
                               safe(r.invoiceNo)
                             ) : (
                               <span className="text-slate-300">↳</span>
                             )}
                           </td>
-                          <td className={`${cell} text-slate-700 whitespace-nowrap`}>
+                          <td
+                            className={`${cell} text-slate-700 whitespace-nowrap`}
+                          >
                             {r.isFirst ? safe(r.partyName) : ""}
                           </td>
-                          <td className={`${cell} text-slate-500 whitespace-nowrap font-mono text-xs`}>
+                          <td
+                            className={`${cell} text-slate-500 whitespace-nowrap font-mono text-xs`}
+                          >
                             {r.isFirst ? safe(r.partyGst) : ""}
                           </td>
                           <td className={`${cell} text-slate-700`}>
@@ -991,28 +1161,40 @@ export default function GstReportPage() {
                           <td className={`${cell} text-slate-500`}>
                             {safe(r.hsn)}
                           </td>
-                          <td className={`${cell} text-right text-slate-600 whitespace-nowrap`}>
+                          <td
+                            className={`${cell} text-right text-slate-600 whitespace-nowrap`}
+                          >
                             {qtyFmt(r.quantity)}
                           </td>
-                          <td className={`${cell} text-right text-slate-600 tabular-nums`}>
+                          <td
+                            className={`${cell} text-right text-slate-600 tabular-nums`}
+                          >
                             {currency(r.taxableValue)}
                           </td>
-                          <td className={`${cell} text-right text-orange-600 tabular-nums`}>
+                          <td
+                            className={`${cell} text-right text-orange-600 tabular-nums`}
+                          >
                             {currency(r.cgst)}
                             <div className="text-[10px] text-slate-400">
                               {r.cgstPct}%
                             </div>
                           </td>
-                          <td className={`${cell} text-right text-orange-600 tabular-nums`}>
+                          <td
+                            className={`${cell} text-right text-orange-600 tabular-nums`}
+                          >
                             {currency(r.sgst)}
                             <div className="text-[10px] text-slate-400">
                               {r.sgstPct}%
                             </div>
                           </td>
-                          <td className={`${cell} text-right font-semibold text-blue-600 tabular-nums`}>
+                          <td
+                            className={`${cell} text-right font-semibold text-blue-600 tabular-nums`}
+                          >
                             {currency(r.totalGst)}
                           </td>
-                          <td className={`${cell} text-right font-semibold text-slate-800 tabular-nums`}>
+                          <td
+                            className={`${cell} text-right font-semibold text-slate-800 tabular-nums`}
+                          >
                             {r.isFirst ? currency(r.invoiceAmount) : ""}
                           </td>
                         </tr>

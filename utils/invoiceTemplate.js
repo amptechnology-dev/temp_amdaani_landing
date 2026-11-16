@@ -175,9 +175,7 @@ function computeShared({
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// A4 RENDERER — matches the "rich" desktop-style invoice: header-grid,
-// Bill-To box, Tax Summary block, Amount-in-Words + Payment Summary inside
-// the totals cell, bank+signature footer strip. (Matches PDF-12 look.)
+// A4 RENDERER
 // ════════════════════════════════════════════════════════════════════════
 function buildA4Html(args, shared) {
   const {
@@ -216,7 +214,7 @@ function buildA4Html(args, shared) {
     isCancelled,
   } = shared;
 
-  const showUnitGst =
+  const showNetRate =
     isGstInvoice && storedata?.settings?.showGstPerUnit === true;
 
   const itemsHTML = cartItems
@@ -228,6 +226,7 @@ function buildA4Html(args, shared) {
       const total = item.total || 0;
       const isTaxInclusive = item.isTaxInclusive || false;
       const taxableValue = gstRate > 0 ? item.taxableValue || 0 : 0;
+      const netRate = qty > 0 ? total / qty : 0;
 
       let perItemDiscount = resolveItemDiscountInRupees(item);
       if (isTaxInclusive && gstRate > 0) {
@@ -254,11 +253,6 @@ function buildA4Html(args, shared) {
             : ""
         }
         <td class="rate">₹${baseRate.toFixed(2)}</td>
-                ${
-                  showUnitGst
-                    ? `<td class="rate">₹${(baseRate * (1 + gstRate / 100)).toFixed(2)}</td>`
-                    : ""
-                }
         <td class="discount">
           ${
             itemTotalDiscount > 0
@@ -275,13 +269,14 @@ function buildA4Html(args, shared) {
           </td>`
             : ""
         }
+        ${showNetRate ? `<td class="rate">₹${netRate.toFixed(2)}</td>` : ""}
         <td class="total-amount">₹${total.toFixed(2)}</td>
       </tr>`;
     })
     .join("");
 
   const colspanCount =
-    (isGstInvoice ? 7 : 5) + (isMrpEnabled ? 1 : 0) + (showUnitGst ? 1 : 0);
+    (isGstInvoice ? 7 : 5) + (isMrpEnabled ? 1 : 0) + (showNetRate ? 1 : 0);
   const totalsRowCount =
     2 +
     (isGstInvoice ? 2 : 1) +
@@ -474,9 +469,9 @@ function buildA4Html(args, shared) {
                     <th>Unit</th>
                     ${isMrpEnabled ? `<th>MRP(₹)</th>` : ""}
                     <th>Price/Unit(₹)</th>
-                    ${showUnitGst ? `<th>Rate incl. GST(₹)</th>` : ""}
                     <th>Discount(₹)</th>
                     ${isGstInvoice ? `<th>Taxable Value(₹)</th><th>GST Amt.(%)</th>` : ""}
+                    ${showNetRate ? `<th>Net Rate(₹)</th>` : ""}
                     <th>Amount(₹)</th>
                   </tr>
                 </thead>
@@ -490,7 +485,6 @@ function buildA4Html(args, shared) {
                     <td></td>
                     ${isMrpEnabled ? `<td></td>` : ""}
                     <td></td>
-                     ${showUnitGst ? `<td></td>` : ""}
                     <td class="discount">₹${totalDiscount.toFixed(2)}</td>
                     ${
                       isGstInvoice
@@ -498,6 +492,7 @@ function buildA4Html(args, shared) {
                            <td class="gst-amount" style="text-align:right;">₹${totalGST.toFixed(2)}</td>`
                         : ""
                     }
+                    ${showNetRate ? `<td></td>` : ""}
                     <td class="total-amount">₹${totalAmount.toFixed(2)}</td>
                   </tr>
 
@@ -710,16 +705,13 @@ function buildA4Html(args, shared) {
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// A5 RENDERER — mirrors the React Native A5 app design exactly: logo-only
-// header, FROM/TO party row, INV_NO/date/Page-X-of-Y meta row, HSN column,
-// bank+QR+payment-summary column beside amount-in-words + totals.
-// (Matches PDF-13 / the RN A5 template's look.)
+// A5 RENDERER (landscape)
 // ════════════════════════════════════════════════════════════════════════
 function buildItemsHTMLA5(
   cartItems,
   isGstInvoice,
   isMrpEnabled,
-  showUnitGst = false,
+  showNetRate = false,
 ) {
   return cartItems
     .map((item, index) => {
@@ -731,6 +723,7 @@ function buildItemsHTMLA5(
       const isTaxInclusive = item.isTaxInclusive || false;
       const taxableValue = gstRate > 0 ? item.taxableValue || 0 : 0;
       const hsn = item.hsn || "—";
+      const netRate = qty > 0 ? totalAmount / qty : 0;
 
       let perItemDiscount = resolveItemDiscountInRupees(item);
       if (isTaxInclusive && gstRate > 0) {
@@ -751,7 +744,6 @@ function buildItemsHTMLA5(
           <td class="c">${item.unit || "PCS"}</td>
           ${isMrpEnabled ? `<td class="r">₹${Number(item.mrp || 0).toFixed(2)}</td>` : ""}
           <td class="r">₹${baseRate.toFixed(2)}</td>
-           ${showUnitGst ? `<td class="r">₹${(baseRate * (1 + gstRate / 100)).toFixed(2)}</td>` : ""}
           <td class="r">${
             totalDiscount > 0
               ? `₹${totalDiscount.toFixed(2)}${discountPercent ? ` (${discountPercent}%)` : ""}`
@@ -765,13 +757,14 @@ function buildItemsHTMLA5(
                  <td class="r">₹${(gstAmount / 2).toFixed(2)}</td>`
               : ""
           }
+          ${showNetRate ? `<td class="r">₹${netRate.toFixed(2)}</td>` : ""}
           <td class="r bold">₹${totalAmount.toFixed(2)}</td>
         </tr>`;
     })
     .join("");
 }
 
-function tableHeaderA5(isGstInvoice, isMrpEnabled, showUnitGst = false) {
+function tableHeaderA5(isGstInvoice, isMrpEnabled, showNetRate = false) {
   return `<thead>
     <tr>
       <th style="width:24px">#</th>
@@ -781,9 +774,9 @@ function tableHeaderA5(isGstInvoice, isMrpEnabled, showUnitGst = false) {
       <th>Unit</th>
       ${isMrpEnabled ? "<th>MRP(₹)</th>" : ""}
       <th>Rate(₹)</th>
-       ${showUnitGst ? "<th>Rate incl. GST(₹)</th>" : ""}
       <th>Discount</th>
       ${isGstInvoice ? "<th>Taxable(₹)</th><th>GST%</th><th>CGST(₹)</th><th>SGST(₹)</th>" : ""}
+      ${showNetRate ? "<th>Net Rate(₹)</th>" : ""}
       <th>Amt(₹)</th>
     </tr>
   </thead>`;
@@ -816,6 +809,8 @@ function buildA5Html(args, shared) {
     roundOffValue,
     amountInWords,
     finalGrandTotal,
+    gstBreakdownRows,
+    hasAnyGstRows,
     hasCustomerDetails,
     hasBankDetails,
     nonZeroTransactions,
@@ -823,6 +818,9 @@ function buildA5Html(args, shared) {
     storeAddressLine,
     isCancelled,
   } = shared;
+
+  const showNetRate =
+    isGstInvoice && storedata?.settings?.showGstPerUnit === true;
 
   const MAX_PAY_SUMMARY_ROWS = 5;
   const visibleTransactions = nonZeroTransactions.slice(
@@ -836,19 +834,27 @@ function buildA5Html(args, shared) {
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { margin: 0; padding: 0; background: #eee; font-family: 'Arial', sans-serif; }
     body { padding: 12px; }
-    .page { max-width: 620px; margin: 0 auto; background: #fff; }
+    .page { max-width: 794px; margin: 0 auto; background: #fff; }
     .wrap {
       background: #fff; display: flex; flex-direction: column;
       font-size: 10px; line-height: 1.35; color: #1a1a1a;
       border: 1px solid #2c5aa0; overflow: hidden;
     }
+
+    /* ── PRINT: A5 landscape = 210mm x 148mm, fit everything on ONE page ── */
+    @page { size: A5 landscape; margin: 0; }
     @media print {
-      html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
-      @page { size: A5; margin: 6mm; }
-      .page { max-width: 100% !important; }
-      .wrap { border: none !important; }
+      html, body {
+        margin: 0 !important;
+        background: #fff !important;
+        width: 210mm;
+      }
+      body { padding: 5mm !important; }
+      .page { width: 200mm; max-width: none !important; margin: 0 !important; }
+      .wrap { border: 1px solid #2c5aa0 !important; }
       * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     }
+
     .brand-strip { display: flex; align-items: center; gap: 6px; padding: 3px 10px; border-bottom: 1px solid #ccc; background: #f9fafc; font-size: 8.5px; color: #666; }
     .brand-strip img { height: 11px; width: auto; }
     .hdr-title-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 2px solid #2c5aa0; gap: 10px; background: linear-gradient(180deg, #ffffff 0%, #f0f4ff 100%); }
@@ -901,13 +907,19 @@ function buildA5Html(args, shared) {
     .words-col { flex: 1; padding: 8px 14px; border-right: 1px solid #2c5aa0; font-size: 8.5px; display: flex; flex-direction: column; justify-content: center; min-width: 170px; }
     .words-lbl { font-weight: 700; color: #2c5aa0; margin-bottom: 3px; text-transform: uppercase; font-size: 8px; }
     .words-val { font-size: 9.5px; font-weight: 600; font-style: italic; }
-    .amt-col { width: 190px; flex-shrink: 0; }
+    .amt-col { width: 220px; flex-shrink: 0; }
     .amt-tbl { width: 100%; border-collapse: collapse; font-size: 8.5px; }
     .amt-tbl td { padding: 4px 8px; border: 1px solid #c9d2dc; }
     .amt-tbl .lbl { font-weight: 600; background: #f8f8f8; }
     .amt-tbl .val { text-align: right; font-weight: 600; }
     .grand .lbl, .grand .val { background: #2c5aa0; color: #fff; font-weight: 700; }
     .pay-red { color: #e53935; } .pay-grn { color: #43a047; }
+    .tax-sum { border-top: 1px solid #2c5aa0; }
+    .tax-ttl { padding: 3px 0; font-size: 8.5px; font-weight: 700; text-align: center; color: #2c5aa0; background: #f0f4ff; text-transform: uppercase; letter-spacing: 0.3px; }
+    .tax-tbl { width: 100%; border-collapse: collapse; font-size: 8px; }
+    .tax-tbl th, .tax-tbl td { padding: 3px 6px; border: 1px solid #c9d2dc; text-align: center; }
+    .tax-tbl th { background: #2c5aa0; color: #fff; font-size: 7.5px; text-transform: uppercase; }
+    .tax-tbl tr.total-row td { font-weight: 700; background: #f8f8f8; }
     .footer-block { border-top: 1.5px solid #2c5aa0; }
     .payment-method-row { text-align: right; font-size: 8px; padding: 4px 14px; color: #444; }
     .ftr { display: flex; justify-content: flex-end; min-height: 45px; }
@@ -922,6 +934,64 @@ function buildA5Html(args, shared) {
       .amt-col { width: 100%; }
       .bank-col, .words-col { border-right: none; border-bottom: 1px solid #2c5aa0; }
     }
+
+    /* Page-break rules.
+       Normal case  : whole invoice is scaled to fit on one page, so we keep
+                      the footer block together (never split).
+       Overflow case: too many items to fit even at min zoom -> script adds
+                      body.multi, and we let it flow across pages naturally. */
+    @media print {
+      .tbl thead { display: table-header-group; }
+      .tbl tr { page-break-inside: avoid; }
+      .footer-block { page-break-inside: avoid; }
+      body.multi .footer-block { page-break-inside: auto; }
+    }
+  `;
+
+  // Auto-fit script: scales the whole invoice so it lands on exactly ONE
+  // A5-landscape page when printing. NOTE: no backticks / ${} inside here.
+  const fitScript = `
+    (function () {
+      var MM = 96 / 25.4;
+      var PAGE_W_MM = 200;      // 210mm - 2 * 5mm body padding
+      var MAX_H_PX = 135 * MM;  // 148mm - 2 * 5mm padding - 3mm safety
+      var MIN_ZOOM = 0.55;      // below this, let it flow to multiple pages
+      var page = document.querySelector('.page');
+      if (!page) return;
+
+      function reset() {
+        page.style.zoom = '';
+        page.style.width = '';
+        document.body.classList.remove('multi');
+      }
+
+      function fit() {
+        reset();
+        page.style.width = PAGE_W_MM + 'mm';
+        var h = page.getBoundingClientRect().height;
+        var z = h > MAX_H_PX ? MAX_H_PX / h : 1;
+        if (z < MIN_ZOOM) {
+          z = MIN_ZOOM;
+          document.body.classList.add('multi');
+        }
+        if (z < 1) {
+          page.style.zoom = String(z);
+          // keep the visual width at 200mm after zoom
+          page.style.width = (PAGE_W_MM / z) + 'mm';
+        }
+      }
+
+      window.addEventListener('beforeprint', fit);
+      window.addEventListener('afterprint', reset);
+
+      // Safari / older browsers fallback
+      if (window.matchMedia) {
+        var mql = window.matchMedia('print');
+        var handler = function (e) { e.matches ? fit() : reset(); };
+        if (mql.addEventListener) mql.addEventListener('change', handler);
+        else if (mql.addListener) mql.addListener(handler);
+      }
+    })();
   `;
 
   const brandStrip = isFreePlan
@@ -988,13 +1058,11 @@ function buildA5Html(args, shared) {
   </div>`;
 
   const headerBlock = preview ? "" : `${titleRow}${partiesRow}${metaRow}`;
-  const showUnitGst =
-    isGstInvoice && storedata?.settings?.showGstPerUnit === true;
   const itemsHTML = buildItemsHTMLA5(
     cartItems,
     isGstInvoice,
     isMrpEnabled,
-    showUnitGst,
+    showNetRate,
   );
 
   const sumRow = `<tr class="sum-row">
@@ -1003,7 +1071,6 @@ function buildA5Html(args, shared) {
     <td></td>
     ${isMrpEnabled ? "<td></td>" : ""}
     <td></td>
-    ${showUnitGst ? "<td></td>" : ""}
     <td class="r bold">₹${totalDiscount.toFixed(2)}</td>
     ${
       isGstInvoice
@@ -1012,6 +1079,7 @@ function buildA5Html(args, shared) {
            <td class="r bold">₹${(totalGST / 2).toFixed(2)}</td>`
         : ""
     }
+    ${showNetRate ? "<td></td>" : ""}
     <td class="r bold">₹${totalAmount.toFixed(2)}</td>
   </tr>`;
 
@@ -1112,6 +1180,17 @@ function buildA5Html(args, shared) {
         </div>`
       : "";
 
+  const taxSummaryHTML =
+    !preview && isGstInvoice && hasAnyGstRows
+      ? `<div class="tax-sum">
+          <div class="tax-ttl">Tax Summary</div>
+          <table class="tax-tbl">
+            <thead><tr><th>GST Rate</th><th>Taxable Value</th><th>CGST</th><th>SGST</th><th>IGST</th></tr></thead>
+            <tbody>${gstBreakdownRows}</tbody>
+          </table>
+        </div>`
+      : "";
+
   const footer = preview
     ? ""
     : `<div class="ftr">
@@ -1145,7 +1224,7 @@ function buildA5Html(args, shared) {
   ${headerBlock}
   <div class="tbl-wrap ${isCancelled ? "cancelled" : ""}">
     <table class="tbl">
-     ${tableHeaderA5(isGstInvoice, isMrpEnabled, showUnitGst)}
+      ${tableHeaderA5(isGstInvoice, isMrpEnabled, showNetRate)}
       <tbody>
         ${itemsHTML}
         ${sumRow}
@@ -1157,6 +1236,7 @@ function buildA5Html(args, shared) {
       ? ""
       : `<div class="footer-block">
           ${totalsBlock}
+          ${taxSummaryHTML}
           ${paymentMethodRow}
           ${footer}
           ${remarksRow}
@@ -1166,14 +1246,13 @@ function buildA5Html(args, shared) {
   ${preview ? "" : `<div class="page-footer-text">Invoice generated using amdaani billing app</div>`}
 </div>
 </div>
+<script>${fitScript}</script>
 </body>
 </html>`;
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// PUBLIC ENTRY POINT — dispatches to A4 or A5 based on pageFormat, exactly
-// what InvoiceListPage.js and InvoiceSummary.js already call. No changes
-// needed in either of those files.
+// PUBLIC ENTRY POINT
 // ════════════════════════════════════════════════════════════════════════
 export const generateInvoiceHTML = (args) => {
   const {
