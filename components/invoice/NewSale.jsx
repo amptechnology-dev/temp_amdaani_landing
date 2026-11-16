@@ -352,7 +352,13 @@ export default function SalesFlow() {
       email: doc.email ?? liveStoredata?.email,
       address: doc.address ?? liveStoredata?.address,
       bankDetails: doc.bankDetails ?? liveStoredata?.bankDetails,
-      settings: doc.settings ?? liveStoredata?.settings,
+      settings: {
+        ...(doc.settings ?? liveStoredata?.settings ?? {}),
+        showGstPerUnit:
+          liveStoredata?.settings?.showGstPerUnit ??
+          doc.settings?.showGstPerUnit ??
+          false,
+      },
       logoUrl: doc.logoUrl ?? liveStoredata?.logoUrl,
       signatureUrl: doc.signatureUrl ?? liveStoredata?.signatureUrl,
       isActive: doc.isActive ?? liveStoredata?.isActive,
@@ -794,8 +800,19 @@ export default function SalesFlow() {
         }
       }
 
-      const effectiveStoredataForPrint =
+      const baseStoredataForPrint =
         Object.keys(afterStoredata).length > 0 ? afterStoredata : storedata;
+
+      const effectiveStoredataForPrint = {
+        ...baseStoredataForPrint,
+        settings: {
+          ...(baseStoredataForPrint?.settings || {}),
+          showGstPerUnit:
+            storedata?.settings?.showGstPerUnit ??
+            baseStoredataForPrint?.settings?.showGstPerUnit ??
+            false,
+        },
+      };
 
       const pageFormat =
         effectiveStoredataForPrint?.settings?.printMode === "a5" ? "a5" : "a4";

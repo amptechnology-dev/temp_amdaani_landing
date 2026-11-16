@@ -39,7 +39,8 @@ function computeShared({
     const isTaxInclusive = item.isTaxInclusive || false;
 
     let discount = resolveItemDiscountInRupees(item);
-    if (isTaxInclusive && gstRate > 0) discount = discount / (1 + gstRate / 100);
+    if (isTaxInclusive && gstRate > 0)
+      discount = discount / (1 + gstRate / 100);
     discount = discount * qty;
 
     totalQty += qty;
@@ -84,7 +85,8 @@ function computeShared({
     const cgst = isIgst ? 0 : breakdown.cgstAmount || 0;
     const sgst = isIgst ? 0 : breakdown.sgstAmount || 0;
     const igst = isIgst
-      ? breakdown.igstAmount || (breakdown.cgstAmount || 0) + (breakdown.sgstAmount || 0)
+      ? breakdown.igstAmount ||
+        (breakdown.cgstAmount || 0) + (breakdown.sgstAmount || 0)
       : 0;
 
     gstBreakdownRows += `
@@ -214,6 +216,9 @@ function buildA4Html(args, shared) {
     isCancelled,
   } = shared;
 
+  const showUnitGst =
+    isGstInvoice && storedata?.settings?.showGstPerUnit === true;
+
   const itemsHTML = cartItems
     .map((item, index) => {
       const qty = item.qty || item.quantity || 0;
@@ -249,6 +254,11 @@ function buildA4Html(args, shared) {
             : ""
         }
         <td class="rate">₹${baseRate.toFixed(2)}</td>
+                ${
+                  showUnitGst
+                    ? `<td class="rate">₹${(baseRate * (1 + gstRate / 100)).toFixed(2)}</td>`
+                    : ""
+                }
         <td class="discount">
           ${
             itemTotalDiscount > 0
@@ -270,7 +280,8 @@ function buildA4Html(args, shared) {
     })
     .join("");
 
-  const colspanCount = (isGstInvoice ? 7 : 5) + (isMrpEnabled ? 1 : 0);
+  const colspanCount =
+    (isGstInvoice ? 7 : 5) + (isMrpEnabled ? 1 : 0) + (showUnitGst ? 1 : 0);
   const totalsRowCount =
     2 +
     (isGstInvoice ? 2 : 1) +
@@ -399,7 +410,8 @@ function buildA4Html(args, shared) {
                         <div class="company-details">
                           ${storedata?.address?.street ? `${storedata.address.street}<br>` : ""}
                           ${
-                            storedata?.address?.city || storedata?.address?.postalCode
+                            storedata?.address?.city ||
+                            storedata?.address?.postalCode
                               ? `${storedata?.address?.city || ""}${storedata?.address?.city && storedata?.address?.postalCode ? " - " : ""}${storedata?.address?.postalCode || ""}<br>`
                               : ""
                           }
@@ -426,7 +438,10 @@ function buildA4Html(args, shared) {
                       ${
                         formValues.customerState || formValues.state
                           ? `<div>State: ${formValues.customerState || formValues.state}${
-                              formValues.customerPostalCode || formValues.postalCode ? `, Pin: ${formValues.customerPostalCode || formValues.postalCode}` : ""
+                              formValues.customerPostalCode ||
+                              formValues.postalCode
+                                ? `, Pin: ${formValues.customerPostalCode || formValues.postalCode}`
+                                : ""
                             }</div>`
                           : ""
                       }
@@ -459,6 +474,7 @@ function buildA4Html(args, shared) {
                     <th>Unit</th>
                     ${isMrpEnabled ? `<th>MRP(₹)</th>` : ""}
                     <th>Price/Unit(₹)</th>
+                    ${showUnitGst ? `<th>Rate incl. GST(₹)</th>` : ""}
                     <th>Discount(₹)</th>
                     ${isGstInvoice ? `<th>Taxable Value(₹)</th><th>GST Amt.(%)</th>` : ""}
                     <th>Amount(₹)</th>
@@ -474,6 +490,7 @@ function buildA4Html(args, shared) {
                     <td></td>
                     ${isMrpEnabled ? `<td></td>` : ""}
                     <td></td>
+                     ${showUnitGst ? `<td></td>` : ""}
                     <td class="discount">₹${totalDiscount.toFixed(2)}</td>
                     ${
                       isGstInvoice
@@ -522,7 +539,10 @@ function buildA4Html(args, shared) {
                     </td>
                     <td class="label">Subtotal</td>
                     <td class="amount">₹${Number(
-                      createdInvoice ? invoiceData?.subTotal ?? invoiceCalculations.subtotal : invoiceCalculations.subtotal,
+                      createdInvoice
+                        ? (invoiceData?.subTotal ??
+                            invoiceCalculations.subtotal)
+                        : invoiceCalculations.subtotal,
                     ).toFixed(2)}</td>
                   </tr>
 
@@ -542,7 +562,9 @@ function buildA4Html(args, shared) {
                           <td class="amount" style="color:#e53935;">−₹${
                             createdInvoice
                               ? Number(invoiceData?.discountTotal).toFixed(2)
-                              : Number(invoiceCalculations.discountTotal).toFixed(2)
+                              : Number(
+                                  invoiceCalculations.discountTotal,
+                                ).toFixed(2)
                           }</td>
                         </tr>`
                       : ""
@@ -693,7 +715,12 @@ function buildA4Html(args, shared) {
 // bank+QR+payment-summary column beside amount-in-words + totals.
 // (Matches PDF-13 / the RN A5 template's look.)
 // ════════════════════════════════════════════════════════════════════════
-function buildItemsHTMLA5(cartItems, isGstInvoice, isMrpEnabled) {
+function buildItemsHTMLA5(
+  cartItems,
+  isGstInvoice,
+  isMrpEnabled,
+  showUnitGst = false,
+) {
   return cartItems
     .map((item, index) => {
       const qty = item.qty || item.quantity || 0;
@@ -724,6 +751,7 @@ function buildItemsHTMLA5(cartItems, isGstInvoice, isMrpEnabled) {
           <td class="c">${item.unit || "PCS"}</td>
           ${isMrpEnabled ? `<td class="r">₹${Number(item.mrp || 0).toFixed(2)}</td>` : ""}
           <td class="r">₹${baseRate.toFixed(2)}</td>
+           ${showUnitGst ? `<td class="r">₹${(baseRate * (1 + gstRate / 100)).toFixed(2)}</td>` : ""}
           <td class="r">${
             totalDiscount > 0
               ? `₹${totalDiscount.toFixed(2)}${discountPercent ? ` (${discountPercent}%)` : ""}`
@@ -743,7 +771,7 @@ function buildItemsHTMLA5(cartItems, isGstInvoice, isMrpEnabled) {
     .join("");
 }
 
-function tableHeaderA5(isGstInvoice, isMrpEnabled) {
+function tableHeaderA5(isGstInvoice, isMrpEnabled, showUnitGst = false) {
   return `<thead>
     <tr>
       <th style="width:24px">#</th>
@@ -753,6 +781,7 @@ function tableHeaderA5(isGstInvoice, isMrpEnabled) {
       <th>Unit</th>
       ${isMrpEnabled ? "<th>MRP(₹)</th>" : ""}
       <th>Rate(₹)</th>
+       ${showUnitGst ? "<th>Rate incl. GST(₹)</th>" : ""}
       <th>Discount</th>
       ${isGstInvoice ? "<th>Taxable(₹)</th><th>GST%</th><th>CGST(₹)</th><th>SGST(₹)</th>" : ""}
       <th>Amt(₹)</th>
@@ -796,8 +825,12 @@ function buildA5Html(args, shared) {
   } = shared;
 
   const MAX_PAY_SUMMARY_ROWS = 5;
-  const visibleTransactions = nonZeroTransactions.slice(0, MAX_PAY_SUMMARY_ROWS);
-  const hiddenTransactionCount = nonZeroTransactions.length - visibleTransactions.length;
+  const visibleTransactions = nonZeroTransactions.slice(
+    0,
+    MAX_PAY_SUMMARY_ROWS,
+  );
+  const hiddenTransactionCount =
+    nonZeroTransactions.length - visibleTransactions.length;
 
   const css = `
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -937,7 +970,9 @@ function buildA5Html(args, shared) {
       ${
         formValues.customerAddress || formValues.address
           ? `<div class="p-row"><span class="p-lbl">Address:</span> ${formValues.customerAddress || formValues.address}${
-              formValues.customerState || formValues.state ? `, ${formValues.customerState || formValues.state}` : ""
+              formValues.customerState || formValues.state
+                ? `, ${formValues.customerState || formValues.state}`
+                : ""
             }</div>`
           : ""
       }
@@ -953,13 +988,22 @@ function buildA5Html(args, shared) {
   </div>`;
 
   const headerBlock = preview ? "" : `${titleRow}${partiesRow}${metaRow}`;
-  const itemsHTML = buildItemsHTMLA5(cartItems, isGstInvoice, isMrpEnabled);
+  const showUnitGst =
+    isGstInvoice && storedata?.settings?.showGstPerUnit === true;
+  const itemsHTML = buildItemsHTMLA5(
+    cartItems,
+    isGstInvoice,
+    isMrpEnabled,
+    showUnitGst,
+  );
 
   const sumRow = `<tr class="sum-row">
     <td></td><td class="l bold">Total</td><td></td>
     <td class="c bold">${formatQty(totalQty)}</td>
+    <td></td>
     ${isMrpEnabled ? "<td></td>" : ""}
     <td></td>
+    ${showUnitGst ? "<td></td>" : ""}
     <td class="r bold">₹${totalDiscount.toFixed(2)}</td>
     ${
       isGstInvoice
@@ -1027,7 +1071,9 @@ function buildA5Html(args, shared) {
     <div class="amt-col">
       <table class="amt-tbl">
         <tr><td class="lbl">Subtotal</td><td class="val">₹${Number(
-          createdInvoice ? invoiceData?.subTotal ?? invoiceCalculations.subtotal : invoiceCalculations.subtotal,
+          createdInvoice
+            ? (invoiceData?.subTotal ?? invoiceCalculations.subtotal)
+            : invoiceCalculations.subtotal,
         ).toFixed(2)}</td></tr>
         ${
           (invoiceCalculations?.discountTotal ?? 0) > 0
@@ -1076,7 +1122,9 @@ function buildA5Html(args, shared) {
         </div>
       </div>`;
 
-  const remarksRow = invoiceData?.remarks ? `<div class="remarks">Remarks: ${invoiceData.remarks}</div>` : "";
+  const remarksRow = invoiceData?.remarks
+    ? `<div class="remarks">Remarks: ${invoiceData.remarks}</div>`
+    : "";
   const termsRow =
     !preview && storedata?.settings?.invoiceTerms
       ? `<div class="invoice-terms-content">${storedata.settings.invoiceTerms}</div>`
@@ -1097,7 +1145,7 @@ function buildA5Html(args, shared) {
   ${headerBlock}
   <div class="tbl-wrap ${isCancelled ? "cancelled" : ""}">
     <table class="tbl">
-      ${tableHeaderA5(isGstInvoice, isMrpEnabled)}
+     ${tableHeaderA5(isGstInvoice, isMrpEnabled, showUnitGst)}
       <tbody>
         ${itemsHTML}
         ${sumRow}

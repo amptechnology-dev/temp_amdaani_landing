@@ -5,6 +5,7 @@ import {
   Package,
   ShoppingCart,
   ClipboardList,
+  Percent,
   MailIcon,
   Phone,
   Bot,
@@ -148,6 +149,10 @@ export default function Settings() {
   const [stockLoading, setStockLoading] = useState(false);
   const [poLoading, setPoLoading] = useState(false);
   const [mrpLoading, setMrpLoading] = useState(false);
+  const [gstUnitLoading, setGstUnitLoading] = useState(false);
+  const isGstPerUnitEnabled = Boolean(
+    authState?.user?.store?.settings?.showGstPerUnit,
+  );
 
   // ── Toast ──
   const [toast, setToast] = useState(null);
@@ -199,6 +204,13 @@ export default function Settings() {
       { mrpManagement: !isMrpEnabled },
       `MRP management ${!isMrpEnabled ? "enabled" : "disabled"}`,
       setMrpLoading,
+    );
+
+  const handleGstPerUnitToggle = () =>
+    updateStoreSettings(
+      { showGstPerUnit: !isGstPerUnitEnabled },
+      `GST rate per unit column ${!isGstPerUnitEnabled ? "enabled" : "disabled"}`,
+      setGstUnitLoading,
     );
 
   // ── Change Email Modal ──
@@ -363,6 +375,18 @@ export default function Settings() {
                     checked={isMrpEnabled}
                     onChange={handleMrpToggle}
                     loading={mrpLoading}
+                  />
+                }
+              />
+              <SettingsRow
+                icon={Percent}
+                title="GST Rate Per Unit"
+                description="Show rate including GST per unit in sale invoice"
+                right={
+                  <Switch
+                    checked={isGstPerUnitEnabled}
+                    onChange={handleGstPerUnitToggle}
+                    loading={gstUnitLoading}
                   />
                 }
               />
