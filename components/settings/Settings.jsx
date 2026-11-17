@@ -136,6 +136,9 @@ export default function Settings() {
     hasPermission,
     updateAuthState,
     isStaff,
+    hasFeature,
+    guardFeature,
+    storeSettings,
   } = useAuth();
 
   const getCurrentEmail = () =>
@@ -166,9 +169,11 @@ export default function Settings() {
       setLoading(true);
       const response = await api.put("/store/update-my-store", {
         settings: {
-          stockManagement: isStockEnabled,
-          purchaseOrderManagement: isPurchaseOrderEnabled,
-          mrpManagement: isMrpEnabled,
+          // store-er asol saved value pathai, plan-lock-er karone
+          // false dekhale-o jeno overwrite na hoy
+          stockManagement: !!storeSettings?.stockManagement,
+          purchaseOrderManagement: !!storeSettings?.purchaseOrderManagement,
+          mrpManagement: !!storeSettings?.mrpManagement,
           ...patch,
         },
       });
@@ -185,19 +190,23 @@ export default function Settings() {
     }
   };
 
-  const handleStockToggle = () =>
+  const handleStockToggle = () => {
+    if (!guardFeature("stockManagement")) return;
     updateStoreSettings(
       { stockManagement: !isStockEnabled },
       `Stock management ${!isStockEnabled ? "enabled" : "disabled"}`,
       setStockLoading,
     );
+  };
 
-  const handlePurchaseOrderToggle = () =>
+  const handlePurchaseOrderToggle = () => {
+    if (!guardFeature("purchaseManagement")) return;
     updateStoreSettings(
       { purchaseOrderManagement: !isPurchaseOrderEnabled },
       `Purchase management ${!isPurchaseOrderEnabled ? "enabled" : "disabled"}`,
       setPoLoading,
     );
+  };
 
   const handleMrpToggle = () =>
     updateStoreSettings(
@@ -345,7 +354,11 @@ export default function Settings() {
               <SettingsRow
                 icon={Package}
                 title="Stock Management"
-                description="Enable inventory tracking and stock adjustments"
+                description={
+                  hasFeature("stockManagement")
+                    ? "Enable inventory tracking and stock adjustments"
+                    : "Not included in your plan. Upgrade to use"
+                }
                 right={
                   <Switch
                     checked={isStockEnabled}
@@ -357,7 +370,11 @@ export default function Settings() {
               <SettingsRow
                 icon={ShoppingCart}
                 title="Purchase Management"
-                description="Enable purchase order features"
+                description={
+                  hasFeature("purchaseManagement")
+                    ? "Enable purchase order features"
+                    : "Not included in your plan. Upgrade to use"
+                }
                 right={
                   <Switch
                     checked={isPurchaseOrderEnabled}

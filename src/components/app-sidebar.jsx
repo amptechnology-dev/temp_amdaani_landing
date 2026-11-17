@@ -3,18 +3,11 @@
 import * as React from "react";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  FileBarChart,
-  Settings,
-  LogOut,
-  ChevronRight,
-  ChevronsUpDown,
-} from "lucide-react";
+import { FileBarChart, ChevronRight, Crown } from "lucide-react";
 
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -27,18 +20,8 @@ import {
   SidebarGroupLabel,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
 import { useAuth } from "../../context/AuthContext";
 import { sections, reportSubItems, isItemVisible } from "../lib/navigation";
-
-const user = { name: "AMDAANI", email: "m@example.com" };
 
 // STAFF role-er jonno ei item gulo sidebar-e dekhabe na.
 // Item-er url ba title e ei word thakle hide hobe.
@@ -50,18 +33,57 @@ const isHiddenForStaff = (item) =>
     (re) => re.test(item?.url || "") || re.test(item?.title || ""),
   );
 
+// Plan-e feature na thakle ei premium badge dekhabe
+function PremiumBadge({ small = false }) {
+  return (
+    <span
+      title="Premium feature"
+      className={`ml-auto shrink-0 flex items-center justify-center rounded-md bg-amber-50 ring-1 ring-amber-200/80 group-data-[collapsible=icon]:hidden ${
+        small ? "w-[18px] h-[18px]" : "w-5 h-5"
+      }`}
+    >
+      <Crown
+        className={`text-amber-500 ${small ? "w-2.5 h-2.5" : "w-3 h-3"}`}
+        fill="currentColor"
+        strokeWidth={1.75}
+      />
+    </span>
+  );
+}
+
+const baseBtn =
+  "relative h-10 rounded-xl px-3 transition-all duration-200 cursor-pointer border";
+const activeBtn =
+  "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-600 hover:to-blue-700 shadow-md shadow-blue-500/25 border-blue-700/30";
+const idleBtn =
+  "text-slate-600 border-transparent hover:bg-slate-100/80 hover:text-slate-900";
+
 export function AppSidebar({ ...props }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { isStockEnabled, isPurchaseOrderEnabled, isStaff } = useAuth();
+  const {
+    isStockEnabled,
+    isPurchaseOrderEnabled,
+    isStaff,
+    hasFeature,
+    guardFeature,
+    subscription,
+  } = useAuth();
 
   const flags = { isStockEnabled, isPurchaseOrderEnabled, isStaff };
 
   const canSee = React.useCallback(
-    (item) =>
-      isItemVisible(item, flags) && !(isStaff && isHiddenForStaff(item)),
+    (item) => {
+      if (isStaff && isHiddenForStaff(item)) return false;
+      if (item.hideForStaff && isStaff) return false;
+
+      // Plan-e feature nai → locked obosthay dekhao (click korle popup)
+      if (item.feature && !hasFeature(item.feature)) return true;
+
+      return isItemVisible(item, flags);
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isStockEnabled, isPurchaseOrderEnabled, isStaff],
+    [isStockEnabled, isPurchaseOrderEnabled, isStaff, subscription],
   );
 
   const visibleReportItems = React.useMemo(
@@ -76,16 +98,18 @@ export function AppSidebar({ ...props }) {
     if (isReportsActive) setReportsOpen(true);
   }, [isReportsActive]);
 
+  const reportsLocked = !hasFeature("reports");
+
   return (
     <Sidebar
       collapsible="icon"
       {...props}
-      className="border-r border-slate-200 bg-gradient-to-b from-white via-slate-50/40 to-slate-50/60 shadow-[4px_0_24px_-8px_rgba(15,23,42,0.08)]"
+      className="border-r border-slate-200/80 bg-gradient-to-b from-white via-slate-50/50 to-slate-50 shadow-[4px_0_24px_-8px_rgba(15,23,42,0.08)]"
     >
       {/* ---------------- HEADER ---------------- */}
-      <SidebarHeader className="border-b border-slate-200/80 bg-white/60 backdrop-blur-sm px-3 py-4">
+      <SidebarHeader className="relative border-b border-slate-200/80 bg-gradient-to-b from-blue-50/60 to-white px-3 py-4">
         <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
-          <div className="relative flex items-center justify-center w-11 h-11 rounded-2xl bg-white shrink-0 shadow-sm ring-1 ring-slate-200 overflow-hidden">
+          <div className="relative flex items-center justify-center w-11 h-11 rounded-2xl bg-white shrink-0 shadow-md shadow-blue-500/10 ring-1 ring-slate-200 overflow-hidden">
             <Image
               src="/images/Tapplogo.png"
               alt="AMDAANI logo"
@@ -104,7 +128,7 @@ export function AppSidebar({ ...props }) {
       </SidebarHeader>
 
       {/* ---------------- NAV ---------------- */}
-      <SidebarContent className="px-2.5 py-3 gap-0.5">
+      <SidebarContent className="px-2.5 py-3 gap-0.5 pb-6 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-200 hover:[&::-webkit-scrollbar-thumb]:bg-slate-300">
         {sections.map((section, sIdx) => {
           const visibleItems = section.items.filter(canSee);
           const showReportsRow = section.label === "Reports & Insights";
@@ -115,7 +139,8 @@ export function AppSidebar({ ...props }) {
           return (
             <React.Fragment key={section.label}>
               <SidebarGroup className="py-1">
-                <SidebarGroupLabel className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider px-2 mb-1.5">
+                <SidebarGroupLabel className="flex items-center gap-1.5 text-[10.5px] font-bold text-slate-400 uppercase tracking-[0.08em] px-2 mb-1.5">
+                  <span className="h-1 w-1 rounded-full bg-blue-400/70 group-data-[collapsible=icon]:hidden" />
                   {section.label}
                 </SidebarGroupLabel>
                 <SidebarMenu className="gap-0.5">
@@ -124,35 +149,42 @@ export function AppSidebar({ ...props }) {
                       pathname === item.url ||
                       (item.url !== "/dashboard" &&
                         pathname?.startsWith(item.url));
+                    const isLocked = item.feature && !hasFeature(item.feature);
+                    const active = isActive && !isLocked;
 
                     return (
                       <SidebarMenuItem key={item.title}>
                         <SidebarMenuButton
-                          onClick={() => router.push(item.url)}
-                          isActive={isActive}
+                          onClick={() => {
+                            if (item.feature && !guardFeature(item.feature))
+                              return;
+                            router.push(item.url);
+                          }}
+                          isActive={active}
                           tooltip={item.title}
-                          className={`relative h-10 rounded-xl px-3 transition-all duration-150 cursor-pointer border ${
-                            isActive
-                              ? "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-600 hover:to-blue-700 shadow-md shadow-blue-300/50 border-blue-700/30"
-                              : "text-slate-600 border-transparent hover:bg-white hover:border-slate-200 hover:shadow-sm hover:text-slate-900"
-                          }`}
+                          className={`${baseBtn} ${active ? activeBtn : idleBtn}`}
                         >
-                          {isActive && (
-                            <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-[3.5px] rounded-full bg-white group-data-[collapsible=icon]:hidden" />
+                          {active && (
+                            <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-[3.5px] rounded-r-full bg-white group-data-[collapsible=icon]:hidden" />
                           )}
                           <item.icon
                             className={`w-[18px] h-[18px] shrink-0 ${
-                              isActive ? "!text-white" : "text-slate-500"
+                              active ? "!text-white" : "text-slate-500"
                             }`}
                             strokeWidth={2.2}
                           />
                           <span
                             className={`font-semibold text-[13.5px] ${
-                              isActive ? "!text-white" : "text-slate-700"
+                              active
+                                ? "!text-white"
+                                : isLocked
+                                  ? "text-slate-500"
+                                  : "text-slate-700"
                             }`}
                           >
                             {item.title}
                           </span>
+                          {isLocked && <PremiumBadge />}
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     );
@@ -161,57 +193,92 @@ export function AppSidebar({ ...props }) {
                   {showReportsRow && (
                     <SidebarMenuItem>
                       <SidebarMenuButton
-                        onClick={() => setReportsOpen((prev) => !prev)}
-                        isActive={isReportsActive}
+                        onClick={() => {
+                          if (!guardFeature("reports")) return;
+                          setReportsOpen((prev) => !prev);
+                        }}
+                        isActive={isReportsActive && !reportsLocked}
                         tooltip="Reports"
-                        className={`relative h-10 rounded-xl px-3 transition-all duration-150 cursor-pointer border ${
-                          isReportsActive
-                            ? "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-600 hover:to-blue-700 shadow-md shadow-blue-300/50 border-blue-700/30"
-                            : "text-slate-600 border-transparent hover:bg-white hover:border-slate-200 hover:shadow-sm hover:text-slate-900"
+                        className={`${baseBtn} ${
+                          isReportsActive && !reportsLocked
+                            ? activeBtn
+                            : idleBtn
                         }`}
                       >
-                        {isReportsActive && (
-                          <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-[3.5px] rounded-full bg-white group-data-[collapsible=icon]:hidden" />
+                        {isReportsActive && !reportsLocked && (
+                          <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-[3.5px] rounded-r-full bg-white group-data-[collapsible=icon]:hidden" />
                         )}
                         <FileBarChart
-                          className={`w-[18px] h-[18px] shrink-0 ${isReportsActive ? "!text-white" : "text-slate-500"}`}
+                          className={`w-[18px] h-[18px] shrink-0 ${
+                            isReportsActive && !reportsLocked
+                              ? "!text-white"
+                              : "text-slate-500"
+                          }`}
                           strokeWidth={2.2}
                         />
                         <span
-                          className={`font-semibold text-[13.5px] ${isReportsActive ? "!text-white" : "text-slate-700"}`}
+                          className={`font-semibold text-[13.5px] ${
+                            isReportsActive && !reportsLocked
+                              ? "!text-white"
+                              : reportsLocked
+                                ? "text-slate-500"
+                                : "text-slate-700"
+                          }`}
                         >
                           Reports
                         </span>
-                        <ChevronRight
-                          className={`ml-auto w-4 h-4 shrink-0 transition-transform duration-200 group-data-[collapsible=icon]:hidden ${
-                            reportsOpen ? "rotate-90" : ""
-                          } ${isReportsActive ? "!text-white" : "text-slate-500"}`}
-                          strokeWidth={2.2}
-                        />
+                        {reportsLocked ? (
+                          <PremiumBadge />
+                        ) : (
+                          <ChevronRight
+                            className={`ml-auto w-4 h-4 shrink-0 transition-transform duration-200 group-data-[collapsible=icon]:hidden ${
+                              reportsOpen ? "rotate-90" : ""
+                            } ${
+                              isReportsActive ? "!text-white" : "text-slate-500"
+                            }`}
+                            strokeWidth={2.2}
+                          />
+                        )}
                       </SidebarMenuButton>
 
-                      {reportsOpen && (
-                        <SidebarMenuSub className="mt-0.5 ml-3.5 pl-3 border-l-2 border-slate-200 gap-0.5 group-data-[collapsible=icon]:hidden">
+                      {reportsOpen && !reportsLocked && (
+                        <SidebarMenuSub className="mt-1 ml-[22px] pl-3 border-l-2 border-slate-200 gap-0.5 group-data-[collapsible=icon]:hidden">
                           {visibleReportItems.map((item) => {
                             const isSubActive = pathname === item.url;
+                            const isSubLocked =
+                              item.feature && !hasFeature(item.feature);
+                            const subActive = isSubActive && !isSubLocked;
+
                             return (
                               <SidebarMenuSubItem key={item.key}>
                                 <SidebarMenuSubButton
-                                  onClick={() => router.push(item.url)}
-                                  isActive={isSubActive}
+                                  onClick={() => {
+                                    if (
+                                      item.feature &&
+                                      !guardFeature(item.feature)
+                                    )
+                                      return;
+                                    router.push(item.url);
+                                  }}
+                                  isActive={subActive}
                                   className={`h-auto min-h-8 py-1.5 rounded-lg px-2.5 text-[13px] font-semibold transition-all duration-150 cursor-pointer border items-start ${
-                                    isSubActive
+                                    subActive
                                       ? "bg-blue-50 text-blue-700 border-blue-200 shadow-sm"
-                                      : "text-slate-600 border-transparent hover:bg-white hover:border-slate-200 hover:text-slate-900"
+                                      : "text-slate-600 border-transparent hover:bg-slate-100/80 hover:text-slate-900"
                                   }`}
                                 >
                                   <item.icon
-                                    className={`w-[15px] h-[15px] shrink-0 mt-0.5 ${isSubActive ? "text-blue-600" : "text-slate-500"}`}
+                                    className={`w-[15px] h-[15px] shrink-0 mt-0.5 ${
+                                      subActive
+                                        ? "text-blue-600"
+                                        : "text-slate-500"
+                                    }`}
                                     strokeWidth={2.2}
                                   />
                                   <span className="whitespace-normal leading-snug">
                                     {item.title}
                                   </span>
+                                  {isSubLocked && <PremiumBadge small />}
                                 </SidebarMenuSubButton>
                               </SidebarMenuSubItem>
                             );
@@ -230,60 +297,6 @@ export function AppSidebar({ ...props }) {
           );
         })}
       </SidebarContent>
-
-      {/* ---------------- FOOTER ---------------- */}
-      <SidebarFooter className="border-t border-slate-200/80 bg-white/60 backdrop-blur-sm px-2.5 py-2.5">
-        <SidebarMenu className="gap-0.5">
-          <SidebarMenuItem>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton
-                  size="lg"
-                  className="h-13 rounded-xl px-2.5 mt-1 hover:bg-white hover:shadow-sm data-[state=open]:bg-white data-[state=open]:shadow-sm border border-transparent hover:border-slate-200 cursor-pointer transition-all duration-150"
-                >
-                  <Avatar className="h-8 w-8 rounded-lg border border-slate-200 shrink-0 bg-white">
-                    <AvatarImage
-                      src="/images/Tapplogo.png"
-                      alt={user.name}
-                      className="object-contain p-1 bg-white"
-                    />
-                    <AvatarFallback className="rounded-lg bg-blue-600 text-white text-xs font-bold">
-                      {user.name?.slice(0, 2)?.toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="grid flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden min-w-0">
-                    <span className="truncate font-bold text-[13.5px] text-slate-800">
-                      {user.name}
-                    </span>
-                    <span className="truncate text-[11.5px] text-slate-400">
-                      {user.email}
-                    </span>
-                  </div>
-                  <ChevronsUpDown className="ml-auto w-4 h-4 text-slate-300 group-data-[collapsible=icon]:hidden" />
-                </SidebarMenuButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                className="w-56 rounded-xl"
-                side="top"
-                align="start"
-              >
-                <DropdownMenuItem
-                  onClick={() => router.push("/dashboard/settings")}
-                  className="gap-2 cursor-pointer"
-                >
-                  <Settings className="w-4 h-4" />
-                  Account Settings
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="gap-2 text-red-600 focus:text-red-600 cursor-pointer">
-                  <LogOut className="w-4 h-4" />
-                  Log out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
 
       <SidebarRail />
     </Sidebar>

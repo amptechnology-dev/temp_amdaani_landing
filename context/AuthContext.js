@@ -13,6 +13,7 @@ import { extractErrorMessage } from "../utils/errorHandler";
 import { jwtDecode } from "jwt-decode";
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
+import FeatureLockedDialog from "../src/components/FeatureLockedDialog";
 
 // Permission roles
 export const roles = {
@@ -63,6 +64,7 @@ export const AuthProvider = ({ children }) => {
   const [subscription, setSubscription] = useState(null);
   const [usage, setUsage] = useState(null);
   const [subLoading, setSubLoading] = useState(false);
+  const [lockedFeature, setLockedFeature] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
@@ -274,6 +276,9 @@ export const AuthProvider = ({ children }) => {
       if (response.data?.subscription) {
         setSubscription(response.data.subscription);
         setUsage(response.data.usage);
+      } else {
+        setSubscription(null);
+        setUsage(null);
       }
     } catch (err) {
       console.log("[Subscription] Error:", err);
@@ -465,6 +470,7 @@ export const AuthProvider = ({ children }) => {
         Cookies.set("user", JSON.stringify(res.data.user));
 
         scheduleProactiveRefresh(newAuth.accessToken);
+        fetchSubscription();
       }
 
       return res;
@@ -538,6 +544,24 @@ export const AuthProvider = ({ children }) => {
     .trim();
   const isStaff = roleName === roles.STAFF;
 
+  const isSuperAdmin = roleName === "super-admin";
+
+  const hasFeature = (key) => {
+    if (isSuperAdmin) return true;
+    if (!subscription) return false;
+    return Boolean(
+      subscription.enabledFeatures?.[key] ??
+      subscription.plan?.enabledFeatures?.[key] ??
+      false,
+    );
+  };
+
+  const guardFeature = (key) => {
+    if (hasFeature(key)) return true;
+    setLockedFeature(key);
+    return false;
+  };
+
   // Staff: shudhu view. Baki role-er jonno permission check.
   const canViewPurchases =
     isStaff || hasPermission(permissions.CAN_VIEW_PURCHASES);
@@ -549,8 +573,10 @@ export const AuthProvider = ({ children }) => {
     !isStaff && hasPermission(permissions.CAN_CANCEL_PURCHASES);
 
   const storeSettings = authState?.user?.store?.settings || {};
-  const isStockEnabled = !!storeSettings.stockManagement;
-  const isPurchaseOrderEnabled = !!storeSettings.purchaseOrderManagement;
+  const isStockEnabled =
+    !!storeSettings.stockManagement && hasFeature("stockManagement");
+  const isPurchaseOrderEnabled =
+    !!storeSettings.purchaseOrderManagement && hasFeature("purchaseManagement");
   const isMrpEnabled = !!storeSettings.mrpManagement;
 
   const completeOnboarding = () => {
@@ -586,6 +612,9 @@ export const AuthProvider = ({ children }) => {
       isPurchaseOrderEnabled,
       isMrpEnabled,
       isStaff,
+      hasFeature,
+      guardFeature,
+      storeSettings,
       canViewPurchases,
       canCreatePurchases,
       canEditPurchases,
@@ -602,7 +631,14 @@ export const AuthProvider = ({ children }) => {
   );
 
   return (
-    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={contextValue}>
+      {children}
+      <FeatureLockedDialog
+        featureKey={lockedFeature}
+        currentPlanName={subscription?.planName}
+        onClose={() => setLockedFeature(null)}
+      />
+    </AuthContext.Provider>
   );
 };
 

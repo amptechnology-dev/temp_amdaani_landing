@@ -39,6 +39,14 @@ const planColors = {
   Silver: "#64748B",
 };
 
+const ACCESS_ROWS = [
+  ["manageStaff", "Manage Staff"],
+  ["stockManagement", "Stock Management"],
+  ["orders", "Orders"],
+  ["reports", "Reports"],
+  ["purchaseManagement", "Purchase & Vendors"],
+];
+
 export default function PricingPage() {
   const { theme } = useTheme();
   const currentTheme = themeConfig[theme];
@@ -85,6 +93,7 @@ export default function PricingPage() {
           durationDays: plan.durationDays,
           featuresDetails: plan.features,
           usageLimits: plan.usageLimits,
+          enabledFeatures: plan.enabledFeatures,
           planType: plan.planType,
           color: planColors[plan.name] || "#2563EB",
           isCurrentPlan:
@@ -427,6 +436,28 @@ export default function PricingPage() {
                         )}
                       </div>
                     )}
+
+                    {/* Plan access (kon feature pabe) */}
+                    <div className="mb-4 space-y-1.5">
+                      {ACCESS_ROWS.map(([k, label]) => (
+                        <div key={k} className="flex items-center gap-2 text-[13px]">
+                          {plan.enabledFeatures?.[k] ? (
+                            <Check className="w-4 h-4 text-blue-600" />
+                          ) : (
+                            <X className="w-4 h-4 text-slate-300" />
+                          )}
+                          <span
+                            className={
+                              plan.enabledFeatures?.[k]
+                                ? "text-slate-700"
+                                : "text-slate-400"
+                            }
+                          >
+                            {label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
 
                     {/* Features — always visible on desktop, no click-to-expand */}
                     {plan.featuresDetails?.length > 0 && (

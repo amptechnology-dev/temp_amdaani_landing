@@ -26,6 +26,7 @@ import {
 // -----------------------------------------
 // Reports sub-items (single source of truth)
 // hideForStaff: true  ->  role STAFF hole sidebar-e dekhabe na
+// feature: "xyz"      ->  plan-e oi feature na thakle locked dekhabe
 // -----------------------------------------
 export const reportSubItems = [
   {
@@ -64,6 +65,7 @@ export const reportSubItems = [
     icon: PackageSearch,
     key: "stock",
     requiresStock: true,
+    feature: "stockManagement",
   },
   {
     title: "Profit & Loss Report",
@@ -77,6 +79,7 @@ export const reportSubItems = [
     icon: ShoppingCart,
     key: "purchase",
     requiresPurchaseOrder: true,
+    feature: "purchaseManagement",
     hideForStaff: true,
   },
   {
@@ -116,6 +119,7 @@ export const sections = [
         url: "/dashboard/vendors",
         icon: Users,
         requiresPurchaseOrder: true,
+        feature: "purchaseManagement",
         hideForStaff: true,
       },
       { title: "Customers", url: "/dashboard/customers", icon: Users },
@@ -129,9 +133,15 @@ export const sections = [
         url: "/dashboard/purchase",
         icon: ShoppingCart,
         requiresPurchaseOrder: true,
+        feature: "purchaseManagement",
         hideForStaff: true,
       },
-      { title: "Orders", url: "/dashboard/orders", icon: ClipboardList },
+      {
+        title: "Orders",
+        url: "/dashboard/orders",
+        icon: ClipboardList,
+        feature: "orders",
+      },
       { title: "Sales", url: "/dashboard/sales", icon: Receipt },
       { title: "Other Expenses", url: "/dashboard/expenses", icon: Wallet },
     ],
@@ -150,6 +160,15 @@ export const sections = [
     label: "Business Setup",
     items: [
       { title: "Business Profile", url: "/dashboard/profile", icon: Building2 },
+      // NOTE: /dashboard/staff page tomar project-e thakte hobe.
+      // Na thakle ei item ta muche dao.
+      {
+        title: "Manage Staff",
+        url: "/dashboard/users",
+        icon: UserCheck,
+        feature: "manageStaff",
+        hideForStaff: true,
+      },
       {
         title: "Print Preference",
         url: "/dashboard/print-preference",
