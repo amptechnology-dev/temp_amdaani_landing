@@ -42,6 +42,69 @@ import indianStatesData from "../../src/assets/data/states.json";
 // -------------------------------
 // Payment method options
 // -------------------------------
+
+const QTY_MAX_DECIMALS = 3;
+
+const sanitizeQty = (raw) => {
+  let v = String(raw ?? "").replace(/[^\d.]/g, "");
+  const parts = v.split(".");
+  if (parts.length > 2) v = parts[0] + "." + parts.slice(1).join("");
+  const [intPart, decPart] = v.split(".");
+  return decPart !== undefined
+    ? `${intPart}.${decPart.slice(0, QTY_MAX_DECIMALS)}`
+    : intPart;
+};
+
+function QtyInput({ value, onCommit }) {
+  const toText = (v) => (v === undefined || v === null ? "" : String(v));
+  const [text, setText] = useState(toText(value));
+  const [focused, setFocused] = useState(false);
+
+  // Focus e na thakle parent er value diye sync (edit mode, external update)
+  useEffect(() => {
+    if (!focused) setText(toText(value));
+  }, [value, focused]);
+
+  const handleChange = (e) => {
+    const clean = sanitizeQty(e.target.value);
+    setText(clean);
+    const n = parseFloat(clean);
+    onCommit(isNaN(n) ? 0 : n);
+  };
+
+  const handleBlur = () => {
+    setFocused(false);
+    const n = parseFloat(text);
+    const safe =
+      isNaN(n) || n <= 0
+        ? 1
+        : Math.round(n * 10 ** QTY_MAX_DECIMALS) / 10 ** QTY_MAX_DECIMALS;
+    setText(String(safe));
+    onCommit(safe);
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={text}
+      onChange={handleChange}
+      onFocus={(e) => {
+        setFocused(true);
+        e.target.select();
+      }}
+      onBlur={handleBlur}
+      className="w-20 h-8 text-center border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 mx-auto block"
+    />
+  );
+}
+
+// Display e unnecessary trailing zero soriye dey: 2.500 -> 2.5, 3.000 -> 3
+const formatQty = (n) =>
+  Number(n || 0)
+    .toFixed(QTY_MAX_DECIMALS)
+    .replace(/\.?0+$/, "");
+
 const PAYMENT_OPTIONS = [
   { label: "Cash", value: "cash", icon: Banknote },
   { label: "UPI", value: "upi", icon: QrCode },
@@ -1140,12 +1203,17 @@ export default function NewInvoiceFormPage({
   };
 
   const handleQtyChange = (id) => (e) => {
-    const v = e.target.value.replace(/[^\d]/g, "");
-    handleUpdateItemField(id, "qty", v);
+    handleUpdateItemField(id, "qty", sanitizeQty(e.target.value));
   };
+
   const handleQtyBlur = (id) => (e) => {
-    const n = parseInt(e.target.value, 10);
-    handleUpdateItemField(id, "qty", isNaN(n) || n < 1 ? 1 : n);
+    const n = parseFloat(e.target.value);
+    // empty / 0 / invalid hole 1, na hole 3 decimal e round
+    const safe =
+      isNaN(n) || n <= 0
+        ? 1
+        : Math.round(n * 10 ** QTY_MAX_DECIMALS) / 10 ** QTY_MAX_DECIMALS;
+    handleUpdateItemField(id, "qty", safe);
   };
 
   const handleDecimalChange = (id, field) => (e) => {
@@ -1468,7 +1536,7 @@ export default function NewInvoiceFormPage({
                 Items
                 {cartItems.length > 0 && (
                   <Badge className="ml-1 bg-blue-600 hover:bg-blue-600 text-xs">
-                    {invoiceCalculations.totalQuantity} qty
+                    {formatQty(invoiceCalculations.totalQuantity)} qty
                   </Badge>
                 )}
               </span>
@@ -1543,13 +1611,11 @@ export default function NewInvoiceFormPage({
                         {item.unit || "Pcs"}
                       </td>
                       <td className="px-2 py-1.5 border-b border-slate-100">
-                        <input
-                          type="text"
-                          inputMode="numeric"
+                        <QtyInput
                           value={item.qty}
-                          onChange={handleQtyChange(item._id)}
-                          onBlur={handleQtyBlur(item._id)}
-                          className="w-16 h-8 text-center border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 mx-auto block"
+                          onCommit={(n) =>
+                            handleUpdateItemField(item._id, "qty", n)
+                          }
                         />
                       </td>
                       <td className="px-2 py-1.5 border-b border-slate-100">

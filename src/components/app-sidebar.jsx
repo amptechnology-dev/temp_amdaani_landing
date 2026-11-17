@@ -58,7 +58,8 @@ export function AppSidebar({ ...props }) {
   const flags = { isStockEnabled, isPurchaseOrderEnabled, isStaff };
 
   const canSee = React.useCallback(
-    (item) => isItemVisible(item, flags) && !(isStaff && isHiddenForStaff(item)),
+    (item) =>
+      isItemVisible(item, flags) && !(isStaff && isHiddenForStaff(item)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [isStockEnabled, isPurchaseOrderEnabled, isStaff],
   );
@@ -97,9 +98,6 @@ export function AppSidebar({ ...props }) {
           <div className="flex flex-col group-data-[collapsible=icon]:hidden min-w-0">
             <span className="font-black text-[19px] text-slate-900 tracking-tight leading-none truncate">
               AMDAANI
-            </span>
-            <span className="text-[11px] font-medium text-slate-400 mt-1 tracking-wide">
-              Free plan
             </span>
           </div>
         </div>

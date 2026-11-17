@@ -125,8 +125,8 @@ export default function InvoiceListPage({
   const [activePreviewStatus, setActivePreviewStatus] = useState("active");
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [activePreviewPageFormat, setActivePreviewPageFormat] = useState("a4");
-const [isSavingPrintPref, setIsSavingPrintPref] = useState(false);
-const previewParamsRef = useRef(null);
+  const [isSavingPrintPref, setIsSavingPrintPref] = useState(false);
+  const previewParamsRef = useRef(null);
   const [isCancelling, setIsCancelling] = useState(false);
 
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
@@ -285,7 +285,13 @@ const previewParamsRef = useRef(null);
       email: doc.email ?? liveStoredata?.email,
       address: doc.address ?? liveStoredata?.address,
       bankDetails: doc.bankDetails ?? liveStoredata?.bankDetails,
-      settings: doc.settings ?? liveStoredata?.settings,
+      settings: {
+        ...(doc.settings ?? liveStoredata?.settings ?? {}),
+        showGstPerUnit:
+          liveStoredata?.settings?.showGstPerUnit ??
+          doc.settings?.showGstPerUnit ??
+          false,
+      },
       logoUrl: doc.logoUrl ?? liveStoredata?.logoUrl,
       signatureUrl: doc.signatureUrl ?? liveStoredata?.signatureUrl,
       isActive: doc.isActive ?? liveStoredata?.isActive,
@@ -770,7 +776,7 @@ const previewParamsRef = useRef(null);
     const pdf = new jsPDF({
       unit: "mm",
       format: pageFormat === "a5" ? "a5" : "a4",
-      orientation: "portrait",
+      orientation: pageFormat === "a5" ? "landscape" : "portrait",
     });
 
     const pageWidth = pdf.internal.pageSize.getWidth();
@@ -822,8 +828,7 @@ const previewParamsRef = useRef(null);
     }
   };
 
-  
-const handleWhatsAppShare = async () => {
+  const handleWhatsAppShare = async () => {
     const phoneDigits = (activePreviewMeta.customerMobile || "").replace(
       /\D/g,
       "",

@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import React, {
+  useState,
+  useMemo,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import {
@@ -30,7 +36,8 @@ import api from "../../utils/api";
 
 // ── helpers ─────────────────────────────────────────────────────────────
 const currency = (v) => `₹${Number(v || 0).toFixed(2)}`;
-const safe = (v) => (v === undefined || v === null || v === "" ? "-" : String(v));
+const safe = (v) =>
+  v === undefined || v === null || v === "" ? "-" : String(v);
 const num = (v) => Number(v || 0);
 
 const formatDDMMYY = (dateStr) => {
@@ -59,10 +66,39 @@ const fromInputDate = (str) => {
 };
 
 const VIEW = { INVOICE: "invoice", PRODUCT: "product" };
+const GST_MODE = { WITHOUT: "without", WITH: "with" };
 
 export default function ProfitLossReportPage() {
-  const [records, setRecords] = useState([]);
-  const [productRows, setProductRows] = useState([]);
+  const [rawRecords, setRecords] = useState([]);
+  const [rawProductRows, setProductRows] = useState([]);
+  const [gstMode, setGstMode] = useState(GST_MODE.WITHOUT);
+
+  const records = useMemo(
+    () =>
+      gstMode === GST_MODE.WITH
+        ? rawRecords.map((r) => ({
+            ...r,
+            totalSales: r.totalSalesWithGst ?? r.totalSales,
+            totalPurchase: r.totalPurchaseWithGst ?? r.totalPurchase,
+            profitLoss: r.profitLossWithGst ?? r.profitLoss,
+          }))
+        : rawRecords,
+    [rawRecords, gstMode],
+  );
+
+  const productRows = useMemo(
+    () =>
+      gstMode === GST_MODE.WITH
+        ? rawProductRows.map((p) => ({
+            ...p,
+            totalSales: p.totalSalesWithGst ?? p.totalSales,
+            totalPurchase: p.totalPurchaseWithGst ?? p.totalPurchase,
+            profitLoss: p.profitLossWithGst ?? p.profitLoss,
+            marginPercent: p.marginPercentWithGst ?? p.marginPercent,
+          }))
+        : rawProductRows,
+    [rawProductRows, gstMode],
+  );
   const [loading, setLoading] = useState(false);
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
@@ -92,10 +128,14 @@ export default function ProfitLossReportPage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await api.get("/product", { params: { page: 1, limit: 500 } });
+        const res = await api.get("/product", {
+          params: { page: 1, limit: 500 },
+        });
         const docs = res?.data?.docs ?? [];
         setProductList(
-          [...docs].sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")))
+          [...docs].sort((a, b) =>
+            String(a.name || "").localeCompare(String(b.name || "")),
+          ),
         );
       } catch {
         /* silent */
@@ -108,7 +148,9 @@ export default function ProfitLossReportPage() {
     if (!storedata?.address) return "";
     if (typeof storedata.address === "object") {
       const a = storedata.address;
-      return [a.street, a.city, a.state, a.postalCode].filter(Boolean).join(", ");
+      return [a.street, a.city, a.state, a.postalCode]
+        .filter(Boolean)
+        .join(", ");
     }
     return String(storedata.address);
   })();
@@ -116,12 +158,12 @@ export default function ProfitLossReportPage() {
 
   const formattedRange = useMemo(
     () => `${formatShort(startDate)} – ${formatShort(endDate)}`,
-    [startDate, endDate]
+    [startDate, endDate],
   );
 
   const selectedProductName = useMemo(
     () => productList.find((p) => p._id === selectedProduct)?.name || "",
-    [productList, selectedProduct]
+    [productList, selectedProduct],
   );
 
   // ── fetch ────────────────────────────────────────────────────────────
@@ -159,7 +201,9 @@ export default function ProfitLossReportPage() {
 
         const payload = res?.data ?? {};
         let rows = payload.invoices || [];
-        rows = [...rows].sort((a, b) => new Date(b.invoiceDate) - new Date(a.invoiceDate));
+        rows = [...rows].sort(
+          (a, b) => new Date(b.invoiceDate) - new Date(a.invoiceDate),
+        );
 
         setRecords(rows);
         setProductRows(payload.products || []);
@@ -177,7 +221,7 @@ export default function ProfitLossReportPage() {
         if (myRequestId === requestIdRef.current) setLoading(false);
       }
     },
-    [startDate, endDate, selectedProduct]
+    [startDate, endDate, selectedProduct],
   );
 
   // product filter change hole (date select kora thakle) auto refetch
@@ -213,7 +257,7 @@ export default function ProfitLossReportPage() {
     const today = new Date();
     applyRange(
       new Date(today.getFullYear(), today.getMonth() - 1, 1),
-      new Date(today.getFullYear(), today.getMonth(), 0)
+      new Date(today.getFullYear(), today.getMonth(), 0),
     );
   };
 
@@ -244,7 +288,9 @@ export default function ProfitLossReportPage() {
 
   // ── PDF export ───────────────────────────────────────────────────────
   const buildHTML = () => {
-    const filterLine = selectedProductName ? `Product: ${selectedProductName}` : "All Products";
+    const filterLine = selectedProductName
+      ? `Product: ${selectedProductName}`
+      : "All Products";
     let tableHTML = "";
 
     if (view === VIEW.PRODUCT) {
@@ -258,7 +304,7 @@ export default function ProfitLossReportPage() {
           <td style="padding:6px;border-bottom:1px solid #eee;font-size:10px;text-align:right;">${currency(p.totalPurchase)}</td>
           <td style="padding:6px;border-bottom:1px solid #eee;font-size:10px;text-align:right;font-weight:700;color:${num(p.profitLoss) < 0 ? "#c62828" : "#2e7d32"};">${currency(p.profitLoss)}</td>
           <td style="padding:6px;border-bottom:1px solid #eee;font-size:10px;text-align:right;">${num(p.marginPercent).toFixed(2)}%</td>
-        </tr>`
+        </tr>`,
         )
         .join("");
 
@@ -287,7 +333,9 @@ export default function ProfitLossReportPage() {
           </tbody>
         </table>`;
     } else {
-      const sorted = [...records].sort((a, b) => new Date(a.invoiceDate) - new Date(b.invoiceDate));
+      const sorted = [...records].sort(
+        (a, b) => new Date(a.invoiceDate) - new Date(b.invoiceDate),
+      );
       const rowsHTML = sorted
         .map(
           (r) => `
@@ -298,7 +346,7 @@ export default function ProfitLossReportPage() {
           <td style="padding:6px;border-bottom:1px solid #eee;font-size:10px;text-align:right;">${currency(r.totalSales)}</td>
           <td style="padding:6px;border-bottom:1px solid #eee;font-size:10px;text-align:right;">${currency(r.totalPurchase)}</td>
           <td style="padding:6px;border-bottom:1px solid #eee;font-size:10px;text-align:right;font-weight:700;">${currency(r.profitLoss)}</td>
-        </tr>`
+        </tr>`,
         )
         .join("");
 
@@ -340,7 +388,7 @@ export default function ProfitLossReportPage() {
         <h2 style="text-align:center;">${storeName}</h2>
         ${address ? `<p style="text-align:center;">${address}</p>` : ""}
         ${gstin ? `<p style="text-align:center;">GSTIN: ${gstin}</p>` : ""}
-        <h1>Profit / Loss Report (${view === VIEW.PRODUCT ? "Product-wise" : "Invoice-wise"})</h1>
+        <h1>Profit / Loss Report (${view === VIEW.PRODUCT ? "Product-wise" : "Invoice-wise"}, ${gstMode === GST_MODE.WITH ? "With GST" : "Without GST"})</h1>
         <div class="sub">Period: ${formattedRange} &nbsp;|&nbsp; ${filterLine}</div>
         <div class="chips">
           <div class="chip">Invoices: ${totals.count}</div>
@@ -384,7 +432,9 @@ export default function ProfitLossReportPage() {
     try {
       const wb = XLSX.utils.book_new();
 
-      const sorted = [...records].sort((a, b) => new Date(a.invoiceDate) - new Date(b.invoiceDate));
+      const sorted = [...records].sort(
+        (a, b) => new Date(a.invoiceDate) - new Date(b.invoiceDate),
+      );
       const invoiceSheet = sorted.map((r) => ({
         Date: formatDDMMYY(r.invoiceDate),
         "Invoice No": safe(r.invoiceNumber),
@@ -405,10 +455,14 @@ export default function ProfitLossReportPage() {
       }));
 
       const wsProduct = XLSX.utils.json_to_sheet(productSheet);
-      wsProduct["!cols"] = Object.keys(productSheet[0] || {}).map((k) => ({ wch: Math.max(14, k.length + 2) }));
+      wsProduct["!cols"] = Object.keys(productSheet[0] || {}).map((k) => ({
+        wch: Math.max(14, k.length + 2),
+      }));
 
       const wsInvoice = XLSX.utils.json_to_sheet(invoiceSheet);
-      wsInvoice["!cols"] = Object.keys(invoiceSheet[0] || {}).map((k) => ({ wch: Math.max(14, k.length + 2) }));
+      wsInvoice["!cols"] = Object.keys(invoiceSheet[0] || {}).map((k) => ({
+        wch: Math.max(14, k.length + 2),
+      }));
 
       // Active view age thakbe
       if (view === VIEW.PRODUCT) {
@@ -441,8 +495,8 @@ export default function ProfitLossReportPage() {
     !startDate || !endDate
       ? "Select a date range and tap Generate."
       : hasFetched
-      ? "No records found for the selected filters."
-      : "Tap Generate to load the report.";
+        ? "No records found for the selected filters."
+        : "Tap Generate to load the report.";
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-slate-50/40">
@@ -455,7 +509,9 @@ export default function ProfitLossReportPage() {
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <h1 className="text-lg font-bold text-slate-900">Profit & Loss Report</h1>
+            <h1 className="text-lg font-bold text-slate-900">
+              Profit & Loss Report
+            </h1>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -463,14 +519,16 @@ export default function ProfitLossReportPage() {
               disabled={!hasData || loading}
               className="h-9 px-3 rounded-lg border border-slate-200 text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium"
             >
-              <FileText className="w-4 h-4" />PDF
+              <FileText className="w-4 h-4" />
+              PDF
             </button>
             <button
               onClick={exportExcel}
               disabled={!hasData || loading}
               className="h-9 px-3 rounded-lg border border-slate-200 text-emerald-600 hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium"
             >
-              <FileSpreadsheet className="w-4 h-4" />Excel
+              <FileSpreadsheet className="w-4 h-4" />
+              Excel
             </button>
           </div>
         </div>
@@ -549,7 +607,9 @@ export default function ProfitLossReportPage() {
             disabled={!startDate || !endDate || loading}
             className="h-9 px-4 ml-auto shrink-0 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-[13px] font-semibold flex items-center gap-2 transition-colors"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`}
+            />
             {loading ? "Loading..." : "Generate"}
           </button>
         </div>
@@ -582,13 +642,24 @@ export default function ProfitLossReportPage() {
               </div>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <SummaryStat label="Invoices" value={String(totals.count)} />
-                <SummaryStat label="Products" value={String(totals.productCount)} />
-                <SummaryStat label="Sales Amount" value={currency(totals.totalSales)} />
-                <SummaryStat label="Purchase Amount" value={currency(totals.totalPurchase)} />
+                <SummaryStat
+                  label="Products"
+                  value={String(totals.productCount)}
+                />
+                <SummaryStat
+                  label="Sales Amount"
+                  value={currency(totals.totalSales)}
+                />
+                <SummaryStat
+                  label="Purchase Amount"
+                  value={currency(totals.totalPurchase)}
+                />
                 <SummaryStat
                   label="Profit/Loss"
                   value={currency(totals.profitLoss)}
-                  accent={totals.profitLoss < 0 ? "text-red-600" : "text-emerald-600"}
+                  accent={
+                    totals.profitLoss < 0 ? "text-red-600" : "text-emerald-600"
+                  }
                   bold
                 />
               </div>
@@ -599,7 +670,9 @@ export default function ProfitLossReportPage() {
               <button
                 onClick={() => setView(VIEW.INVOICE)}
                 className={`h-8 px-3 rounded-lg text-[12.5px] font-semibold flex items-center gap-1.5 transition-colors ${
-                  view === VIEW.INVOICE ? "bg-blue-50 text-blue-600" : "text-slate-500 hover:bg-slate-50"
+                  view === VIEW.INVOICE
+                    ? "bg-blue-50 text-blue-600"
+                    : "text-slate-500 hover:bg-slate-50"
                 }`}
               >
                 <Receipt className="w-3.5 h-3.5" />
@@ -608,7 +681,9 @@ export default function ProfitLossReportPage() {
               <button
                 onClick={() => setView(VIEW.PRODUCT)}
                 className={`h-8 px-3 rounded-lg text-[12.5px] font-semibold flex items-center gap-1.5 transition-colors ${
-                  view === VIEW.PRODUCT ? "bg-blue-50 text-blue-600" : "text-slate-500 hover:bg-slate-50"
+                  view === VIEW.PRODUCT
+                    ? "bg-blue-50 text-blue-600"
+                    : "text-slate-500 hover:bg-slate-50"
                 }`}
               >
                 <Package className="w-3.5 h-3.5" />
@@ -616,24 +691,66 @@ export default function ProfitLossReportPage() {
               </button>
             </div>
 
+            {/* GST mode toggle */}
+            <div className="inline-flex items-center gap-1 p-1 mb-3 ml-2 bg-white border border-slate-200/80 rounded-xl">
+              <button
+                onClick={() => setGstMode(GST_MODE.WITHOUT)}
+                className={`h-8 px-3 rounded-lg text-[12.5px] font-semibold transition-colors ${
+                  gstMode === GST_MODE.WITHOUT
+                    ? "bg-blue-50 text-blue-600"
+                    : "text-slate-500 hover:bg-slate-50"
+                }`}
+              >
+                Without GST
+              </button>
+              <button
+                onClick={() => setGstMode(GST_MODE.WITH)}
+                className={`h-8 px-3 rounded-lg text-[12.5px] font-semibold transition-colors ${
+                  gstMode === GST_MODE.WITH
+                    ? "bg-blue-50 text-blue-600"
+                    : "text-slate-500 hover:bg-slate-50"
+                }`}
+              >
+                With GST
+              </button>
+            </div>
+
             {/* Product-wise table */}
             {view === VIEW.PRODUCT && (
               <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden mb-4">
                 <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
-                  <h2 className="text-sm font-bold text-slate-800">Product-wise Profit/Loss</h2>
-                  <span className="text-xs text-slate-400">{productRows.length} products</span>
+                  <h2 className="text-sm font-bold text-slate-800">
+                    Product-wise Profit/Loss
+                  </h2>
+                  <span className="text-xs text-slate-400">
+                    {productRows.length} products
+                  </span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
-                        <th className="text-left font-semibold px-4 py-3">Product</th>
-                        <th className="text-right font-semibold px-4 py-3">Qty Sold</th>
-                        <th className="text-right font-semibold px-4 py-3">Invoices</th>
-                        <th className="text-right font-semibold px-4 py-3">Sales Amount</th>
-                        <th className="text-right font-semibold px-4 py-3">Purchase Amount</th>
-                        <th className="text-right font-semibold px-4 py-3">Profit/Loss</th>
-                        <th className="text-right font-semibold px-4 py-3">Margin %</th>
+                        <th className="text-left font-semibold px-4 py-3">
+                          Product
+                        </th>
+                        <th className="text-right font-semibold px-4 py-3">
+                          Qty Sold
+                        </th>
+                        <th className="text-right font-semibold px-4 py-3">
+                          Invoices
+                        </th>
+                        <th className="text-right font-semibold px-4 py-3">
+                          Sales Amount
+                        </th>
+                        <th className="text-right font-semibold px-4 py-3">
+                          Purchase Amount
+                        </th>
+                        <th className="text-right font-semibold px-4 py-3">
+                          Profit/Loss
+                        </th>
+                        <th className="text-right font-semibold px-4 py-3">
+                          Margin %
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -647,10 +764,18 @@ export default function ProfitLossReportPage() {
                             <td className="px-4 py-3 font-medium text-slate-800 capitalize">
                               {safe(p.productName)}
                             </td>
-                            <td className="px-4 py-3 text-right text-slate-600">{num(p.quantitySold)}</td>
-                            <td className="px-4 py-3 text-right text-slate-600">{num(p.invoiceCount)}</td>
-                            <td className="px-4 py-3 text-right text-slate-600">{currency(p.totalSales)}</td>
-                            <td className="px-4 py-3 text-right text-slate-600">{currency(p.totalPurchase)}</td>
+                            <td className="px-4 py-3 text-right text-slate-600">
+                              {num(p.quantitySold)}
+                            </td>
+                            <td className="px-4 py-3 text-right text-slate-600">
+                              {num(p.invoiceCount)}
+                            </td>
+                            <td className="px-4 py-3 text-right text-slate-600">
+                              {currency(p.totalSales)}
+                            </td>
+                            <td className="px-4 py-3 text-right text-slate-600">
+                              {currency(p.totalPurchase)}
+                            </td>
                             <td
                               className={`px-4 py-3 text-right font-semibold ${
                                 isLoss ? "text-red-600" : "text-emerald-600"
@@ -679,13 +804,21 @@ export default function ProfitLossReportPage() {
                     <tfoot>
                       <tr className="bg-slate-50 font-semibold text-slate-800">
                         <td className="px-4 py-3 text-right">TOTAL</td>
-                        <td className="px-4 py-3 text-right">{totals.quantitySold}</td>
+                        <td className="px-4 py-3 text-right">
+                          {totals.quantitySold}
+                        </td>
                         <td className="px-4 py-3 text-right"></td>
-                        <td className="px-4 py-3 text-right">{currency(totals.totalSales)}</td>
-                        <td className="px-4 py-3 text-right">{currency(totals.totalPurchase)}</td>
+                        <td className="px-4 py-3 text-right">
+                          {currency(totals.totalSales)}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {currency(totals.totalPurchase)}
+                        </td>
                         <td
                           className={`px-4 py-3 text-right ${
-                            totals.profitLoss < 0 ? "text-red-600" : "text-emerald-600"
+                            totals.profitLoss < 0
+                              ? "text-red-600"
+                              : "text-emerald-600"
                           }`}
                         >
                           {currency(totals.profitLoss)}
@@ -702,19 +835,35 @@ export default function ProfitLossReportPage() {
             {view === VIEW.INVOICE && (
               <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden mb-4">
                 <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
-                  <h2 className="text-sm font-bold text-slate-800">Invoice-wise Profit/Loss</h2>
-                  <span className="text-xs text-slate-400">{totals.count} records</span>
+                  <h2 className="text-sm font-bold text-slate-800">
+                    Invoice-wise Profit/Loss
+                  </h2>
+                  <span className="text-xs text-slate-400">
+                    {totals.count} records
+                  </span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
-                        <th className="text-left font-semibold px-4 py-3">Date</th>
-                        <th className="text-left font-semibold px-4 py-3">Invoice No</th>
-                        <th className="text-left font-semibold px-4 py-3">Customer</th>
-                        <th className="text-right font-semibold px-4 py-3">Sales Amount</th>
-                        <th className="text-right font-semibold px-4 py-3">Purchase Amount</th>
-                        <th className="text-right font-semibold px-4 py-3">Profit/Loss</th>
+                        <th className="text-left font-semibold px-4 py-3">
+                          Date
+                        </th>
+                        <th className="text-left font-semibold px-4 py-3">
+                          Invoice No
+                        </th>
+                        <th className="text-left font-semibold px-4 py-3">
+                          Customer
+                        </th>
+                        <th className="text-right font-semibold px-4 py-3">
+                          Sales Amount
+                        </th>
+                        <th className="text-right font-semibold px-4 py-3">
+                          Purchase Amount
+                        </th>
+                        <th className="text-right font-semibold px-4 py-3">
+                          Profit/Loss
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -728,10 +877,18 @@ export default function ProfitLossReportPage() {
                             <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
                               {formatDDMMYY(r.invoiceDate)}
                             </td>
-                            <td className="px-4 py-3 font-medium text-slate-800">{safe(r.invoiceNumber)}</td>
-                            <td className="px-4 py-3 text-slate-700">{safe(r.customerDescription)}</td>
-                            <td className="px-4 py-3 text-right text-slate-600">{currency(r.totalSales)}</td>
-                            <td className="px-4 py-3 text-right text-slate-600">{currency(r.totalPurchase)}</td>
+                            <td className="px-4 py-3 font-medium text-slate-800">
+                              {safe(r.invoiceNumber)}
+                            </td>
+                            <td className="px-4 py-3 text-slate-700">
+                              {safe(r.customerDescription)}
+                            </td>
+                            <td className="px-4 py-3 text-right text-slate-600">
+                              {currency(r.totalSales)}
+                            </td>
+                            <td className="px-4 py-3 text-right text-slate-600">
+                              {currency(r.totalPurchase)}
+                            </td>
                             <td
                               className={`px-4 py-3 text-right font-semibold ${
                                 isLoss ? "text-red-600" : "text-emerald-600"
@@ -752,12 +909,20 @@ export default function ProfitLossReportPage() {
                     </tbody>
                     <tfoot>
                       <tr className="bg-slate-50 font-semibold text-slate-800">
-                        <td colSpan={3} className="px-4 py-3 text-right">TOTAL</td>
-                        <td className="px-4 py-3 text-right">{currency(totals.totalSales)}</td>
-                        <td className="px-4 py-3 text-right">{currency(totals.totalPurchase)}</td>
+                        <td colSpan={3} className="px-4 py-3 text-right">
+                          TOTAL
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {currency(totals.totalSales)}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {currency(totals.totalPurchase)}
+                        </td>
                         <td
                           className={`px-4 py-3 text-right ${
-                            totals.profitLoss < 0 ? "text-red-600" : "text-emerald-600"
+                            totals.profitLoss < 0
+                              ? "text-red-600"
+                              : "text-emerald-600"
                           }`}
                         >
                           {currency(totals.profitLoss)}
@@ -784,7 +949,9 @@ function SummaryStat({ label, value, accent, bold }) {
       <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1">
         {label}
       </div>
-      <div className={`${bold ? "text-lg" : "text-base"} font-bold ${accent || "text-slate-800"} truncate`}>
+      <div
+        className={`${bold ? "text-lg" : "text-base"} font-bold ${accent || "text-slate-800"} truncate`}
+      >
         {value}
       </div>
     </div>

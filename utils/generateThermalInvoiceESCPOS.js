@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import { formatQty } from "./qtyFormat";
 
 export const PRINTER_DOT_WIDTH = { 58: 384, 80: 576 };
 export function resolveDotWidth(paperWidthMM) {
@@ -122,7 +123,7 @@ async function buildThermalReceiptHTML({
       const mainRow = `
         <tr>
           <td class="item-name">${escapeHtml(item.name || "")}</td>
-          <td class="center nowrap">${qty}</td>
+          <td class="center nowrap">${formatQty(qty)}</td>
           <td class="right nowrap">${baseRate.toFixed(2)}</td>
           <td class="right nowrap">${totalAmount.toFixed(2)}</td>
         </tr>`;

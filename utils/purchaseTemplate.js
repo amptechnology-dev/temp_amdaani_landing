@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import numberToWords from "number-to-words";
-
+import { formatQty } from "./qtyFormat";
 /* ============================================================
    Shared helpers (used by both A4 and A5 branches)
    ============================================================ */
@@ -21,15 +21,7 @@ function parseSafeDate(value) {
 }
 
 /* ============================================================
-   A5 — multi-page, mobile-style layout.
-   ✅ NOTE: To match A4, this template does NOT render:
-      - Store header (logo/company name/address/GSTIN)
-      - Store party column ("To, StoreName")
-      - Bank details / UPI QR
-      - Terms & Conditions
-      - Signature block
-   Only Vendor ("From") details, items, totals and payment info
-   are shown — kept minimal, same as the A4 purchase template.
+   A5 — multi-page, landscape layout.
    ============================================================ */
 
 const A5_CONTENT_W_MM = 210;
@@ -37,8 +29,6 @@ const A5_CONTENT_H_MM = 148;
 const A5_PRINT_SAFE_MARGIN_MM = 3;
 
 const A5_ITEMS_PER_CONT_PAGE = 20;
-// ✅ Base bumped up (16 → 19) since bank/terms/signature blocks are
-// permanently gone now — the footer needs less reserved space.
 const A5_ITEMS_LAST_PAGE_BASE = 19;
 const A5_LAST_PAGE_MAX_CAPACITY = 22;
 
@@ -68,7 +58,9 @@ function paginateA5Items(items, lastPageCapacity) {
     const prevPage = pages[pages.length - 2];
     const lastPage = pages[pages.length - 1];
     const borrowCount = Math.min(lastPageCapacity, prevPage.length);
-    lastPage.push(...prevPage.splice(prevPage.length - borrowCount, borrowCount));
+    lastPage.push(
+      ...prevPage.splice(prevPage.length - borrowCount, borrowCount),
+    );
   }
 
   return pages;
@@ -91,7 +83,7 @@ const a5SharedCSS = () => `
 
   @media print {
     html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
-    @page { size: ${A5_CONTENT_W_MM}mm ${A5_CONTENT_H_MM}mm landscape; margin: 0; }
+    @page { size: A5 landscape; margin: 0; }
     .page { width: ${A5_CONTENT_W_MM}mm !important; height: ${A5_CONTENT_H_MM}mm !important; page-break-after: always; overflow: hidden !important; background: #fff !important; }
     .page:last-child { page-break-after: avoid; }
     .wrap {
@@ -153,10 +145,15 @@ const a5SharedCSS = () => `
   .iname { font-weight: 600; }
   .sum-row td { font-weight: 700; background: #f0f4ff; border-top: 1.5px solid #2c5aa0; }
 
-  /* ── Totals row — words-col (amount in words + payment summary) | amt-col (grand total table) ── */
   .totals-wrap { display: flex; align-items: stretch; border-top: 2px solid #2c5aa0; flex-shrink: 0; }
 
-  .words-col { flex: 2; padding: 5px 12px; border-right: 1px solid #2c5aa0; font-size: 8px; display: flex; flex-direction: column; justify-content: center; }
+  .words-col { flex: 1.2; padding: 5px 12px; border-right: 1px solid #2c5aa0; font-size: 8px; display: flex; flex-direction: column; justify-content: center; }
+  .tax-col { flex: 1.6; padding: 5px 8px; border-right: 1px solid #2c5aa0; display: flex; flex-direction: column; justify-content: center; }
+  .tax-ttl { font-weight: 700; color: #2c5aa0; font-size: 7.5px; text-transform: uppercase; letter-spacing: 0.3px; text-align: center; margin-bottom: 2px; }
+  .tax-tbl { width: 100%; border-collapse: collapse; font-size: 7px; }
+  .tax-tbl th, .tax-tbl td { border: 1px solid #c9d2dc; padding: 1.5px 3px; text-align: center; }
+  .tax-tbl th { background: #2c5aa0; color: #fff; text-transform: uppercase; }
+  .tax-tbl tr.tt td { font-weight: 700; background: #f8f8f8; }
   .words-lbl { font-weight: 700; color: #2c5aa0; margin-bottom: 2px; text-transform: uppercase; font-size: 7.5px; letter-spacing: 0.3px; }
   .words-val { font-size: 9px; font-weight: 600; font-style: italic; }
 
@@ -194,7 +191,14 @@ const a5SharedCSS = () => `
   }
 `;
 
-function buildA5ItemsHTML(pageItems, startIndex, isGstInvoice, isMrpEnabled, isIgst) {
+function buildA5ItemsHTML(
+  pageItems,
+  startIndex,
+  isGstInvoice,
+  isMrpEnabled,
+  isIgst,
+  showNetRate = false,
+) {
   return pageItems
     .map((item, i) => {
       const index = startIndex + i;
@@ -210,6 +214,7 @@ function buildA5ItemsHTML(pageItems, startIndex, isGstInvoice, isMrpEnabled, isI
       const sgstAmount = isIgst ? 0 : gstAmount / 2;
       const igstAmount = isIgst ? gstAmount : 0;
       const itemTotal = Number(item.total || 0);
+      const netRate = qty > 0 ? itemTotal / qty : 0;
 
       const perUnitDiscount = getPerUnitDiscountAmount(item);
       const totalDiscountAmt = perUnitDiscount * qty;
@@ -227,7 +232,7 @@ function buildA5ItemsHTML(pageItems, startIndex, isGstInvoice, isMrpEnabled, isI
           <td class="c">${index + 1}</td>
           <td class="l"><div class="iname">${item.name}</div></td>
           <td class="c">${hsn}</td>
-          <td class="c">${qty}</td>
+          <td class="c">${formatQty(qty)}</td>
           <td class="c">${unit}</td>
           ${isMrpEnabled ? `<td class="r">₹${mrp.toFixed(2)}</td>` : ""}
           <td class="r">₹${costPrice.toFixed(2)}</td>
@@ -247,13 +252,19 @@ function buildA5ItemsHTML(pageItems, startIndex, isGstInvoice, isMrpEnabled, isI
                  }`
               : ""
           }
+          ${showNetRate ? `<td class="r">₹${netRate.toFixed(2)}</td>` : ""}
           <td class="r bold">₹${itemTotal.toFixed(2)}</td>
         </tr>`;
     })
     .join("");
 }
 
-function a5TableHeader(isGstInvoice, isMrpEnabled, isIgst) {
+function a5TableHeader(
+  isGstInvoice,
+  isMrpEnabled,
+  isIgst,
+  showNetRate = false,
+) {
   return `<thead>
     <tr>
       <th style="width:18px">#</th>
@@ -271,6 +282,7 @@ function a5TableHeader(isGstInvoice, isMrpEnabled, isIgst) {
             }`
           : ""
       }
+      ${showNetRate ? "<th>Net Rate(₹)</th>" : ""}
       <th>Amt(₹)</th>
     </tr>
   </thead>`;
@@ -284,6 +296,7 @@ function generateA5PurchaseHTML({
   cartItems,
   invoiceCalculations,
   invoiceNumber,
+  storedata,
   invoiceDate,
   isGstInvoice,
   isMrpEnabled = false,
@@ -293,6 +306,7 @@ function generateA5PurchaseHTML({
 }) {
   const safeDate = parseSafeDate(invoiceDate);
   const isIgst = invoiceData?.isIgst === true;
+  const showNetRate = storedata?.settings?.showGstPerUnit === true;
 
   let totalQty = 0,
     totalDiscount = 0,
@@ -323,9 +337,13 @@ function generateA5PurchaseHTML({
     ? Number(invoiceData?.roundOff || 0)
     : Number((roundedGrandTotal - rawGrandTotal).toFixed(2));
 
-  const safeGrandTotal = Number.isFinite(roundedGrandTotal) ? Math.max(roundedGrandTotal, 0) : 0;
+  const safeGrandTotal = Number.isFinite(roundedGrandTotal)
+    ? Math.max(roundedGrandTotal, 0)
+    : 0;
   const amountInWords =
-    numberToWords.toWords(safeGrandTotal).replace(/\b\w/g, (c) => c.toUpperCase()) + " Rupees Only";
+    numberToWords
+      .toWords(safeGrandTotal)
+      .replace(/\b\w/g, (c) => c.toUpperCase()) + " Rupees Only";
 
   const hasVendorDetails =
     formValues.contactNumber ||
@@ -342,13 +360,79 @@ function generateA5PurchaseHTML({
     .filter((t) => Number(t.amount || 0) > 0)
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   const MAX_PAY_SUMMARY_ROWS = 4;
-  const visibleTransactions = nonZeroTransactions.slice(0, MAX_PAY_SUMMARY_ROWS);
-  const hiddenTransactionCount = nonZeroTransactions.length - visibleTransactions.length;
+  const visibleTransactions = nonZeroTransactions.slice(
+    0,
+    MAX_PAY_SUMMARY_ROWS,
+  );
+  const hiddenTransactionCount =
+    nonZeroTransactions.length - visibleTransactions.length;
 
   const isCancelled = invoiceData?.status?.toLowerCase() === "cancelled";
 
+  // ── Tax Summary ──
+  const passedBreakdown = invoiceCalculations?.gstBreakdown || {};
+  const hasUsableBreakdown = Object.values(passedBreakdown).some(
+    (b) => Number(b?.taxableAmount || 0) > 0 || Number(b?.totalGst || 0) > 0,
+  );
+  let effectiveBreakdown = passedBreakdown;
+  if (!hasUsableBreakdown) {
+    effectiveBreakdown = {};
+    cartItems.forEach((item) => {
+      const rate = Number(item.gstRate || 0);
+      if (rate <= 0) return;
+      const gst = Number(item.gstAmount || 0);
+      if (!effectiveBreakdown[rate]) {
+        effectiveBreakdown[rate] = {
+          taxableAmount: 0,
+          cgstAmount: 0,
+          sgstAmount: 0,
+          igstAmount: 0,
+        };
+      }
+      effectiveBreakdown[rate].taxableAmount += Number(item.taxableValue || 0);
+      effectiveBreakdown[rate].cgstAmount += isIgst ? 0 : gst / 2;
+      effectiveBreakdown[rate].sgstAmount += isIgst ? 0 : gst / 2;
+      effectiveBreakdown[rate].igstAmount += isIgst ? gst : 0;
+    });
+  }
+
+  let taxRowsHTML = "";
+  const taxTot = { taxable: 0, cgst: 0, sgst: 0, igst: 0 };
+  Object.entries(effectiveBreakdown).forEach(([rate, b]) => {
+    if (parseFloat(rate) === 0) return;
+    const taxable = Number(b.taxableAmount || 0);
+    const cgst = isIgst ? 0 : Number(b.cgstAmount || 0);
+    const sgst = isIgst ? 0 : Number(b.sgstAmount || 0);
+    const igst = isIgst
+      ? Number(
+          b.igstAmount || Number(b.cgstAmount || 0) + Number(b.sgstAmount || 0),
+        )
+      : 0;
+    taxRowsHTML += `<tr><td>${rate}%</td><td>₹${taxable.toFixed(2)}</td><td>₹${cgst.toFixed(2)}</td><td>₹${sgst.toFixed(2)}</td><td>₹${igst.toFixed(2)}</td></tr>`;
+    taxTot.taxable += taxable;
+    taxTot.cgst += cgst;
+    taxTot.sgst += sgst;
+    taxTot.igst += igst;
+  });
+
+  const taxColHTML =
+    !preview && taxRowsHTML
+      ? `<div class="tax-col">
+          <div class="tax-ttl">Tax Summary</div>
+          <table class="tax-tbl">
+            <thead><tr><th>Rate</th><th>Taxable</th><th>CGST</th><th>SGST</th><th>IGST</th></tr></thead>
+            <tbody>
+              ${taxRowsHTML}
+              <tr class="tt"><td>Total</td><td>₹${taxTot.taxable.toFixed(2)}</td><td>₹${taxTot.cgst.toFixed(2)}</td><td>₹${taxTot.sgst.toFixed(2)}</td><td>₹${taxTot.igst.toFixed(2)}</td></tr>
+            </tbody>
+          </table>
+        </div>`
+      : "";
+
   const willShowRemarks = Boolean(invoiceData?.remarks);
-  const willShowPaymentNote = Boolean(invoiceData?.paymentMethod || invoiceData?.paymentNote);
+  const willShowPaymentNote = Boolean(
+    invoiceData?.paymentMethod || invoiceData?.paymentNote,
+  );
   const lastPageCapacity = getA5LastPageCapacity({
     hasRemarks: willShowRemarks,
     hasPaymentNote: willShowPaymentNote,
@@ -367,7 +451,6 @@ function generateA5PurchaseHTML({
       </div>`
     : "";
 
-  // ✅ No logo/company header — title + payment status only (matches A4)
   const titleRow = `<div class="hdr-title-row">
     <div class="hdr-title-center">
       <div class="main-title">${isGstInvoice ? "Purchase Tax Invoice" : "Purchase Invoice"}</div>
@@ -380,12 +463,14 @@ function generateA5PurchaseHTML({
     </div>
   </div>`;
 
-  // ✅ Only Vendor ("From") shown — no Store party column (matches A4)
   const partiesRow = `<div class="hdr-parties-row">
     <div class="hdr-party">
       <div class="ttl">From, ${
         hasVendorDetails
-          ? formValues.customerName || formValues.partyName || formValues.vendorName || "Vendor"
+          ? formValues.customerName ||
+            formValues.partyName ||
+            formValues.vendorName ||
+            "Vendor"
           : "Walk-in Vendor"
       }</div>
       ${
@@ -410,7 +495,8 @@ function generateA5PurchaseHTML({
     <span>Page ${pageNum} of ${pageTotal}</span>
   </div>`;
 
-  const headerBlock = (pageNum, pageTotal) => (preview ? "" : `${titleRow}${partiesRow}${metaRow(pageNum, pageTotal)}`);
+  const headerBlock = (pageNum, pageTotal) =>
+    preview ? "" : `${titleRow}${partiesRow}${metaRow(pageNum, pageTotal)}`;
 
   const paymentSummaryHTML =
     !preview && visibleTransactions.length > 0
@@ -439,19 +525,21 @@ function generateA5PurchaseHTML({
         </div>`
       : "";
 
-  // ✅ No bank-col / QR — just amount in words (+ payment summary)
   const totalsBlock = `<div class="totals-wrap">
     <div class="words-col">
       <div class="words-lbl">Amount in Words:</div>
       <div class="words-val">${amountInWords}</div>
       ${paymentSummaryHTML}
     </div>
+    ${taxColHTML}
     <div class="amt-col">
       <table class="amt-tbl">
         <tr>
           <td class="lbl">Subtotal</td>
           <td class="val">₹${Number(
-            createdInvoice ? (invoiceData?.subTotal ?? invoiceCalculations.subtotal) : invoiceCalculations.subtotal,
+            createdInvoice
+              ? (invoiceData?.subTotal ?? invoiceCalculations.subtotal)
+              : invoiceCalculations.subtotal,
           ).toFixed(2)}</td>
         </tr>
         <tr><td class="lbl">Total Tax</td><td class="val">₹${Number(totalGST).toFixed(2)}</td></tr>
@@ -482,7 +570,9 @@ function generateA5PurchaseHTML({
         <tr class="grand">
           <td class="lbl">Net Total</td>
           <td class="val">₹${
-            createdInvoice ? Math.round(invoiceData?.grandTotal).toFixed(2) : roundedGrandTotal.toFixed(2)
+            createdInvoice
+              ? Math.round(invoiceData?.grandTotal).toFixed(2)
+              : roundedGrandTotal.toFixed(2)
           }</td>
         </tr>
         ${
@@ -503,23 +593,39 @@ function generateA5PurchaseHTML({
         </div>`
       : "";
 
-  const remarksRow = invoiceData?.remarks ? `<div class="remarks">Remarks: ${invoiceData.remarks}</div>` : "";
+  const remarksRow = invoiceData?.remarks
+    ? `<div class="remarks">Remarks: ${invoiceData.remarks}</div>`
+    : "";
 
-  // ── Build all page HTML blocks ───────────────────────────────────────────
+  // ── Build all page HTML blocks ──
   let itemOffset = 0;
   const pageBlocks = pages.map((pageItems, pageIndex) => {
     const isLastPage = pageIndex === totalPages - 1;
     const pageNum = pageIndex + 1;
 
-    const itemsHTML = buildA5ItemsHTML(pageItems, itemOffset, isGstInvoice, isMrpEnabled, isIgst);
+    const itemsHTML = buildA5ItemsHTML(
+      pageItems,
+      itemOffset,
+      isGstInvoice,
+      isMrpEnabled,
+      isIgst,
+      showNetRate,
+    );
     itemOffset += pageItems.length;
 
-    const pageQty = pageItems.reduce((s, i) => s + Number(i.qty ?? i.quantity ?? 0), 0);
-    const pageDiscount = pageItems.reduce(
-      (s, i) => s + getPerUnitDiscountAmount(i) * Number(i.qty ?? i.quantity ?? 0),
+    const pageQty = pageItems.reduce(
+      (s, i) => s + Number(i.qty ?? i.quantity ?? 0),
       0,
     );
-    const pageTaxable = pageItems.reduce((s, i) => s + Number(i.taxableValue || 0), 0);
+    const pageDiscount = pageItems.reduce(
+      (s, i) =>
+        s + getPerUnitDiscountAmount(i) * Number(i.qty ?? i.quantity ?? 0),
+      0,
+    );
+    const pageTaxable = pageItems.reduce(
+      (s, i) => s + Number(i.taxableValue || 0),
+      0,
+    );
     const pageGST = pageItems.reduce((s, i) => s + Number(i.gstAmount || 0), 0);
     const pageAmount = pageItems.reduce((s, i) => s + Number(i.total || 0), 0);
 
@@ -532,7 +638,7 @@ function generateA5PurchaseHTML({
       <td></td>
       <td class="l bold">${isLastPage ? "Total" : `Page ${pageNum} Total`}</td>
       <td></td>
-      <td class="c bold">${isLastPage ? totalQty : pageQty}</td>
+      <td class="c bold">${formatQty(isLastPage ? totalQty : pageQty)}</td>
       <td></td>
       ${isMrpEnabled ? "<td></td>" : ""}
       <td></td>
@@ -548,6 +654,7 @@ function generateA5PurchaseHTML({
              }`
           : ""
       }
+      ${showNetRate ? "<td></td>" : ""}
       <td class="r bold">₹${(isLastPage ? totalAmount : pageAmount).toFixed(2)}</td>
     </tr>`;
 
@@ -561,7 +668,7 @@ function generateA5PurchaseHTML({
 
   <div class="tbl-wrap ${isCancelled ? "cancelled" : ""}">
     <table class="tbl">
-      ${a5TableHeader(isGstInvoice, isMrpEnabled, isIgst)}
+      ${a5TableHeader(isGstInvoice, isMrpEnabled, isIgst, showNetRate)}
       <tbody>
         ${itemsHTML}
         ${sumRow}
@@ -639,8 +746,6 @@ ${pageBlocks.join("\n")}
 
 /* ============================================================
    A4 — desktop-style single continuous page.
-   Already matches the "no Store details / no Terms / no Bank
-   details" rule — unchanged from before.
    ============================================================ */
 
 function generateA4PurchaseHTML({
@@ -651,6 +756,7 @@ function generateA4PurchaseHTML({
   cartItems,
   invoiceCalculations,
   invoiceNumber,
+  storedata,
   invoiceDate,
   isGstInvoice,
   isMrpEnabled = true,
@@ -659,9 +765,12 @@ function generateA4PurchaseHTML({
   payment = { paid: 0, due: 0, status: "unpaid" },
 }) {
   const parsedInvoiceDate = invoiceDate ? new Date(invoiceDate) : new Date();
-  const safeInvoiceDate = Number.isNaN(parsedInvoiceDate.getTime()) ? new Date() : parsedInvoiceDate;
+  const safeInvoiceDate = Number.isNaN(parsedInvoiceDate.getTime())
+    ? new Date()
+    : parsedInvoiceDate;
 
   const invoiceContainerWidth = "800px";
+  const showNetRate = storedata?.settings?.showGstPerUnit === true;
 
   let totalQty = 0;
   let totalDiscount = 0;
@@ -689,7 +798,9 @@ function generateA4PurchaseHTML({
       const qty = item.qty || item.quantity || 0;
       const costPrice = Number(item.costPrice ?? item.rate ?? item.price ?? 0);
       const discountType = item.purchaseDiscountType || "amount";
-      const rawDiscountInput = Number(item.purchaseDiscount ?? item.discount ?? 0);
+      const rawDiscountInput = Number(
+        item.purchaseDiscount ?? item.discount ?? 0,
+      );
       const perUnitDiscountAmount = getPerUnitDiscountAmount(item);
       const gstRate = item.gstRate || 0;
       const gstAmount = item.gstAmount || 0;
@@ -698,7 +809,7 @@ function generateA4PurchaseHTML({
       const isTaxInclusive = item.isPurchaseTaxInclusive || false;
       const mrp = item.mrp;
       const totalDiscountAmt = perUnitDiscountAmount * qty;
-
+      const netRate = qty > 0 ? totalAmt / qty : 0;
       const discountPercent =
         discountType === "percentage"
           ? rawDiscountInput > 0
@@ -715,7 +826,7 @@ function generateA4PurchaseHTML({
         <div class="item-name">${item.name}</div>
         ${item.hsn ? `<div class="item-code">HSN: ${item.hsn}</div>` : ""}
       </td>
-      <td class="qty">${qty}</td>
+      <td class="qty">${formatQty(qty)}</td>
       <td class="unit">${item.unit || "PCS"}</td>
       ${isMrpEnabled ? `<td class="mrp">&#8377;${mrp ? mrp.toFixed(2) : "&#8212;"}</td>` : ""}
       <td class="rate">&#8377;${costPrice.toFixed(2)}</td>
@@ -736,6 +847,7 @@ function generateA4PurchaseHTML({
             : `&#8212;`
         }
       </td>
+      ${showNetRate ? `<td class="rate">&#8377;${netRate.toFixed(2)}</td>` : ""}
       <td class="total-amount">&#8377;${totalAmt.toFixed(2)}</td>
     </tr>
   `;
@@ -749,7 +861,9 @@ function generateA4PurchaseHTML({
   const passedGstBreakdown = invoiceCalculations.gstBreakdown || {};
   const hasUsableBreakdown =
     Object.keys(passedGstBreakdown).length > 0 &&
-    Object.values(passedGstBreakdown).some((b) => Number(b?.taxableAmount || 0) > 0 || Number(b?.totalGst || 0) > 0);
+    Object.values(passedGstBreakdown).some(
+      (b) => Number(b?.taxableAmount || 0) > 0 || Number(b?.totalGst || 0) > 0,
+    );
 
   let effectiveGstBreakdown = passedGstBreakdown;
   if (!hasUsableBreakdown) {
@@ -761,7 +875,13 @@ function generateA4PurchaseHTML({
       const itemGstAmount = Number(item.gstAmount || 0);
 
       if (!computedGstBreakdown[rate]) {
-        computedGstBreakdown[rate] = { taxableAmount: 0, cgstAmount: 0, sgstAmount: 0, igstAmount: 0, totalGst: 0 };
+        computedGstBreakdown[rate] = {
+          taxableAmount: 0,
+          cgstAmount: 0,
+          sgstAmount: 0,
+          igstAmount: 0,
+          totalGst: 0,
+        };
       }
       computedGstBreakdown[rate].taxableAmount += itemTaxable;
       computedGstBreakdown[rate].cgstAmount += isIgst ? 0 : itemGstAmount / 2;
@@ -777,7 +897,10 @@ function generateA4PurchaseHTML({
     const taxable = breakdown.taxableAmount || 0;
     const cgst = isIgst ? 0 : breakdown.cgstAmount || 0;
     const sgst = isIgst ? 0 : breakdown.sgstAmount || 0;
-    const igst = isIgst ? breakdown.igstAmount || (breakdown.cgstAmount || 0) + (breakdown.sgstAmount || 0) : 0;
+    const igst = isIgst
+      ? breakdown.igstAmount ||
+        (breakdown.cgstAmount || 0) + (breakdown.sgstAmount || 0)
+      : 0;
 
     gstBreakdownHTML += `
       <tr>
@@ -818,8 +941,9 @@ function generateA4PurchaseHTML({
     : Number((Math.round(effectiveNetTotal) - effectiveNetTotal).toFixed(2));
 
   const amountInWords =
-    numberToWords.toWords(Math.round(effectiveNetTotal).toFixed(2)).replace(/\b\w/g, (c) => c.toUpperCase()) +
-    " Rupees Only";
+    numberToWords
+      .toWords(Math.round(effectiveNetTotal).toFixed(2))
+      .replace(/\b\w/g, (c) => c.toUpperCase()) + " Rupees Only";
 
   const hasVendorDetails =
     formValues.contactNumber ||
@@ -832,11 +956,15 @@ function generateA4PurchaseHTML({
     formValues.customerGstNumber ||
     formValues.gstNumber;
 
-  const rawGrandTotal = createdInvoice ? effectiveNetTotal : invoiceCalculations.netTotal;
+  const rawGrandTotal = createdInvoice
+    ? effectiveNetTotal
+    : invoiceCalculations.netTotal;
   const roundedGrandTotal = Math.round(rawGrandTotal);
-  const roundOffValue = Number.isFinite(effectiveRoundOff) ? effectiveRoundOff : 0;
+  const roundOffValue = Number.isFinite(effectiveRoundOff)
+    ? effectiveRoundOff
+    : 0;
 
-  const colspanCount = isMrpEnabled ? 8 : 7;
+  const colspanCount = (isMrpEnabled ? 8 : 7) + (showNetRate ? 1 : 0);
 
   const totalsRowCount =
     2 +
@@ -950,7 +1078,9 @@ function generateA4PurchaseHTML({
                       : ""
                   }
                   ${
-                    formValues.customerName || formValues.partyName || formValues.vendorName
+                    formValues.customerName ||
+                    formValues.partyName ||
+                    formValues.vendorName
                       ? `<div>Name: ${formValues.customerName || formValues.partyName || formValues.vendorName}</div>`
                       : ""
                   }
@@ -962,7 +1092,9 @@ function generateA4PurchaseHTML({
                   ${
                     formValues.customerState || formValues.state
                       ? `<div>State: ${formValues.customerState || formValues.state}${
-                          formValues.customerPostalCode ? `, Pin: ${formValues.customerPostalCode}` : ""
+                          formValues.customerPostalCode
+                            ? `, Pin: ${formValues.customerPostalCode}`
+                            : ""
                         }</div>`
                       : ""
                   }
@@ -1005,6 +1137,7 @@ function generateA4PurchaseHTML({
                       <th>Discount(&#8377;)</th>
                       <th>Taxable Value(&#8377;)</th>
                       <th>GST Amt.(%)</th>
+                      ${showNetRate ? `<th>Net Rate(&#8377;)</th>` : ""}
                       <th>Amount(&#8377;)</th>
                     </tr>
                   </thead>
@@ -1014,13 +1147,14 @@ function generateA4PurchaseHTML({
                     <tr class="summary-total-row" style="font-weight:bold; background:#f8f8f8;">
                       <td></td>
                       <td style="text-align:left;">Total</td>
-                      <td>${totalQty}</td>
+                      <td>${formatQty(totalQty)}</td>
                       <td></td>
                       ${isMrpEnabled ? `<td></td>` : ""}
                       <td></td>
                       <td class="discount">&#8377;${totalDiscount.toFixed(2)}</td>
                       <td>&#8377;${totalTaxable.toFixed(2)}</td>
                       <td class="gst-amount">&#8377;${totalGST.toFixed(2)}</td>
+                      ${showNetRate ? `<td></td>` : ""}
                       <td class="total-amount">&#8377;${totalAmount.toFixed(2)}</td>
                     </tr>
 
@@ -1033,7 +1167,8 @@ function generateA4PurchaseHTML({
                         <div style="font-size:11px; font-weight:bold; color:#2c5aa0; margin-top:2px;">${amountInWords}</div>
 
                         ${
-                          invoiceData?.transactions && invoiceData.transactions.length > 0
+                          invoiceData?.transactions &&
+                          invoiceData.transactions.length > 0
                             ? `
                         <div style="margin-top:15px;">
                           <div style="font-weight:bold; color:#2c5aa0; padding:4px 0; font-size:12px; text-align:center; background:#f0f4ff;">Payment Summary</div>
@@ -1068,7 +1203,9 @@ function generateA4PurchaseHTML({
                       </td>
                       <td class="label">Subtotal</td>
                       <td class="amount">&#8377;${
-                        createdInvoice ? Number(invoiceData?.subTotal).toFixed(2) : invoiceCalculations.subtotal.toFixed(2)
+                        createdInvoice
+                          ? Number(invoiceData?.subTotal).toFixed(2)
+                          : invoiceCalculations.subtotal.toFixed(2)
                       }</td>
                     </tr>
 
@@ -1112,12 +1249,16 @@ function generateA4PurchaseHTML({
                       <td class="amount">&#8377;${
                         createdInvoice
                           ? Number(invoiceData?.grandTotal).toFixed(2)
-                          : (Number(rawGrandTotal) + Number(invoiceCalculations?.roundOff ?? 0)).toFixed(2)
+                          : (
+                              Number(rawGrandTotal) +
+                              Number(invoiceCalculations?.roundOff ?? 0)
+                            ).toFixed(2)
                       }</td>
                     </tr>
 
                     ${
-                      payment.status !== "paid" || Math.round(payment.due * 100) / 100 > 0.01
+                      payment.status !== "paid" ||
+                      Math.round(payment.due * 100) / 100 > 0.01
                         ? `
                     <tr class="payment-row no-break">
                       <td class="label">Paid Amount</td>
@@ -1126,7 +1267,9 @@ function generateA4PurchaseHTML({
                     <tr class="payment-row no-break">
                       <td class="label">Due Amount</td>
                       <td class="amount" style="color:${
-                        Math.round(payment.due * 100) / 100 > 0.01 ? "#e53935" : "#000"
+                        Math.round(payment.due * 100) / 100 > 0.01
+                          ? "#e53935"
+                          : "#000"
                       };">&#8377;${payment.due.toFixed(2)}</td>
                     </tr>`
                         : ""
@@ -1174,7 +1317,10 @@ function generateA4PurchaseHTML({
               </div>
 
               ${
-                !preview && Object.keys(effectiveGstBreakdown || {}).some((r) => parseFloat(r) > 0)
+                !preview &&
+                Object.keys(effectiveGstBreakdown || {}).some(
+                  (r) => parseFloat(r) > 0,
+                )
                   ? `
               <div class="gst-breakdown">
                 <div class="gst-breakdown-title">Tax Summary</div>
@@ -1216,5 +1362,7 @@ function generateA4PurchaseHTML({
 
 export const generatePurchaseHTML = (params) => {
   const pageFormat = params?.pageFormat === "a5" ? "a5" : "a4";
-  return pageFormat === "a5" ? generateA5PurchaseHTML(params) : generateA4PurchaseHTML(params);
+  return pageFormat === "a5"
+    ? generateA5PurchaseHTML(params)
+    : generateA4PurchaseHTML(params);
 };

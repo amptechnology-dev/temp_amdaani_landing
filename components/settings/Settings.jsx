@@ -5,6 +5,7 @@ import {
   Package,
   ShoppingCart,
   ClipboardList,
+  Percent,
   MailIcon,
   Phone,
   Bot,
@@ -148,6 +149,10 @@ export default function Settings() {
   const [stockLoading, setStockLoading] = useState(false);
   const [poLoading, setPoLoading] = useState(false);
   const [mrpLoading, setMrpLoading] = useState(false);
+  const [gstUnitLoading, setGstUnitLoading] = useState(false);
+  const isGstPerUnitEnabled = Boolean(
+    authState?.user?.store?.settings?.showGstPerUnit,
+  );
 
   // ── Toast ──
   const [toast, setToast] = useState(null);
@@ -199,6 +204,13 @@ export default function Settings() {
       { mrpManagement: !isMrpEnabled },
       `MRP management ${!isMrpEnabled ? "enabled" : "disabled"}`,
       setMrpLoading,
+    );
+
+  const handleGstPerUnitToggle = () =>
+    updateStoreSettings(
+      { showGstPerUnit: !isGstPerUnitEnabled },
+      `Net Rate column ${!isGstPerUnitEnabled ? "enabled" : "disabled"}`,
+      setGstUnitLoading,
     );
 
   // ── Change Email Modal ──
@@ -363,6 +375,18 @@ export default function Settings() {
                     checked={isMrpEnabled}
                     onChange={handleMrpToggle}
                     loading={mrpLoading}
+                  />
+                }
+              />
+              <SettingsRow
+                icon={Percent}
+                title="Net Rate"
+                description="Show Net Rate (per unit, incl. GST, after discount) in sale and purchase invoice"
+                right={
+                  <Switch
+                    checked={isGstPerUnitEnabled}
+                    onChange={handleGstPerUnitToggle}
+                    loading={gstUnitLoading}
                   />
                 }
               />
