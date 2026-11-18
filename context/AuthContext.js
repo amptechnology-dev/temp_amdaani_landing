@@ -310,9 +310,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   // OTP Send
-  const sendOtp = async (phone) => {
+  const sendOtp = async (phone, email) => {
     try {
-      return await api.post("/auth/get-otp", { phone });
+      return await api.post(
+        "/auth/get-otp",
+        email ? { phone, email } : { phone },
+        { timeout: 30000 }, // OTP route e SMS fail + email fallback e beshi somoy lage
+      );
     } catch (err) {
       return { success: false, message: err.message };
     }
