@@ -33,6 +33,40 @@ const SOCIAL_BASE_URLS = {
   linkedin: "https://linkedin.com",
 };
 
+// Soft orange + brown palette for the footer
+const footerPalette = {
+  light: {
+    bg: "linear-gradient(180deg, #FFF8F1 0%, #FBEBDC 100%)",
+    border: "#EBD3BD",
+    heading: "#5A3A28",
+    text: "#7A5A47",
+    muted: "#A07C63",
+    accent: "#D9925A", // mild orange
+    brand: "#8A4B1F",
+    iconBg: "#F6E1CC",
+    iconText: "#8B5E3C",
+    linkHover: "hover:text-[#B8661F]",
+    iconHover: "hover:bg-[#EFCFB0] hover:text-[#8A4B1F]",
+    topBtn:
+      "bg-[#FFF3E6] text-[#8B5E3C] hover:bg-[#F6E1CC] border border-[#EBD3BD]",
+  },
+  dark: {
+    bg: "linear-gradient(180deg, #2B211B 0%, #3A2B21 100%)",
+    border: "#5A4333",
+    heading: "#F4E4D3",
+    text: "#CDB6A1",
+    muted: "#A88F7A",
+    accent: "#D9925A",
+    brand: "#E8B27E",
+    iconBg: "#4A372A",
+    iconText: "#D8BBA0",
+    linkHover: "hover:text-[#F0B98A]",
+    iconHover: "hover:bg-[#5A4333] hover:text-[#F0B98A]",
+    topBtn:
+      "bg-[#3A2B21] text-[#E8B27E] hover:bg-[#4A372A] border border-[#5A4333]",
+  },
+};
+
 const isValidLinkRaw = (raw) => {
   if (!raw || typeof raw !== "string") return false;
   const v = raw.trim();
@@ -95,6 +129,7 @@ const buildSocialUrl = (platform, rawUrl) => {
 export default function Footer() {
   const { theme } = useTheme();
   const currentTheme = themeConfig[theme];
+  const p = footerPalette[theme === "light" ? "light" : "dark"];
   const [isVisible, setIsVisible] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [helpline, setHelpline] = useState(DEFAULT_HELPLINE);
@@ -177,34 +212,31 @@ export default function Footer() {
       icon: FaFacebook,
       raw: helpline?.socialLinks?.facebook,
       href: buildSocialUrl("facebook", helpline?.socialLinks?.facebook),
-      color: "hover:text-blue-600",
     },
     {
       name: "Instagram",
       icon: FaInstagram,
       raw: helpline?.socialLinks?.instagram,
       href: buildSocialUrl("instagram", helpline?.socialLinks?.instagram),
-      color: "hover:text-pink-600",
     },
     {
       name: "YouTube",
       icon: FaYoutube,
       raw: helpline?.socialLinks?.youtube,
       href: buildSocialUrl("youtube", helpline?.socialLinks?.youtube),
-      color: "hover:text-red-600",
     },
     {
       name: "LinkedIn",
       icon: FaLinkedin,
       raw: helpline?.socialLinks?.linkedin,
       href: buildSocialUrl("linkedin", helpline?.socialLinks?.linkedin),
-      color: "hover:text-blue-700",
     },
   ];
 
   return (
     <footer
-      className={`relative ${currentTheme.background} border-t ${currentTheme.outline}`}
+      className="relative border-t"
+      style={{ background: p.bg, borderColor: p.border }}
     >
       {/* Scroll to Top Button */}
       <motion.button
@@ -214,11 +246,7 @@ export default function Footer() {
           scale: showScrollTop ? 1 : 0,
         }}
         onClick={scrollToTop}
-        className={`fixed bottom-24 right-8 z-50 w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 ${
-          theme === "light"
-            ? "bg-white text-gray-700 hover:bg-gray-50 border border-gray-200"
-            : "bg-[#1C1C1E] text-gray-300 hover:bg-[#2C2C2E] border border-gray-700"
-        }`}
+        className={`fixed bottom-24 right-8 z-50 w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 ${p.topBtn}`}
       >
         <ArrowUp className="w-5 h-5" />
       </motion.button>
@@ -246,23 +274,22 @@ export default function Footer() {
                 <span
                   style={{
                     fontFamily: "'Hit and Run', sans-serif",
-                    color: "#255e97",
+                    color: p.brand,
                   }}
                   className="text-lg font-extrabold tracking-tight leading-none"
                 >
                   AMDAANI
                 </span>
                 <span
-                  className={`text-[11px] mt-[2px] tracking-[0.14em] font-bold ${currentTheme.textTertiary} hidden sm:block`}
+                  style={{ color: p.muted }}
+                  className="text-[11px] mt-[2px] tracking-[0.14em] font-bold hidden sm:block"
                 >
                   Smart Business Solutions
                 </span>
               </div>
             </div>
 
-            <p
-              className={`text-lg mb-6 ${currentTheme.textSecondary} max-w-md`}
-            >
+            <p className="text-lg mb-6 max-w-md" style={{ color: p.text }}>
               Reliable billing software designed for Indian businesses. Create
               professional invoices, manage customer records, and support your
               business growth effortlessly
@@ -272,44 +299,24 @@ export default function Footer() {
             {/* <div className="space-y-3 mb-6">
               {hasPhone && (
                 <div className="flex items-center space-x-3">
-                  <Phone className={`w-4 h-4 ${currentTheme.textTertiary}`} />
-                  <a href={`tel:${normalizedPhone}`} className={currentTheme.text}>
+                  <Phone className="w-4 h-4" style={{ color: p.accent }} />
+                  <a href={`tel:${normalizedPhone}`} style={{ color: p.text }}>
                     {helpline.phone}
                   </a>
                 </div>
               )}
               {hasEmail && (
                 <div className="flex items-center space-x-3">
-                  <Mail className={`w-4 h-4 ${currentTheme.textTertiary}`} />
-                  <a href={`mailto:${helpline.email}`} className={currentTheme.text}>
+                  <Mail className="w-4 h-4" style={{ color: p.accent }} />
+                  <a href={`mailto:${helpline.email}`} style={{ color: p.text }}>
                     {helpline.email}
                   </a>
                 </div>
               )}
               <div className="flex items-center space-x-3">
-                <MapPin className={`w-4 h-4 ${currentTheme.textTertiary}`} />
-                <span className={currentTheme.text}>{helpline.location}</span>
+                <MapPin className="w-4 h-4" style={{ color: p.accent }} />
+                <span style={{ color: p.text }}>{helpline.location}</span>
               </div>
-            </div> */}
-
-            {/* Social Links */}
-            {/* <div className="flex space-x-4">
-              {socialLinks.map((social) => {
-                const IconComponent = social.icon;
-                return (
-                  <motion.a
-                    key={social.name}
-                    href={social.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    className={`w-10 h-10 rounded-lg ${currentTheme.surfaceVariant} flex items-center justify-center transition-colors duration-200 ${currentTheme.textTertiary} ${social.color}`}
-                  >
-                    <IconComponent className="w-5 h-5" />
-                  </motion.a>
-                );
-              })}
             </div> */}
           </motion.div>
 
@@ -320,18 +327,23 @@ export default function Footer() {
             transition={{ duration: 0.6, delay: 0.12 }}
             className="xl:col-span-1"
           >
-            <h3 className={`text-lg font-semibold mb-4 ${currentTheme.text}`}>
+            <h3
+              className="text-lg font-semibold mb-4"
+              style={{ color: p.heading }}
+            >
               {footerSections[0].title}
             </h3>
             <ul className="space-y-3">
               {footerSections[0].links.map((link) => (
                 <li key={link.name} className="flex items-center space-x-3">
                   <span
-                    className={`w-2 h-2 rounded-full ${currentTheme.textTertiary} inline-block mt-1`}
+                    className="w-2 h-2 rounded-full inline-block mt-1"
+                    style={{ backgroundColor: p.accent }}
                   />
                   <a
                     href={link.href}
-                    className={`text-sm transition-colors duration-200 hover:${currentTheme.text} ${currentTheme.textSecondary}`}
+                    style={{ color: p.text }}
+                    className={`text-sm transition-colors duration-200 ${p.linkHover}`}
                   >
                     {link.name}
                   </a>
@@ -347,17 +359,21 @@ export default function Footer() {
             transition={{ duration: 0.6, delay: 0.18 }}
             className="xl:col-span-1"
           >
-            <h3 className={`text-lg font-semibold mb-4 ${currentTheme.text}`}>
+            <h3
+              className="text-lg font-semibold mb-4"
+              style={{ color: p.heading }}
+            >
               Contact
             </h3>
 
             <div className="space-y-3 mb-4">
               {/* {hasPhone && (
                 <div className="flex items-center space-x-3">
-                  <Phone className={`w-4 h-4 ${currentTheme.textTertiary}`} />
+                  <Phone className="w-4 h-4" style={{ color: p.accent }} />
                   <a
                     href={`tel:${normalizedPhone}`}
-                    className={`text-sm ${currentTheme.text}`}
+                    className="text-sm"
+                    style={{ color: p.text }}
                   >
                     {helpline.phone}
                   </a>
@@ -366,10 +382,11 @@ export default function Footer() {
 
               {hasEmail && (
                 <div className="flex items-center space-x-3">
-                  <Mail className={`w-4 h-4 ${currentTheme.textTertiary}`} />
+                  <Mail className="w-4 h-4" style={{ color: p.accent }} />
                   <a
                     href={`mailto:${helpline.email}`}
-                    className={`text-sm ${currentTheme.text}`}
+                    className={`text-sm transition-colors duration-200 ${p.linkHover}`}
+                    style={{ color: p.text }}
                   >
                     {helpline.email}
                   </a>
@@ -377,8 +394,10 @@ export default function Footer() {
               )}
 
               {/* <div className="flex items-center space-x-3">
-                <MapPin className={`w-4 h-4 ${currentTheme.textTertiary}`} />
-                <span className={`text-sm ${currentTheme.text}`}>{helpline.location}</span>
+                <MapPin className="w-4 h-4" style={{ color: p.accent }} />
+                <span className="text-sm" style={{ color: p.text }}>
+                  {helpline.location}
+                </span>
               </div> */}
             </div>
 
@@ -394,7 +413,8 @@ export default function Footer() {
                     rel="noopener noreferrer"
                     whileHover={{ scale: 1.08 }}
                     whileTap={{ scale: 0.95 }}
-                    className={`w-10 h-10 rounded-lg ${currentTheme.surfaceVariant} flex items-center justify-center transition-colors duration-200 ${currentTheme.textTertiary} ${social.color}`}
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors duration-200 ${p.iconHover}`}
+                    style={{ backgroundColor: p.iconBg, color: p.iconText }}
                   >
                     <IconComponent className="w-5 h-5" />
                   </motion.a>
