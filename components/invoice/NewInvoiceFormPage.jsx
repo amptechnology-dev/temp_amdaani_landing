@@ -105,6 +105,53 @@ const formatQty = (n) =>
     .toFixed(QTY_MAX_DECIMALS)
     .replace(/\.?0+$/, "");
 
+function StockBadge({ stock }) {
+  if (stock === undefined || stock === null || isNaN(Number(stock)))
+    return null;
+  const n = Number(stock);
+  const style =
+    n <= 2
+      ? "text-red-600 border-red-300 bg-red-50"
+      : n <= 10
+        ? "text-amber-600 border-amber-300 bg-amber-50"
+        : "text-green-600 border-green-300 bg-green-50";
+  return (
+    <span
+      className={`inline-block text-[11px] font-medium px-2 py-0.5 rounded-full border ${style}`}
+    >
+      {formatQty(n)} in stock
+    </span>
+  );
+}
+
+function ItemCalcInfo({ price, gstRate, inclusive, qty, total, stock }) {
+  const gst = Number(gstRate || 0);
+  const t = Number(total || 0);
+  // total tax-shoho dhore Base/Tax ber kora hocche
+  const base = gst > 0 ? t / (1 + gst / 100) : t;
+  const tax = t - base;
+  return (
+    <div className="mt-1 space-y-0.5">
+      <p className="text-xs font-medium text-blue-600">
+        ₹{Number(price || 0).toFixed(2)}
+        {gst > 0
+          ? inclusive
+            ? ` (incl. ${gst}% GST)`
+            : ` (+ ${gst}% GST)`
+          : ""}
+        {" × "}
+        {formatQty(qty)} = ₹{t.toFixed(2)}
+      </p>
+      {gst > 0 && (
+        <p className="text-[11px] text-slate-500">
+          Base: ₹{base.toFixed(2)} + Tax: ₹{tax.toFixed(2)}
+        </p>
+      )}
+      <StockBadge stock={stock} />
+    </div>
+  );
+}
+
 const PAYMENT_OPTIONS = [
   { label: "Cash", value: "cash", icon: Banknote },
   { label: "UPI", value: "upi", icon: QrCode },
@@ -740,9 +787,12 @@ function InlineProductCombobox({ products, onSelect, onCreateNew }) {
                     HSN: {p.hsn || "-"} · {p.unit || "Pcs"}
                   </p>
                 </div>
-                <span className="text-blue-600 font-semibold text-xs shrink-0 ml-2">
-                  ₹{Number(p.sellingPrice ?? 0).toFixed(2)}
-                </span>
+                <div className="text-right shrink-0 ml-2 space-y-1">
+                  <span className="text-blue-600 font-semibold text-xs block">
+                    ₹{Number(p.sellingPrice ?? 0).toFixed(2)}
+                  </span>
+                  <StockBadge stock={p.currentStock} />
+                </div>
               </div>
             ))}
 
@@ -1307,6 +1357,10 @@ export default function NewInvoiceFormPage({
     }));
   };
 
+  const stockById = new Map(
+    (products || []).map((p) => [String(p._id), p.currentStock]),
+  );
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -1602,7 +1656,18 @@ export default function NewInvoiceFormPage({
                         {i + 1}
                       </td>
                       <td className="px-3 py-1.5 border-b border-slate-100 font-medium text-slate-800">
-                        {item.name}
+                        <div>{item.name}</div>
+                        <ItemCalcInfo
+                          price={item.price ?? item.sellingPrice}
+                          gstRate={item.gstRate}
+                          inclusive={item.isTaxInclusive}
+                          qty={item.qty}
+                          total={item.total}
+                          stock={
+                            stockById.get(String(item.product ?? item._id)) ??
+                            item.currentStock
+                          }
+                        />
                       </td>
                       <td className="px-3 py-1.5 border-b border-slate-100 text-slate-500">
                         {item.hsn || "-"}
