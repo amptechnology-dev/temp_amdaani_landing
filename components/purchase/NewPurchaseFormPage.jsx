@@ -1091,7 +1091,11 @@ export default function NewPurchaseFormPage({
         Boolean(newItem.isPurchaseTaxInclusive),
       );
       handleUpdateItemField(targetId, "mrp", Number(newItem.mrp || 0));
-
+      handleUpdateItemField(
+        targetId,
+        "isTaxInclusive",
+        Boolean(newItem.isTaxInclusive),
+      );
       setAllProducts?.((prev) => [
         newItem,
         ...prev.filter((p) => p._id !== newItem._id),
@@ -1247,15 +1251,17 @@ export default function NewPurchaseFormPage({
                   className="bg-transparent outline-none text-sm text-slate-600 font-medium cursor-pointer"
                 />
               </div>
-              <div className="flex items-center gap-1.5 bg-blue-600 px-2.5 py-1 rounded-full text-sm text-white font-semibold shadow-sm shadow-blue-200">
-                <Hash className="w-3.5 h-3.5 text-blue-200" />
+              <div className="flex items-center gap-1.5 bg-blue-600 px-3 py-1 rounded-full text-sm text-white font-semibold shadow-sm shadow-blue-200">
+                <Hash className="w-3.5 h-3.5 text-blue-200 shrink-0" />
                 {isEditMode ? (
                   purchaseNumber || "Loading..."
                 ) : (
                   <input
                     value={purchaseNumber}
                     onChange={(e) => setPurchaseNumber(e.target.value)}
-                    className="bg-transparent outline-none w-24 placeholder:text-blue-200 text-white text-sm"
+                    maxLength={30}
+                    placeholder="Enter purchase number"
+                    className="bg-transparent outline-none w-64 placeholder:text-blue-200 text-white text-sm"
                   />
                 )}
               </div>

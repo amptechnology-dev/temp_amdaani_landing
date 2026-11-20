@@ -297,7 +297,7 @@ export default function PurchaseFlow() {
     setExistingPurchaseId(null);
     setPurchaseDate(format(new Date(), "yyyy-MM-dd"));
     const store = await fetchStoreData();
-    await fetchNextPurchaseNumber();
+    setPurchaseNumber("");
     await fetchAllProducts();
     return store;
   };
@@ -458,6 +458,10 @@ export default function PurchaseFlow() {
       return null;
     }
     if (cartItems.length === 0) return null;
+    if (!purchaseNumber || !purchaseNumber.trim()) {
+      toast.error("Purchase number is required");
+      return null;
+    }
 
     const isValidObjectId = (id) => /^[0-9a-fA-F]{24}$/.test(String(id || ""));
     const invalidItems = invoiceCalculations.computedItems.filter(
@@ -486,7 +490,7 @@ export default function PurchaseFlow() {
       const vendor = selectedVendor || { name: "Walk-in Vendor", mobile: "" };
 
       const purchaseData = {
-        invoiceNumber: purchaseNumber,
+        invoiceNumber: purchaseNumber.trim(),
         vendor: isEditMode ? undefined : vendor._id || null,
         vendorName: vendor.name,
         vendorMobile: vendor.mobile,
@@ -570,7 +574,11 @@ export default function PurchaseFlow() {
 
       return html;
     } catch (error) {
-      toast.error(error?.message || "Purchase creation failed");
+      toast.error(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Purchase creation failed",
+      );
       return null;
     } finally {
       setIsSubmitting(false);
@@ -648,7 +656,6 @@ export default function PurchaseFlow() {
       setDiscount={setDiscount}
       remarks={remarks}
       setRemarks={setRemarks}
-
     />
   );
 }

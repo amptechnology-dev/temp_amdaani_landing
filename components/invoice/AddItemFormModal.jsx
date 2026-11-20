@@ -91,6 +91,25 @@ const TAX_OPTIONS = [
 
 const defaultTaxOption = TAX_OPTIONS[1];
 
+const validateTaxRates = ({
+  salesTaxOption,
+  salesTaxRate,
+  purchaseTaxOption,
+  purchaseTaxRate,
+}) => {
+  const errors = {};
+
+  if (salesTaxOption?.id === "with_tax" && !salesTaxRate) {
+    errors.salesTaxRate = "Select GST rate for Include Tax";
+  }
+
+  if (purchaseTaxOption?.id === "with_tax" && !purchaseTaxRate) {
+    errors.purchaseTaxRate = "Select GST rate for Include Tax";
+  }
+
+  return errors;
+};
+
 const GST_RATE_OPTIONS = COMMON_GST_RATES.map((r) => ({
   id: String(r),
   rate: r,
@@ -148,26 +167,29 @@ function validateOpeningStockValues(stockStr, valueStr, isEdit = false) {
   return errors;
 }
 
-const validationSchema = Yup.object().shape({
-  itemName: Yup.string().trim().required("Item name is required").min(2),
-  hsnCode: Yup.string().trim(),
-  unit: Yup.string().required("Unit is required"),
-  salesPrice: Yup.number()
-    .required("Sales price is required")
-    .positive("Sales price must be positive"),
-  purchasePrice: Yup.number()
-    .nullable()
-    .positive("Purchase price must be positive")
-    .typeError("Must be a number"),
-  mrp: Yup.number()
-    .nullable()
-    .positive("MRP must be positive")
-    .typeError("MRP must be a valid number"),
-  discountPrice: Yup.number()
-    .nullable()
-    .min(0, "Discount cannot be negative")
-    .typeError("Must be a number"),
-});
+const getValidationSchema = (isMrpEnabled) =>
+  Yup.object().shape({
+    itemName: Yup.string().trim().required("Item name is required").min(2),
+    hsnCode: Yup.string().trim(),
+    unit: Yup.string().required("Unit is required"),
+    salesPrice: Yup.number()
+      .required("Sales price is required")
+      .positive("Sales price must be positive"),
+    purchasePrice: Yup.number()
+      .nullable()
+      .positive("Purchase price must be positive")
+      .typeError("Must be a number"),
+    mrp: isMrpEnabled
+      ? Yup.number()
+          .typeError("MRP must be a valid number")
+          .required("MRP is required")
+          .positive("MRP must be positive")
+      : Yup.number().nullable().notRequired(),
+    discountPrice: Yup.number()
+      .nullable()
+      .min(0, "Discount cannot be negative")
+      .typeError("Must be a number"),
+  });
 
 // =========================================================
 // Category inline creator
@@ -238,7 +260,10 @@ function CategorySection({ value, onChange }) {
   };
 
   const handleTriggerKeyDown = (e) => {
-    if (!open && (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ")) {
+    if (
+      !open &&
+      (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ")
+    ) {
       e.preventDefault();
       setOpen(true);
     }
@@ -441,7 +466,8 @@ function CategorySection({ value, onChange }) {
             ) : (
               filtered.map((cat, index) => {
                 const selected = value === cat._id;
-                const isHighlighted = highlightedIndex === index && !isAddingNew;
+                const isHighlighted =
+                  highlightedIndex === index && !isAddingNew;
                 const isEditingThis = editTarget?._id === cat._id;
 
                 if (isEditingThis) {
@@ -624,7 +650,10 @@ function HsnCodeSection({ value, gstRate, onHsnSelect }) {
   };
 
   const handleTriggerKeyDown = (e) => {
-    if (!open && (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ")) {
+    if (
+      !open &&
+      (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ")
+    ) {
       e.preventDefault();
       setOpen(true);
     }
@@ -948,7 +977,10 @@ function UnitSection({ value, onChange }) {
   };
 
   const handleTriggerKeyDown = (e) => {
-    if (!open && (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ")) {
+    if (
+      !open &&
+      (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ")
+    ) {
       e.preventDefault();
       setOpen(true);
     }
@@ -1086,7 +1118,7 @@ function TaxOptionSection({ value, onChange }) {
   );
 }
 
-function TaxRateSection({ value, onChange, disabled }) {
+function TaxRateSection({ value, onChange, disabled, error }) {
   const [open, setOpen] = useState(false);
   const [customRate, setCustomRate] = useState(
     value?.rate != null ? String(value.rate) : "",
@@ -1130,9 +1162,7 @@ function TaxRateSection({ value, onChange, disabled }) {
   const handleListKeyDown = (e) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setHighlightedIndex((i) =>
-        Math.min(i + 1, GST_RATE_OPTIONS.length - 1),
-      );
+      setHighlightedIndex((i) => Math.min(i + 1, GST_RATE_OPTIONS.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setHighlightedIndex((i) => Math.max(i - 1, 0));
@@ -1159,7 +1189,9 @@ function TaxRateSection({ value, onChange, disabled }) {
             type="button"
             disabled={disabled}
             onKeyDown={handleTriggerKeyDown}
-            className="mt-0.5 w-full h-9 px-3 rounded-md border border-slate-200 bg-white flex items-center justify-between text-sm hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed"
+            className={`mt-0.5 w-full h-9 px-3 rounded-md border bg-white flex items-center justify-between text-sm hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed ${
+              error ? "border-red-400 ring-1 ring-red-200" : "border-slate-200"
+            }`}
           >
             <span
               className={`text-xs ${value ? "text-slate-800" : "text-slate-400"}`}
@@ -1258,6 +1290,7 @@ function TaxRateSection({ value, onChange, disabled }) {
           </div>
         </PopoverContent>
       </Popover>
+      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
     </div>
   );
 }
@@ -1274,6 +1307,11 @@ export default function AddItemFormModal({
 }) {
   const isEditMode = Boolean(editItem);
   const { isMrpEnabled } = useAuth();
+
+  const validationSchema = useMemo(
+    () => getValidationSchema(isMrpEnabled),
+    [isMrpEnabled],
+  );
 
   const [resolvedItem, setResolvedItem] = useState(null);
   const [isFetchingEditItem, setIsFetchingEditItem] = useState(false);
@@ -1332,7 +1370,10 @@ export default function AddItemFormModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editItem]);
 
-  const activeItem = resolvedItem || editItem;
+  const activeItem =
+    editItem && isValidObjectId(editItem._id) && !resolvedItem
+      ? null
+      : resolvedItem || editItem;
   const canUpdateExisting = isValidObjectId(activeItem?._id);
 
   const [selectedTaxOption, setSelectedTaxOption] = useState(defaultTaxOption);
@@ -1341,6 +1382,32 @@ export default function AddItemFormModal({
   const [selectedPurchaseTaxOption, setSelectedPurchaseTaxOption] =
     useState(defaultTaxOption);
   const [selectedPurchaseTaxRate, setSelectedPurchaseTaxRate] = useState(null);
+  const [taxErrors, setTaxErrors] = useState({});
+
+  useEffect(() => {
+    setTaxErrors((prev) => {
+      const next = { ...prev };
+      if (selectedTaxOption?.id !== "with_tax" || selectedTaxRate) {
+        delete next.salesTaxRate;
+      }
+      if (
+        selectedPurchaseTaxOption?.id !== "with_tax" ||
+        selectedPurchaseTaxRate
+      ) {
+        delete next.purchaseTaxRate;
+      }
+      return next;
+    });
+  }, [
+    selectedTaxOption,
+    selectedTaxRate,
+    selectedPurchaseTaxOption,
+    selectedPurchaseTaxRate,
+  ]);
+
+  useEffect(() => {
+    if (!open) setTaxErrors({});
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -1358,7 +1425,10 @@ export default function AddItemFormModal({
       : defaultTaxOption;
 
     const taxRate =
-      activeItem.gstRate && Number(activeItem.gstRate) > 0
+      activeItem.gstRate !== undefined &&
+      activeItem.gstRate !== null &&
+      activeItem.gstRate !== "" &&
+      (Number(activeItem.gstRate) > 0 || activeItem.isTaxInclusive)
         ? {
             rate: Number(activeItem.gstRate),
             label: `${activeItem.gstRate}% GST`,
@@ -1375,7 +1445,10 @@ export default function AddItemFormModal({
     const purchaseGstRateValue =
       activeItem.purchaseGstRate ?? activeItem.gstRate;
     const purchaseTaxRate =
-      purchaseGstRateValue && Number(purchaseGstRateValue) > 0
+      purchaseGstRateValue !== undefined &&
+      purchaseGstRateValue !== null &&
+      purchaseGstRateValue !== "" &&
+      (Number(purchaseGstRateValue) > 0 || activeItem.isPurchaseTaxInclusive)
         ? {
             rate: Number(purchaseGstRateValue),
             label: `${purchaseGstRateValue}% GST`,
@@ -1474,6 +1547,19 @@ export default function AddItemFormModal({
 
   const handleSubmit = async (values, { resetForm, setSubmitting }) => {
     try {
+      const taxValidationErrors = validateTaxRates({
+        salesTaxOption: selectedTaxOption,
+        salesTaxRate: selectedTaxRate,
+        purchaseTaxOption: selectedPurchaseTaxOption,
+        purchaseTaxRate: selectedPurchaseTaxRate,
+      });
+
+      if (Object.keys(taxValidationErrors).length > 0) {
+        setTaxErrors(taxValidationErrors);
+        toast.error(Object.values(taxValidationErrors)[0]);
+        setSubmitting(false);
+        return;
+      }
       const salesPrice = Number(values.salesPrice) || 0;
       const inputDiscount = Number(values.discountPrice) || 0;
 
@@ -1528,7 +1614,9 @@ export default function AddItemFormModal({
         hsn: values.hsnCode || "",
         sellingPrice: salesPrice,
         costPrice: purchasePrice,
-        ...(isMrpEnabled ? { mrp: Number(values.mrp) || 0 } : {}),
+        ...(isMrpEnabled && Number(values.mrp) > 0
+          ? { mrp: Number(values.mrp) }
+          : {}),
 
         gstRate: selectedTaxRate?.rate ? Number(selectedTaxRate.rate) : 0,
         isTaxInclusive: selectedTaxOption?.id === "with_tax",
@@ -1753,6 +1841,7 @@ export default function AddItemFormModal({
                       <TaxRateSection
                         value={selectedPurchaseTaxRate}
                         onChange={setSelectedPurchaseTaxRate}
+                        error={taxErrors.purchaseTaxRate}
                       />
 
                       {/* <div>
@@ -1859,6 +1948,7 @@ export default function AddItemFormModal({
                       <TaxRateSection
                         value={selectedTaxRate}
                         onChange={setSelectedTaxRate}
+                        error={taxErrors.salesTaxRate}
                       />
 
                       <div>
@@ -1929,7 +2019,7 @@ export default function AddItemFormModal({
 
                   {isMrpEnabled && (
                     <div className="sm:w-1/3">
-                      <Label>MRP (optional)</Label>
+                      <Label>MRP *</Label>
                       <Input
                         name="mrp"
                         value={values.mrp}
