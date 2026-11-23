@@ -33,6 +33,7 @@ import {
   generateKOTPreviewHTML,
   generateKOTESCPOS,
 } from "../../utils/generateThermalKOT";
+import { generateInvoicePdfBlob } from "../../utils/invoicePdf";
 
 export default function InvoiceSummary({
   invoiceCalculations,
@@ -440,59 +441,9 @@ export default function InvoiceSummary({
   };
 
   const generatePdfBlob = async () => {
-    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-      import("html2canvas-pro"),
-      import("jspdf"),
-    ]);
-
-    const idoc = iframeRef.current?.contentDocument;
-    if (!idoc || !idoc.body) {
-      throw new Error("Preview not ready yet");
-    }
-
-    await inlineImagesAsBase64(idoc);
-    await waitForImagesToLoad(idoc);
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    const canvas = await html2canvas(idoc.body, {
-      scale: 2,
-      backgroundColor: "#ffffff",
-      useCORS: true,
-      allowTaint: false,
-      windowWidth: idoc.documentElement.scrollWidth,
-      windowHeight: idoc.documentElement.scrollHeight,
-    });
-
-    const imgData = canvas.toDataURL("image/jpeg", 0.98);
-
-    const pdf = new jsPDF({
-      unit: "mm",
-      format: pageFormat === "a5" ? "a5" : "a4",
-      orientation: pageFormat === "a5" ? "landscape" : "portrait",
-    });
-
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const imgWidth = pageWidth;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-    if (imgHeight <= pageHeight) {
-      pdf.addImage(imgData, "JPEG", 0, 0, imgWidth, imgHeight);
-    } else {
-      let heightLeft = imgHeight;
-      let position = 0;
-      pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-    }
-
-    return pdf.output("blob");
-  };
+  const idoc = iframeRef.current?.contentDocument;
+  return generateInvoicePdfBlob({ idoc, pageFormat });
+};
 
   const downloadBlob = (blob, filename) => {
     const url = URL.createObjectURL(blob);
