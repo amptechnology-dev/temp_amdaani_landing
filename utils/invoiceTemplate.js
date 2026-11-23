@@ -342,6 +342,17 @@ function buildA4Html(args, shared) {
     .items-table-wrap { position: relative; }
     .items-table-watermark { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 2; }
     .items-table-watermark .text { font-family: Arial, sans-serif; font-weight: 800; font-size: clamp(36px, 10vw, 96px); letter-spacing: 0.5em; text-transform: uppercase; color: rgba(0,0,0,0.08); transform: rotate(-28deg); user-select: none; white-space: nowrap; }
+
+    /* Payment status + method line stays attached to the totals table
+       (never ends up alone on the next page). */
+    .pay-tail { break-before: avoid; page-break-before: avoid; break-inside: avoid; page-break-inside: avoid; }
+
+    /* END BLOCK = Tax Summary + Bank/Signature + remarks + terms + footer text.
+       Kept together and never split. It simply follows the content, so there
+       is NO artificial spacer (which was the cause of the blank last page).
+       The header (thead) repeats only on pages that actually have content. */
+    #end-block { break-inside: avoid; page-break-inside: avoid; }
+
     @media (max-width: 600px) {
       .header-grid { flex-direction: row; align-items: flex-start; justify-content: space-between; flex-wrap: nowrap; gap: 8px; }
       .header-left { flex-direction: row; align-items: center; flex: 1; min-width: 0; }
@@ -350,12 +361,12 @@ function buildA4Html(args, shared) {
       .invoice-badge { font-size: 12px; padding: 4px 8px; }
     }
     @media print {
+      /* Without this, table-header blue backgrounds are NOT printed and the
+         white header text becomes invisible. */
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
       body { margin: 0; padding: 0; }
       thead { display: table-header-group; }
-      tfoot { display: table-footer-group; }
       .no-break { page-break-inside: avoid; }
-      .brand-strip, .header-grid, .footer-section { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-      .items-table-watermark .text { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
       @page { size: A4; margin: 6mm; }
     }
   `;
@@ -510,9 +521,9 @@ function buildA4Html(args, shared) {
                               <table style="width:100%; border-collapse:collapse; font-size:10px;">
                                 <thead>
                                   <tr style="background-color:#f5f5f5;">
-                                    <th style="border:1px solid #ddd; padding:6px; text-align:left;">Date</th>
-                                    <th style="border:1px solid #ddd; padding:6px; text-align:right;">Amount</th>
-                                    <th style="border:1px solid #ddd; padding:6px; text-align:center;">Payment Method</th>
+                                    <th style="border:1px solid #ddd; padding:6px; text-align:left; background:#f5f5f5; color:#333;">Date</th>
+                                    <th style="border:1px solid #ddd; padding:6px; text-align:right; background:#f5f5f5; color:#333;">Amount</th>
+                                    <th style="border:1px solid #ddd; padding:6px; text-align:center; background:#f5f5f5; color:#333;">Payment Method</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -600,106 +611,107 @@ function buildA4Html(args, shared) {
                 </tbody>
               </table>
 
-              <div class="payment-status-container">
-                <span class="payment-status ${payment.status?.toLowerCase()}">
-                  ${
-                    payment.status === "paid"
-                      ? "Amount is Fully Paid"
-                      : payment.status === "partial"
-                        ? "Amount is Partially Paid"
-                        : "Amount is Unpaid"
-                  }
-                </span>
-              </div>
+              <div class="pay-tail">
+                <div class="payment-status-container">
+                  <span class="payment-status ${payment.status?.toLowerCase()}">
+                    ${
+                      payment.status === "paid"
+                        ? "Amount is Fully Paid"
+                        : payment.status === "partial"
+                          ? "Amount is Partially Paid"
+                          : "Amount is Unpaid"
+                    }
+                  </span>
+                </div>
 
+                ${
+                  invoiceData?.paymentMethod || invoiceData?.paymentNote
+                    ? `<div style="text-align:right; margin-top:4px; margin-right:8px; font-size:9px; line-height:1.6;">
+                        ${
+                          invoiceData.paymentMethod && payment.paid > 0
+                            ? `<div style="margin-bottom:4px;"><span style="color:#666;">Payment Method:</span><span style="color:#000; font-weight:600; margin-left:6px;">${invoiceData.paymentMethod.toUpperCase()}</span></div>`
+                            : ""
+                        }
+                        ${
+                          invoiceData.paymentNote
+                            ? `<div><span style="color:#666;">Note:</span><span style="color:#000; margin-left:6px;">${invoiceData.paymentNote}</span></div>`
+                            : ""
+                        }
+                      </div>`
+                    : ""
+                }
+              </div>
+            </div>
+
+            <!-- END BLOCK: Tax Summary + Bank/Signature + remarks + terms.
+                 Printed once, right after the content (last page only). -->
+            <div id="end-block">
               ${
-                invoiceData?.paymentMethod || invoiceData?.paymentNote
-                  ? `<div style="text-align:right; margin-top:4px; margin-right:8px; font-size:9px; line-height:1.6;">
-                      ${
-                        invoiceData.paymentMethod && payment.paid > 0
-                          ? `<div style="margin-bottom:4px;"><span style="color:#666;">Payment Method:</span><span style="color:#000; font-weight:600; margin-left:6px;">${invoiceData.paymentMethod.toUpperCase()}</span></div>`
-                          : ""
-                      }
-                      ${
-                        invoiceData.paymentNote
-                          ? `<div><span style="color:#666;">Note:</span><span style="color:#000; margin-left:6px;">${invoiceData.paymentNote}</span></div>`
-                          : ""
-                      }
+                !preview && isGstInvoice && hasAnyGstRows
+                  ? `<div class="gst-breakdown">
+                      <div class="gst-breakdown-title">Tax Summary</div>
+                      <table class="gst-table">
+                        <thead><tr><th>GST Rate</th><th>Taxable Value</th><th>CGST</th><th>SGST</th><th>IGST</th></tr></thead>
+                        <tbody>${gstBreakdownRows}</tbody>
+                      </table>
                     </div>`
                   : ""
               }
-            </div>
 
-            ${
-              !preview && isGstInvoice && hasAnyGstRows
-                ? `<div class="gst-breakdown">
-                    <div class="gst-breakdown-title">Tax Summary</div>
-                    <table class="gst-table">
-                      <thead><tr><th>GST Rate</th><th>Taxable Value</th><th>CGST</th><th>SGST</th><th>IGST</th></tr></thead>
-                      <tbody>${gstBreakdownRows}</tbody>
-                    </table>
-                  </div>`
-                : ""
-            }
+              ${
+                preview
+                  ? ""
+                  : `<div class="footer-section">
+                      ${
+                        hasBankDetails
+                          ? `<div class="terms-section" style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+                              <div>
+                                <div class="section-title" style="font-weight:600; margin-bottom:4px;">Bank Details:</div>
+                                ${storedata.bankDetails.bankName ? `Bank: ${storedata.bankDetails.bankName}<br>` : ""}
+                                ${storedata.bankDetails.accountNo ? `A/C No: ${storedata.bankDetails.accountNo}<br>` : ""}
+                                ${storedata.bankDetails.ifsc ? `IFSC: ${storedata.bankDetails.ifsc}<br>` : ""}
+                                ${storedata.bankDetails.upiId ? `UPI: ${storedata.bankDetails.upiId}<br>` : ""}
+                              </div>
+                              ${
+                                storedata?.bankDetails?.upiId
+                                  ? `<div style="text-align:center;">
+                                      <div style="font-weight:bold; font-size:12px; margin-bottom:4px;">Scan &amp; Pay</div>
+                                      <img src="${qrURL}" width="70" height="70" onerror="this.style.display='none'" />
+                                      <div style="font-size:10px; margin-top:4px;">UPI ID: ${storedata.bankDetails.upiId}</div>
+                                      <div style="font-size:10px;">Amount: ₹${roundedGrandTotal}</div>
+                                    </div>`
+                                  : ""
+                              }
+                            </div>`
+                          : ""
+                      }
+                      <div class="signature-section">
+                        <div class="section-title">For ${storedata?.name || "YOUR COMPANY NAME"}</div>
+                        ${storedata?.signatureUrl ? `<img src="${storedata.signatureUrl}" class="signature-image"><br>` : ""}
+                        <div class="signature-line">Authorized Signatory</div>
+                      </div>
+                    </div>`
+              }
+
+              ${
+                invoiceData?.remarks
+                  ? `<pre style="font-size:8px; color:#666; margin-top:8px; padding:0 10px; white-space:pre-wrap; font-family:inherit;">Remarks : ${invoiceData.remarks}</pre>`
+                  : ""
+              }
+              ${
+                !preview && storedata?.settings?.invoiceTerms
+                  ? `<div style="font-size:8px; color:#666; margin-top:8px; padding-left:10px; padding-right:10px; text-align:left;">
+                      <div style="padding-left:10px; font-size:8px;">${storedata.settings.invoiceTerms}</div>
+                    </div>`
+                  : ""
+              }
+              ${preview ? "" : `<div class="page-footer-text">Invoice generated using amdaani billing app</div>`}
+            </div>
           </td>
         </tr>
       </tbody>
-
-      ${
-        preview
-          ? ""
-          : `<tfoot>
-              <tr>
-                <td>
-                  <div class="footer-section">
-                    ${
-                      hasBankDetails
-                        ? `<div class="terms-section" style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
-                            <div>
-                              <div class="section-title" style="font-weight:600; margin-bottom:4px;">Bank Details:</div>
-                              ${storedata.bankDetails.bankName ? `Bank: ${storedata.bankDetails.bankName}<br>` : ""}
-                              ${storedata.bankDetails.accountNo ? `A/C No: ${storedata.bankDetails.accountNo}<br>` : ""}
-                              ${storedata.bankDetails.ifsc ? `IFSC: ${storedata.bankDetails.ifsc}<br>` : ""}
-                              ${storedata.bankDetails.upiId ? `UPI: ${storedata.bankDetails.upiId}<br>` : ""}
-                            </div>
-                            ${
-                              storedata?.bankDetails?.upiId
-                                ? `<div style="text-align:center;">
-                                    <div style="font-weight:bold; font-size:12px; margin-bottom:4px;">Scan &amp; Pay</div>
-                                    <img src="${qrURL}" width="70" height="70" onerror="this.style.display='none'" />
-                                    <div style="font-size:10px; margin-top:4px;">UPI ID: ${storedata.bankDetails.upiId}</div>
-                                    <div style="font-size:10px;">Amount: ₹${roundedGrandTotal}</div>
-                                  </div>`
-                                : ""
-                            }
-                          </div>`
-                        : ""
-                    }
-                    <div class="signature-section">
-                      <div class="section-title">For ${storedata?.name || "YOUR COMPANY NAME"}</div>
-                      ${storedata?.signatureUrl ? `<img src="${storedata.signatureUrl}" class="signature-image"><br>` : ""}
-                      <div class="signature-line">Authorized Signatory</div>
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            </tfoot>`
-      }
     </table>
   </div>
-  ${
-    invoiceData?.remarks
-      ? `<pre style="font-size:8px; color:#666; margin-top:8px;">Remarks : ${invoiceData.remarks}</pre>`
-      : ""
-  }
-  ${
-    !preview && storedata?.settings?.invoiceTerms
-      ? `<div style="font-size:8px; color:#666; margin-top:8px; padding-left:10px; padding-right:10px; text-align:left;">
-          <div style="padding-left:10px; font-size:8px;">${storedata.settings.invoiceTerms}</div>
-        </div>`
-      : ""
-  }
-  ${preview ? "" : `<div class="page-footer-text">Invoice generated using amdaani billing app</div>`}
 </body>
 </html>`;
 }
@@ -835,23 +847,33 @@ function buildA5Html(args, shared) {
     html, body { margin: 0; padding: 0; background: #eee; font-family: 'Arial', sans-serif; }
     body { padding: 12px; }
     .page { max-width: 794px; margin: 0 auto; background: #fff; }
+
+    /* NOTE: .wrap is a plain block (NO display:flex, NO overflow:hidden).
+       Chrome cannot fragment a flex/overflow:hidden container across pages,
+       which pushed the whole table to page 2 and left an empty frame on
+       page 1. */
     .wrap {
-      background: #fff; display: flex; flex-direction: column;
+      background: #fff; display: block;
       font-size: 10px; line-height: 1.35; color: #1a1a1a;
-      border: 1px solid #2c5aa0; overflow: hidden;
+      border: 1px solid #2c5aa0;
     }
 
-    /* ── PRINT: A5 landscape = 210mm x 148mm, fit everything on ONE page ── */
-    @page { size: A5 landscape; margin: 0; }
+    /* Outer layout table: thead = header (repeats on every page that has
+       content), tbody = items row + end row (footer prints ONLY at the end). */
+    .outer { width: 100%; border-collapse: collapse; }
+    .outer > thead > tr > td,
+    .outer > tbody > tr > td { padding: 0; border: 0; text-align: left; vertical-align: top; }
+
+    /* ── PRINT: A5 landscape = 210mm x 148mm, margin 6mm
+          => printable area 198mm x 136mm ── */
+    @page { size: A5 landscape; margin: 6mm; }
     @media print {
       html, body {
         margin: 0 !important;
+        padding: 0 !important;
         background: #fff !important;
-        width: 210mm;
       }
-      body { padding: 5mm !important; }
-      .page { width: 200mm; max-width: none !important; margin: 0 !important; }
-      .wrap { border: 1px solid #2c5aa0 !important; }
+      .page { width: 198mm; max-width: none !important; margin: 0 !important; }
       * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     }
 
@@ -936,26 +958,31 @@ function buildA5Html(args, shared) {
     }
 
     /* Page-break rules.
-       Normal case  : whole invoice is scaled to fit on one page, so we keep
-                      the footer block together (never split).
-       Overflow case: too many items to fit even at min zoom -> script adds
-                      body.multi, and we let it flow across pages naturally. */
+       Normal case  : the whole invoice is zoomed to fit ONE page.
+       Overflow case: too many items even at MIN_ZOOM -> body.multi, the
+                      invoice flows across pages: header repeats only on
+                      pages with content, footer prints once, after the
+                      last item (no artificial spacer, so no blank page). */
+    #end-block { break-inside: avoid; page-break-inside: avoid; }
+    body.multi #end-block { break-inside: auto; page-break-inside: auto; }
+    body.multi .footer-block { break-inside: avoid; page-break-inside: avoid; }
     @media print {
+      .outer > thead { display: table-header-group; }
       .tbl thead { display: table-header-group; }
       .tbl tr { page-break-inside: avoid; }
-      .footer-block { page-break-inside: avoid; }
-      body.multi .footer-block { page-break-inside: auto; }
     }
   `;
 
-  // Auto-fit script: scales the whole invoice so it lands on exactly ONE
-  // A5-landscape page when printing. NOTE: no backticks / ${} inside here.
+  // Auto-fit script: zoom the whole invoice so it lands on exactly ONE
+  // A5-landscape page when printing.
+  // Printable area = 210x148mm minus 6mm @page margin => 198 x 136mm.
+  // NOTE: no backticks / ${} inside here.
   const fitScript = `
     (function () {
       var MM = 96 / 25.4;
-      var PAGE_W_MM = 200;      // 210mm - 2 * 5mm body padding
-      var MAX_H_PX = 135 * MM;  // 148mm - 2 * 5mm padding - 3mm safety
-      var MIN_ZOOM = 0.55;      // below this, let it flow to multiple pages
+      var PAGE_W_MM = 198;       // 210mm - 2 * 6mm margin
+      var MAX_H_PX = 130 * MM;   // 148mm - 2 * 6mm = 136mm, minus ~6mm safety
+      var MIN_ZOOM = 0.5;        // below this, let it flow to multiple pages
       var page = document.querySelector('.page');
       if (!page) return;
 
@@ -976,7 +1003,7 @@ function buildA5Html(args, shared) {
         }
         if (z < 1) {
           page.style.zoom = String(z);
-          // keep the visual width at 200mm after zoom
+          // keep the visual width at 198mm after zoom
           page.style.width = (PAGE_W_MM / z) + 'mm';
         }
       }
@@ -1209,6 +1236,8 @@ function buildA5Html(args, shared) {
       ? `<div class="invoice-terms-content">${storedata.settings.invoiceTerms}</div>`
       : "";
 
+  const headerCellHTML = `${brandStrip}${headerBlock}`;
+
   return /*html*/ `<!DOCTYPE html>
 <html>
 <head>
@@ -1220,30 +1249,45 @@ function buildA5Html(args, shared) {
 <body>
 <div class="page">
 <div class="wrap">
-  ${brandStrip}
-  ${headerBlock}
-  <div class="tbl-wrap ${isCancelled ? "cancelled" : ""}">
-    <table class="tbl">
-      ${tableHeaderA5(isGstInvoice, isMrpEnabled, showNetRate)}
-      <tbody>
-        ${itemsHTML}
-        ${sumRow}
-      </tbody>
-    </table>
-  </div>
-  ${
-    preview
-      ? ""
-      : `<div class="footer-block">
-          ${totalsBlock}
-          ${taxSummaryHTML}
-          ${paymentMethodRow}
-          ${footer}
-          ${remarksRow}
-          ${termsRow}
-        </div>`
-  }
-  ${preview ? "" : `<div class="page-footer-text">Invoice generated using amdaani billing app</div>`}
+  <table class="outer">
+    <thead>
+      <tr><td>${headerCellHTML}</td></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          <div class="tbl-wrap ${isCancelled ? "cancelled" : ""}">
+            <table class="tbl">
+              ${tableHeaderA5(isGstInvoice, isMrpEnabled, showNetRate)}
+              <tbody>
+                ${itemsHTML}
+                ${sumRow}
+              </tbody>
+            </table>
+          </div>
+        </td>
+      </tr>
+      ${
+        preview
+          ? ""
+          : `<tr>
+              <td>
+                <div id="end-block">
+                  <div class="footer-block">
+                    ${totalsBlock}
+                    ${taxSummaryHTML}
+                    ${paymentMethodRow}
+                    ${footer}
+                    ${remarksRow}
+                    ${termsRow}
+                  </div>
+                  <div class="page-footer-text">Invoice generated using amdaani billing app</div>
+                </div>
+              </td>
+            </tr>`
+      }
+    </tbody>
+  </table>
 </div>
 </div>
 <script>${fitScript}</script>

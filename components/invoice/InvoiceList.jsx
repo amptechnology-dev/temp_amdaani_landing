@@ -315,10 +315,13 @@ export default function InvoiceListPage({
       setActivePreviewStatus((doc.status || "active").toLowerCase());
 
       const rawItems = doc.items || doc.cartItems || [];
+      const isGstDoc = doc.type === "gst";
 
       const cartItems = rawItems.map((it) => {
         const qty = Number(it.qty ?? it.quantity ?? 0);
-        const baseRate = Number(
+
+        // Stored selling price (tax-inclusive hole inclusive-i thake, jemon 600)
+        const sellingPriceRaw = Number(
           it.price ??
             it.sellingPrice ??
             it.baseRate ??
@@ -334,21 +337,34 @@ export default function InvoiceListPage({
             : it.discountType || "amount";
         const discount = Number(it.discount ?? 0);
 
+        // ✅ FIX: SalesFlow-er moto exactly same logic —
+        // GST invoice + tax-inclusive hole baseRate = price / (1 + gst%)
+        // (600 -> 508.47). Non-GST hole kono division hobe na.
+        const shouldStripTax = isGstDoc && isTaxInclusive && gstRate > 0;
+        const baseRate = shouldStripTax
+          ? sellingPriceRaw / (1 + gstRate / 100)
+          : sellingPriceRaw;
+
         const perUnitDiscount =
-          discountType === "percent" ? (baseRate * discount) / 100 : discount;
+          discountType === "percent"
+            ? (sellingPriceRaw * discount) / 100
+            : discount;
 
         let taxableValue =
           it.taxableValue != null ? Number(it.taxableValue) : undefined;
         if (taxableValue === undefined) {
-          let perUnitTaxable = baseRate - perUnitDiscount;
-          if (isTaxInclusive && gstRate > 0) {
+          // ✅ FIX: sellingPriceRaw theke start korchi (baseRate theke na),
+          // noile double-division hoye jabe.
+          let perUnitTaxable = Math.max(sellingPriceRaw - perUnitDiscount, 0);
+          if (shouldStripTax) {
             perUnitTaxable = perUnitTaxable / (1 + gstRate / 100);
           }
-          taxableValue = Math.max(perUnitTaxable, 0) * qty;
+          taxableValue = perUnitTaxable * qty;
         }
 
-        const gstAmount =
-          it.gstAmount != null
+        const gstAmount = !isGstDoc
+          ? 0
+          : it.gstAmount != null
             ? Number(it.gstAmount)
             : (taxableValue * gstRate) / 100;
 
@@ -361,9 +377,9 @@ export default function InvoiceListPage({
           hsn: it.hsn,
           unit: it.unit,
           qty,
-          baseRate,
-          price: baseRate,
-          sellingPrice: baseRate,
+          baseRate, // ✅ ekhon 508.47 (GST bad)
+          price: sellingPriceRaw, // ✅ raw price (discount calc-er jonno template eta use kore)
+          sellingPrice: sellingPriceRaw,
           discount,
           discountType,
           gstRate,
@@ -391,15 +407,6 @@ export default function InvoiceListPage({
         doc.invoiceCalculations?.roundOff ?? doc.roundOff ?? 0,
       );
 
-      // ✅ FIXED: doc.paidAmount / doc.dueAmount field backend response-e
-      // exact ei naam-e na-o thakte pare (naming mismatch) — age eta
-      // silently 0/0 hoye jachhilo, fole buildThermalReceiptHTML-er
-      // `!isUnpaid && (payment.paid > 0 || payment.due > 0)` condition
-      // false hoye "Paid Amount / Due Amount" row-i print hocchilo na,
-      // shudhu list theke print korle (InvoiceSummary.js-e direct
-      // checkout-theke asha payment prop thik chilo bole okhane problem
-      // hoyni). Ekhon multiple possible field-name fallback + shesh
-      // upay hishebe grandTotal theke compute kora hocche.
       const resolvedPaidAmount = Number(
         doc.paidAmount ??
           doc.paid ??
@@ -491,8 +498,6 @@ export default function InvoiceListPage({
         grandTotal,
       };
 
-      // ✅ CHANGED: resolvedPaidAmount / resolvedDueAmount use kora
-      // hocche, age-r doc.paidAmount / doc.dueAmount er bodole
       thermalPayloadRef.current = {
         createdInvoice: true,
         invoiceData,
@@ -502,7 +507,7 @@ export default function InvoiceListPage({
         invoiceNumber: doc.invoiceNumber,
         invoiceDate: dateObj,
         storedata: effectiveStoredata,
-        isGstInvoice: doc.type === "gst",
+        isGstInvoice: isGstDoc,
         isFreePlan:
           effectiveStoredata?.isFreePlan ?? storedata?.isFreePlan ?? true,
         payment: {
@@ -524,7 +529,7 @@ export default function InvoiceListPage({
         currentTime: format(dateObj, "hh:mm a"),
         storedata: effectiveStoredata,
         invoiceDate: dateObj,
-        isGstInvoice: doc.type === "gst",
+        isGstInvoice: isGstDoc,
         isMrpEnabled: Boolean(doc.isMrpEnabled),
         isFreePlan:
           effectiveStoredata?.isFreePlan ?? storedata?.isFreePlan ?? true,
@@ -540,15 +545,6 @@ export default function InvoiceListPage({
 
       setActivePreviewNumber(doc.invoiceNumber);
       setActivePreviewPageFormat(pageFormat);
-      setActivePreviewMeta({
-        customerName: doc.customerName || "",
-        customerMobile: doc.customerMobile || "",
-        grandTotal,
-      });
-      setPreviewHtml(html);
-      setPreviewOpen(true);
-
-      setActivePreviewNumber(doc.invoiceNumber);
       setActivePreviewMeta({
         customerName: doc.customerName || "",
         customerMobile: doc.customerMobile || "",
