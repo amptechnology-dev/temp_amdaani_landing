@@ -627,20 +627,7 @@ export default function InvoiceSummary({
 
             {isCreatedInvoice && (
               <div className="flex gap-2 flex-wrap">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleDownloadClick}
-                  disabled={isDownloading}
-                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
-                >
-                  {isDownloading ? (
-                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                  ) : (
-                    <Download className="w-3.5 h-3.5 mr-1.5" />
-                  )}
-                  Download
-                </Button>
+                
 
                 <Button
                   size="sm"
