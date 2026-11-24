@@ -295,12 +295,12 @@ function buildA4Html(args, shared) {
     .info-label { min-width: 80px; font-weight: bold; }
     .customer-title { font-weight: bold; font-size: 12px; margin-bottom: 2px; color: #2c5aa0; }
     .items-table { width: 100%; border-collapse: collapse; font-size: 10px; }
-    .items-table th { background: #2c5aa0; color: white; padding: 8px 4px; border: 1px solid #000; font-size: 9px; }
-    .items-table td { padding: 6px 4px; border: 1px solid #000; text-align: center; }
+    .items-table th { background: #dbe6f7; color: #1f3f73; padding: 8px 4px; border: 1px solid #b9cbe8; font-size: 9px; }
+    .items-table td { padding: 6px 4px; border: 0; border-left: 1px solid #b9c2cf; border-right: 1px solid #b9c2cf; text-align: center; }
     .gst-breakdown { margin-top: 10px; border-top: 1px solid #000; }
     .gst-table { width: 100%; border-collapse: collapse; font-size: 9px; }
     .gst-table th, .gst-table td { padding: 6px 8px; border: 1px solid #000; text-align: center; }
-    .gst-table th { background: #2c5aa0; color: white; }
+    .gst-table th { background: #dbe6f7; color: #1f3f73; }
     .description { text-align: left !important; white-space: normal; word-break: break-word; overflow-wrap: anywhere; }
     .description .item-name, .description .item-code { text-align: left; display: block; white-space: normal; word-break: break-word; }
     .item-code { font-size: 9px; color: #666; }
@@ -331,11 +331,12 @@ function buildA4Html(args, shared) {
     .payment-status.paid { background-color: #43a047; }
     .payment-status.partial { background-color: #fb8c00; }
     .payment-status.unpaid { background-color: #e53935; }
-    .items-table .totals-row td, .items-table .grand-total-row td { border: 1px solid #000; font-size: 10px; padding: 6px 8px; }
+    .items-table .totals-row td, .items-table .grand-total-row td { border: 1px solid #b9c2cf; font-size: 10px; padding: 6px 8px; }
+    .items-table tr.summary-total-row td { border-top: 1px solid #000; border-bottom: 1px solid #000; }
     .amount-words-cell { font-size: 10px; background: #fafafa; color: #000; }
     .items-table .label { text-align: left; font-weight: 600; background: #f8f8f8; }
     .items-table .amount { text-align: right; font-weight: 600; }
-    .grand-total-row .label, .grand-total-row .amount { background: #2c5aa0; color: #fff; font-weight: bold; }
+    .grand-total-row .label, .grand-total-row .amount { background: #dbe6f7; color: #1f3f73; font-weight: bold; }
     .no-break { page-break-inside: avoid; }
     .payment-row .label { font-weight: 600; background: #f8f8f8; text-align: left; }
     .payment-row .amount { text-align: right !important; font-weight: 600; }
@@ -919,18 +920,18 @@ function buildA5Html(args, shared) {
     .tbl { width: 100%; border-collapse: collapse; table-layout: auto; font-size: 1.1rem; }
     .tbl > thead { display: table-header-group; }
 
-    .tbl > thead > tr > th { background: #2c5aa0; color: #fff; padding: 4px 3px; border: 1px solid #2c5aa0; font-size: 0.9rem; text-align: center; text-transform: uppercase; letter-spacing: 0; font-weight: 700; white-space: normal; line-height: 1.15; }
+    .tbl > thead > tr > th { background: #dbe6f7; color: #1f3f73; padding: 4px 3px; border: 1px solid #b9cbe8; font-size: 0.9rem; text-align: center; text-transform: uppercase; letter-spacing: 0; font-weight: 700; white-space: normal; line-height: 1.15; }
     /* the company-header cell: plain container, no table-header styling */
     .tbl > thead > tr > th.hdr-th { background: transparent; color: #1a1a1a; padding: 0; border: 0; font-size: 1.1rem; text-align: left; text-transform: none; font-weight: 400; line-height: 1.35; }
 
-    .tbl > tbody > tr > td { padding: 3px 4px; border: 1px solid #c9d2dc; vertical-align: middle; white-space: nowrap; }
+    .tbl > tbody > tr > td { padding: 3px 4px; border: 0; border-left: 1px solid #c9d2dc; border-right: 1px solid #c9d2dc; vertical-align: middle; white-space: nowrap; }
     .tbl > tbody > tr > td.c { text-align: center; }
     .tbl > tbody > tr > td.r { text-align: right; }
     .tbl > tbody > tr > td.bold, .tbl .bold { font-weight: 700; }
     .tbl > thead > tr > th.l, .tbl > tbody > tr > td.l { text-align: left; width: 100%; min-width: 6rem; white-space: normal; word-break: break-word; overflow-wrap: anywhere; }
     .tbl .sub { font-size: 0.85rem; color: #555; font-weight: 400; line-height: 1.1; }
     .iname { font-weight: 600; }
-    .sum-row > td { font-weight: 700; background: #f0f4ff; border-top: 1.5px solid #2c5aa0; }
+    .sum-row > td { font-weight: 700; background: #f0f4ff; border-top: 1.5px solid #2c5aa0; border-bottom: 1px solid #c9d2dc; }
     .sum-row { break-before: avoid; page-break-before: avoid; }
 
     /* footer / notes cell: plain container (no borders/padding/nowrap) */
@@ -943,10 +944,10 @@ function buildA5Html(args, shared) {
        Each page is its own table, header is NOT a repeating header-group,
        so Chrome's table page-breaking is never involved. */
     .wrap.paged { border: 0; }
-    .pg-wrap { display: block; border: 1px solid #2c5aa0; background: #fff; overflow: hidden; }
+    .pg-wrap { display: block; box-sizing: border-box; width: 100%; border: 0; background: #fff; position: relative; }
+    .pg-wrap::after { content: ""; position: absolute; inset: 0; border: 1.5px solid #2c5aa0; pointer-events: none; }
     .pg-wrap.pg-break { break-after: page; page-break-after: always; }
     .pg-wrap:last-child { break-after: avoid; page-break-after: avoid; }
-    .pg-container { overflow: hidden; }
     .pg-wrap .tbl > thead { display: table-row-group; }
 
     /* CANCELLED watermark: fixed => repeats centred on every printed page */
@@ -975,7 +976,7 @@ function buildA5Html(args, shared) {
     .pay-summary .ps-ttl { font-weight: 700; color: #2c5aa0; font-size: 1rem; text-transform: uppercase; margin-bottom: 2px; }
     .pay-summary table { width: 100%; border-collapse: collapse; font-size: 1rem; }
     .pay-summary th, .pay-summary td { border: 1px solid #c9d2dc; padding: 2px 4px; white-space: nowrap; }
-    .pay-summary th { background: #f0f4ff; color: #2c5aa0; font-weight: 700; text-transform: uppercase; }
+    .pay-summary th { background: #dbe6f7; color: #1f3f73; font-weight: 700; text-transform: uppercase; }
     .pay-summary td.r { text-align: right; } .pay-summary td.c { text-align: center; }
     .pay-summary .ps-more { font-size: 0.85rem; color: #777; font-style: italic; margin-top: 2px; text-align: right; }
 
@@ -987,7 +988,7 @@ function buildA5Html(args, shared) {
     .tax-ttl { padding: 2px 0; font-size: 1rem; font-weight: 700; text-align: center; color: #2c5aa0; background: #f0f4ff; text-transform: uppercase; letter-spacing: 0.3px; }
     .tax-tbl { width: 100%; border-collapse: collapse; font-size: 1rem; }
     .tax-tbl th, .tax-tbl td { padding: 2px 5px; border: 1px solid #c9d2dc; text-align: center; white-space: nowrap; }
-    .tax-tbl th { background: #2c5aa0; color: #fff; font-size: 0.9rem; text-transform: uppercase; }
+    .tax-tbl th { background: #dbe6f7; color: #1f3f73; font-size: 0.9rem; text-transform: uppercase; }
     .tax-tbl tr.total-row td { font-weight: 700; background: #f8f8f8; }
 
     .amt-col { flex: 0 0 17rem; }
@@ -995,7 +996,7 @@ function buildA5Html(args, shared) {
     .amt-tbl td { padding: 4px 8px; border: 1px solid #c9d2dc; white-space: nowrap; }
     .amt-tbl .lbl { font-weight: 600; background: #f8f8f8; }
     .amt-tbl .val { text-align: right; font-weight: 600; }
-    .grand .lbl, .grand .val { background: #2c5aa0; color: #fff; font-weight: 700; }
+    .grand .lbl, .grand .val { background: #dbe6f7; color: #1f3f73; font-weight: 700; }
     .pay-red { color: #e53935; } .pay-grn { color: #43a047; }
     .payment-method-row { text-align: right; font-size: 1.05rem; padding: 3px 14px; color: #444; border-top: 1px solid #c9d2dc; }
 
@@ -1064,8 +1065,11 @@ function buildA5Html(args, shared) {
       }
 
       // Same scale in screen AND print: 1rem = 1.25vw * f, page = 80/f rem.
+      // 1rem at scale 1 = 198mm / 80 = 9.354px (real print width), so the
+      // measurement no longer depends on the browser window size.
+      var BASE_PX = 748.3 / PAGE_W;
       function applyScale(f) {
-        root.style.fontSize = 'calc(1.25vw * ' + f + ')';
+        root.style.fontSize = (BASE_PX * f) + 'px';
         page.style.setProperty('max-width', 'none');
         page.style.setProperty('width', (PAGE_W / f) + 'rem');
       }
@@ -1077,6 +1081,8 @@ function buildA5Html(args, shared) {
 
       function undo() {
         if (!state) return;
+        var pn = state.thead.querySelector('.pg-no');
+        if (pn) pn.textContent = 'Page 1 of 1';
         var tb = origTable.tBodies[0];
         for (var i = 0; i < state.rows.length; i++) tb.appendChild(state.rows[i]);
         origTable.insertBefore(state.thead, tb);
@@ -1206,6 +1212,9 @@ function buildA5Html(args, shared) {
             if (cr && cr.parentNode) cr.parentNode.removeChild(cr);
           }
           t.appendChild(th);
+
+          var pno = th.querySelector('.pg-no');
+          if (pno) pno.textContent = 'Page ' + (pi + 1) + ' of ' + pages.length;
 
           var tb = document.createElement('tbody');
           for (var ui = 0; ui < pg.units.length; ui++) {
@@ -1346,6 +1355,7 @@ function buildA5Html(args, shared) {
   const metaRow = `<div class="hdr-meta-row">
     <span>INV_NO : ${invoiceNumber}</span>
     <span>Invoice Date : ${format(invoiceDate, "dd/MM/yyyy")} &nbsp;|&nbsp; ${format(invoiceDate, "hh:mm a")}</span>
+    <span class="pg-no">Page 1 of 1</span>
   </div>`;
 
   const headerBlock = preview ? "" : `${titleRow}${partiesRow}${metaRow}`;
