@@ -692,7 +692,7 @@ function buildInvoiceHtml(args, shared, fmt) {
     .wrap {
       background: #fff; display: block;
       font-size: 1.1rem; line-height: 1.35; color: #1a1a1a;
-      border: 1px solid #2c5aa0;
+      border: 0;
     }
 
     @page { size: ${cfg.pageSize}; margin: 6mm; }
@@ -773,7 +773,7 @@ function buildInvoiceHtml(args, shared, fmt) {
     /* ── print-time pages ── */
     .wrap.paged { border: 0; }
     .pg-wrap { display: flex; flex-direction: column; box-sizing: border-box; width: 100%; border: 0; background: #fff; position: relative; }
-    .pg-wrap::after { content: ""; position: absolute; inset: 0; border: 1.5px solid #2c5aa0; pointer-events: none; }
+    
     .pg-wrap.pg-break { break-after: page; page-break-after: always; }
     .pg-wrap:last-child { break-after: avoid; page-break-after: avoid; }
     .pg-wrap .tbl > thead { display: table-row-group; }
