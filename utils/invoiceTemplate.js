@@ -351,7 +351,7 @@ function buildFitScript(pageW, ratio) {
   var PAGE_H = PAGE_W * ${ratio};
   var MIN_FIT = 0.75;
   var STEP = 0.02;
-  var SAFETY = [0.95, 0.92, 0.89];
+  var SAFETY = [0.985, 0.97, 0.95];
   var BASE_MM = 198 / PAGE_W;   // 1rem at scale 1, in mm (printable width = 198mm)
   var root = document.documentElement;
   var page = document.querySelector('.page');
@@ -378,8 +378,7 @@ function buildFitScript(pageW, ratio) {
     if (!state) return;
     var tb = origTable.tBodies[0];
     for (var i = 0; i < state.rows.length; i++) tb.appendChild(state.rows[i]);
-    var pns = state.thead.querySelectorAll('.pg-no');
-    for (var j = 0; j < pns.length; j++) pns[j].textContent = 'Page 1 of 1';
+    // page numbers now live in per-page footers, nothing to reset in thead
     origTable.insertBefore(state.thead, tb);
     if (state.container.parentNode) state.container.parentNode.removeChild(state.container);
     wrapEl.classList.remove('paged');
@@ -413,14 +412,9 @@ function buildFitScript(pageW, ratio) {
       }
     }
 
-    // every item alone, but the LAST item stays together with the Total row
+    // every row alone (Total row is the last unit)
     var units = [];
     for (var i = 0; i < rows.length; i++) units.push({ rows: [rows[i]] });
-    if (units.length >= 2) {
-      var s = units.pop();
-      var l = units.pop();
-      units.push({ rows: l.rows.concat(s.rows) });
-    }
 
     return { thead: thead, allRows: allRows, units: units, foot: footRow, end: endRow, colWidths: colWidths };
   }
@@ -456,8 +450,15 @@ function buildFitScript(pageW, ratio) {
       var tb = document.createElement('tbody');
       t.appendChild(tb);
       wrap.appendChild(t);
+      var ft = document.createElement('div');
+      ft.className = 'pg-foot';
+      var fs = document.createElement('span');
+      fs.className = 'pg-no';
+      fs.textContent = 'Page 1 of 1';
+      ft.appendChild(fs);
+      wrap.appendChild(ft);
       container.appendChild(wrap);
-      var p = { wrap: wrap, tb: tb, th: th, units: [], pin: null };
+      var p = { wrap: wrap, tb: tb, th: th, units: [], pin: null, foot: ft };
       pages.push(p);
       return p;
     }
@@ -483,7 +484,7 @@ function buildFitScript(pageW, ratio) {
         pb.appendChild(m.end);
         pt.appendChild(pb);
         pin.appendChild(pt);
-        p.wrap.appendChild(pin);
+        p.wrap.insertBefore(pin, p.foot);
         p.pin = pin;
       }
     }
@@ -543,22 +544,20 @@ function buildFitScript(pageW, ratio) {
     // 3) finish: page breaks, pin end row to the bottom, page numbers
     var n = pages.length;
     for (var i = 0; i < n; i++) {
-      var pn = pages[i].th.querySelectorAll('.pg-no');
+      var pn = pages[i].foot.querySelectorAll('.pg-no');
       for (var j = 0; j < pn.length; j++) pn[j].textContent = 'Page ' + (i + 1) + ' of ' + n;
+      pages[i].wrap.style.minHeight = full + 'rem';   // every page fills the sheet, footer sits at the bottom-right
       if (i < n - 1) pages[i].wrap.classList.add('pg-break');
     }
     var lp = pages[n - 1];
-    if (lp.pin) {
-      lp.wrap.classList.add('pg-last');
-      lp.wrap.style.minHeight = full + 'rem';
-    }
+    if (lp.pin) lp.wrap.classList.add('pg-last');
     return n;
   }
 
   function overflows(f) {
     if (!state) return false;
     var rem = remPx();
-    var lim = (PAGE_H / f) * 0.98;
+    var lim = (PAGE_H / f) * 0.99;
     var kids = state.container.children;
     for (var i = 0; i < kids.length; i++) {
       if (kids[i].getBoundingClientRect().height / rem > lim) return true;
@@ -577,7 +576,7 @@ function buildFitScript(pageW, ratio) {
         undo();
         var m = measure(f);
         if (!m) return;
-        var n = layout(m, (PAGE_H / f) * SAFETY[0], remPx(), (PAGE_H / f) * 0.97);
+        var n = layout(m, (PAGE_H / f) * SAFETY[0], remPx(), (PAGE_H / f) * 0.985);
         if (!best || n < best.n) best = { f: f, n: n };
         if (n === 1) break;
       }
@@ -587,7 +586,7 @@ function buildFitScript(pageW, ratio) {
           undo();
           var m2 = measure(ff);
           if (!m2) return;
-          layout(m2, (PAGE_H / ff) * SAFETY[s], remPx(), (PAGE_H / ff) * 0.97);
+          layout(m2, (PAGE_H / ff) * SAFETY[s], remPx(), (PAGE_H / ff) * 0.985);
           if (!overflows(ff)) return;
         }
       }
@@ -663,13 +662,22 @@ function buildInvoiceHtml(args, shared, fmt) {
     isGstInvoice && storedata?.settings?.showGstPerUnit === true;
 
   const colCount = isA4
-    ? 7 + (isMrpEnabled ? 1 : 0) + (isGstInvoice ? 2 : 0) + (showNetRate ? 1 : 0)
-    : 8 + (isMrpEnabled ? 1 : 0) + (isGstInvoice ? 4 : 0) + (showNetRate ? 1 : 0);
+    ? 7 +
+      (isMrpEnabled ? 1 : 0) +
+      (isGstInvoice ? 2 : 0) +
+      (showNetRate ? 1 : 0)
+    : 8 +
+      (isMrpEnabled ? 1 : 0) +
+      (isGstInvoice ? 4 : 0) +
+      (showNetRate ? 1 : 0);
 
   const cust = getCustomer(formValues);
 
   const MAX_PAY_SUMMARY_ROWS = 5;
-  const visibleTransactions = nonZeroTransactions.slice(0, MAX_PAY_SUMMARY_ROWS);
+  const visibleTransactions = nonZeroTransactions.slice(
+    0,
+    MAX_PAY_SUMMARY_ROWS,
+  );
   const hiddenTransactionCount =
     nonZeroTransactions.length - visibleTransactions.length;
 
@@ -764,14 +772,16 @@ function buildInvoiceHtml(args, shared, fmt) {
 
     /* ── print-time pages ── */
     .wrap.paged { border: 0; }
-    .pg-wrap { display: block; box-sizing: border-box; width: 100%; border: 0; background: #fff; position: relative; }
+    .pg-wrap { display: flex; flex-direction: column; box-sizing: border-box; width: 100%; border: 0; background: #fff; position: relative; }
     .pg-wrap::after { content: ""; position: absolute; inset: 0; border: 1.5px solid #2c5aa0; pointer-events: none; }
     .pg-wrap.pg-break { break-after: page; page-break-after: always; }
     .pg-wrap:last-child { break-after: avoid; page-break-after: avoid; }
     .pg-wrap .tbl > thead { display: table-row-group; }
-    .pg-wrap.pg-last { display: flex; flex-direction: column; }
-    .pg-wrap.pg-last > .tbl { flex: 0 0 auto; }
+    .pg-wrap > .tbl { flex: 0 0 auto; }
     .pg-pin { margin-top: auto; }
+    .pg-foot { margin-top: auto; text-align: right; padding: 0.15rem 0.9rem 0.25rem; font-size: 0.95rem; line-height: 1.2; }
+    .pg-wrap.pg-last .pg-foot { margin-top: 0; }
+    .wrap.paged > .pg-foot-static { display: none; }
 
     .cancel-mark {
       position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
@@ -864,7 +874,6 @@ function buildInvoiceHtml(args, shared, fmt) {
       </div>
       <div class="meta-block">
         <div class="invoice-badge">${isGstInvoice ? "Tax Invoice" : "Invoice"}</div>
-        <div class="pg-no">Page 1 of 1</div>
       </div>
     </header>
     <div class="invoice-info">
@@ -921,7 +930,6 @@ function buildInvoiceHtml(args, shared, fmt) {
     <div class="hdr-meta-row">
       <span>INV_NO : ${invoiceNumber}</span>
       <span>Invoice Date : ${format(invoiceDate, "dd/MM/yyyy")} &nbsp;|&nbsp; ${format(invoiceDate, "hh:mm a")}</span>
-      <span class="pg-no">Page 1 of 1</span>
     </div>`;
 
   const headerCellHTML = `${brandStrip}${preview ? "" : isA4 ? a4Header : a5Header}`;
@@ -1170,6 +1178,7 @@ ${isCancelled ? `<div class="cancel-mark">CANCELLED</div>` : ""}
       ${endRowHTML}
     </tbody>
   </table>
+  <div class="pg-foot pg-foot-static"><span class="pg-no">Page 1 of 1</span></div>
 </div>
 </div>
 <script>${buildFitScript(cfg.pageW, cfg.ratio)}</script>
