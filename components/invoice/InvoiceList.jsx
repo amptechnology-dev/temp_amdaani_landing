@@ -273,7 +273,6 @@ export default function InvoiceListPage({
   const buildEffectiveStoredata = (doc, liveStoredata) => {
     const hasEmbeddedStoreData = !!doc?.name;
     if (!hasEmbeddedStoreData) return liveStoredata || {};
-
     return {
       ...liveStoredata,
       name: doc.name,
@@ -293,8 +292,8 @@ export default function InvoiceListPage({
           doc.settings?.showGstPerUnit ??
           false,
       },
-      logoUrl: doc.logoUrl ?? liveStoredata?.logoUrl,
-      signatureUrl: doc.signatureUrl ?? liveStoredata?.signatureUrl,
+      logoUrl: liveStoredata?.logoUrl ?? doc.logoUrl,
+      signatureUrl: liveStoredata?.signatureUrl ?? doc.signatureUrl,
       isActive: doc.isActive ?? liveStoredata?.isActive,
     };
   };
@@ -1218,8 +1217,6 @@ export default function InvoiceListPage({
                   ? "Cancelled"
                   : "Cancel Invoice"}
               </Button>
-
-              
 
               <Button
                 size="sm"

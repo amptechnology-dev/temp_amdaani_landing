@@ -19,6 +19,19 @@ const openInvoiceInPrintWindow = (html) => {
   setTimeout(() => w.print(), 500);
 };
 
+const showApiError = (err, fallback) => {
+  const data = err?.response?.data || err?.data || err;
+  const msgs = (Array.isArray(data?.errors) ? data.errors : [])
+    .map((e) => e?.message)
+    .filter(Boolean);
+
+  if (msgs.length) {
+    msgs.forEach((m) => toast.error(m));
+    return;
+  }
+  toast.error(data?.message || err?.message || fallback);
+};
+
 function getFinancialYear(date = new Date()) {
   const year = date.getFullYear();
   const month = date.getMonth() + 1;
@@ -359,8 +372,8 @@ export default function SalesFlow() {
           doc.settings?.showGstPerUnit ??
           false,
       },
-      logoUrl: doc.logoUrl ?? liveStoredata?.logoUrl,
-      signatureUrl: doc.signatureUrl ?? liveStoredata?.signatureUrl,
+      logoUrl: liveStoredata?.logoUrl ?? doc.logoUrl,
+      signatureUrl: liveStoredata?.signatureUrl ?? doc.signatureUrl,
       isActive: doc.isActive ?? liveStoredata?.isActive,
     };
   }
@@ -780,6 +793,14 @@ export default function SalesFlow() {
         res = await api.post("/invoice", invoiceData);
       }
 
+      if (res?.success === false) {
+        showApiError(
+          res,
+          isEditMode ? "Invoice update failed" : "Invoice creation failed",
+        );
+        return null;
+      }
+
       // Order theke invoice hoye gele abar same order-e duplicate invoice na hoy
       if (sourceOrderId) {
         setSourceOrderId(null);
@@ -805,6 +826,9 @@ export default function SalesFlow() {
 
       const effectiveStoredataForPrint = {
         ...baseStoredataForPrint,
+        logoUrl: storedata?.logoUrl ?? baseStoredataForPrint?.logoUrl,
+        signatureUrl:
+          storedata?.signatureUrl ?? baseStoredataForPrint?.signatureUrl,
         settings: {
           ...(baseStoredataForPrint?.settings || {}),
           showGstPerUnit:
@@ -845,8 +869,9 @@ export default function SalesFlow() {
       setInvoiceRefreshKey((k) => k + 1);
 
       return { html, printParams };
-    } catch {
-      toast.error(
+    } catch (err) {
+      showApiError(
+        err,
         isEditMode ? "Invoice update failed" : "Invoice creation failed",
       );
       return null;

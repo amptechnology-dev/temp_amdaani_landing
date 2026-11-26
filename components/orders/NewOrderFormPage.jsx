@@ -33,6 +33,44 @@ const INDIAN_STATES = indianStatesData?.states || [];
 
 const currency = (v) => `₹${Number(v || 0).toFixed(2)}`;
 
+const formatQty = (n) =>
+  Number(n || 0)
+    .toFixed(3)
+    .replace(/\.?0+$/, "");
+
+function StockBadge({ stock }) {
+  if (stock === undefined || stock === null || isNaN(Number(stock)))
+    return null;
+  const n = Number(stock);
+  const style =
+    n <= 2
+      ? "text-red-600 border-red-300 bg-red-50"
+      : n <= 10
+        ? "text-amber-600 border-amber-300 bg-amber-50"
+        : "text-green-600 border-green-300 bg-green-50";
+  return (
+    <span
+      className={`inline-block text-[11px] font-medium px-2 py-0.5 rounded-full border ${style}`}
+    >
+      {formatQty(n)} in stock
+    </span>
+  );
+}
+
+// Backend er errors[].message gulo toast e dekhay
+const showApiError = (err, fallback) => {
+  const data = err?.response?.data || err?.data || err;
+  const msgs = (Array.isArray(data?.errors) ? data.errors : [])
+    .map((e) => e?.message)
+    .filter(Boolean);
+
+  if (msgs.length) {
+    msgs.forEach((m) => toast.error(m));
+    return;
+  }
+  toast.error(data?.message || err?.message || fallback);
+};
+
 const toInputDate = (date) => {
   if (!date) return "";
   const d = new Date(date);
@@ -441,9 +479,12 @@ function InlineProductCombobox({ products, onSelect, onCreateNew }) {
                     HSN: {p.hsn || "-"} · {p.unit || "Pcs"}
                   </p>
                 </div>
-                <span className="text-blue-600 font-semibold text-xs shrink-0 ml-2">
-                  {currency(p.sellingPrice)}
-                </span>
+                <div className="text-right shrink-0 ml-2 space-y-1">
+                  <span className="text-blue-600 font-semibold text-xs block">
+                    {currency(p.sellingPrice)}
+                  </span>
+                  <StockBadge stock={p.currentStock} />
+                </div>
               </div>
             ))}
 
@@ -691,6 +732,14 @@ export default function NewOrderFormPage({
     updateItem(id, "sellingPrice", String(isNaN(n) ? 0 : n));
   };
 
+  const stockById = useMemo(
+    () =>
+      new Map(
+        (localProducts || []).map((p) => [String(p._id), p.currentStock]),
+      ),
+    [localProducts],
+  );
+
   // ── totals ───────────────────────────────────────────────────────────
   const totals = useMemo(() => {
     const totalQty = items.reduce((s, i) => s + Number(i.quantity || 0), 0);
@@ -735,15 +784,15 @@ export default function NewOrderFormPage({
         ? await api.put(`/order/id/${editOrder._id}`, payload)
         : await api.post("/order", payload);
 
-      if (res?.success === false)
-        throw new Error(res?.message || "Failed to save order");
+      if (res?.success === false) {
+        showApiError(res, "Failed to save order");
+        return;
+      }
 
       toast.success(isEdit ? "Order updated!" : "Order created!");
       onSaved();
     } catch (err) {
-      toast.error(
-        err?.response?.data?.message || err?.message || "Failed to save order",
-      );
+      showApiError(err, "Failed to save order");
     } finally {
       setIsSaving(false);
     }
@@ -1010,7 +1059,12 @@ export default function NewOrderFormPage({
                         {i + 1}
                       </td>
                       <td className="px-3 py-1.5 border-b border-slate-100 font-medium text-slate-800">
-                        {item.name}
+                        <div>{item.name}</div>
+                        <div className="mt-1">
+                          <StockBadge
+                            stock={stockById.get(String(item.product))}
+                          />
+                        </div>
                       </td>
                       <td className="px-3 py-1.5 border-b border-slate-100 text-slate-500">
                         {item.unit || "-"}

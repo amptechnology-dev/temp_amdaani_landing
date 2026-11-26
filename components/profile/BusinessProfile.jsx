@@ -23,6 +23,8 @@ import {
   X,
   Save,
   Loader2,
+  PenLine,
+  Eraser,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { Input } from "@/components/ui/input";
@@ -289,6 +291,7 @@ export default function BusinessProfile() {
 
   const logoInputRef = useRef(null);
   const signatureInputRef = useRef(null);
+  const [signaturePadOpen, setSignaturePadOpen] = useState(false);
 
   const formik = useFormik({
     initialValues: {
@@ -819,8 +822,18 @@ export default function BusinessProfile() {
                         onRemove={() => setFieldValue("signature", null)}
                         inputRef={signatureInputRef}
                         icon={Upload}
-                        label="Add signature"
+                        label="Upload signature"
                       />
+                      {!isStaff && (
+                        <button
+                          type="button"
+                          onClick={() => setSignaturePadOpen(true)}
+                          className="mt-2 w-full flex items-center justify-center gap-1.5 h-8 rounded-lg border border-blue-200 bg-blue-50/60 text-[12px] font-medium text-blue-700 hover:bg-blue-100 transition-colors cursor-pointer"
+                        >
+                          <PenLine className="w-3.5 h-3.5" />
+                          Draw signature
+                        </button>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -1048,6 +1061,195 @@ export default function BusinessProfile() {
           </div>
         </div>
       )}
+
+      <SignaturePadModal
+        open={signaturePadOpen}
+        onClose={() => setSignaturePadOpen(false)}
+        onSave={(file) => handleFileSelect("signature", file)}
+      />
+    </div>
+  );
+}
+
+function SignaturePadModal({ open, onClose, onSave }) {
+  const canvasRef = useRef(null);
+  const drawingRef = useRef(false);
+  const lastPointRef = useRef({ x: 0, y: 0 });
+  const [isEmpty, setIsEmpty] = useState(true);
+
+  // Modal khulle canvas ready koro (high-DPI screen-e sharp rakhar jonno)
+  useEffect(() => {
+    if (!open) return;
+    setIsEmpty(true);
+
+    const t = setTimeout(() => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const ratio = window.devicePixelRatio || 1;
+      canvas.width = rect.width * ratio;
+      canvas.height = rect.height * ratio;
+      const ctx = canvas.getContext("2d");
+      ctx.scale(ratio, ratio);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, rect.width, rect.height);
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = "#111827";
+    }, 50);
+
+    return () => clearTimeout(t);
+  }, [open]);
+
+  const getPoint = (e) => {
+    const rect = canvasRef.current.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  };
+
+  const handlePointerDown = (e) => {
+    e.preventDefault();
+    canvasRef.current.setPointerCapture?.(e.pointerId);
+    drawingRef.current = true;
+    const p = getPoint(e);
+    lastPointRef.current = p;
+
+    // Ekta dot-o jate ake (just click korle)
+    const ctx = canvasRef.current.getContext("2d");
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 1.2, 0, Math.PI * 2);
+    ctx.fillStyle = "#111827";
+    ctx.fill();
+    setIsEmpty(false);
+  };
+
+  const handlePointerMove = (e) => {
+    if (!drawingRef.current) return;
+    e.preventDefault();
+    const ctx = canvasRef.current.getContext("2d");
+    const p = getPoint(e);
+    ctx.beginPath();
+    ctx.moveTo(lastPointRef.current.x, lastPointRef.current.y);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    lastPointRef.current = p;
+  };
+
+  const handlePointerUp = () => {
+    drawingRef.current = false;
+  };
+
+  const handleClear = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, rect.width, rect.height);
+    setIsEmpty(true);
+  };
+
+  const handleSave = () => {
+    const canvas = canvasRef.current;
+    if (!canvas || isEmpty) return;
+
+    // White background ke transparent kore PNG banano (invoice-e sundor dekhabe)
+    const out = document.createElement("canvas");
+    out.width = canvas.width;
+    out.height = canvas.height;
+    const octx = out.getContext("2d");
+    octx.drawImage(canvas, 0, 0);
+
+    const imgData = octx.getImageData(0, 0, out.width, out.height);
+    const d = imgData.data;
+    for (let i = 0; i < d.length; i += 4) {
+      // jeta white-er kachakachi, oita transparent
+      const brightness = (d[i] + d[i + 1] + d[i + 2]) / 3;
+      if (brightness > 245) {
+        d[i + 3] = 0;
+      } else if (brightness > 200) {
+        // edge smooth rakhar jonno partial alpha
+        d[i + 3] = Math.round(((245 - brightness) / 45) * 255);
+      }
+    }
+    octx.putImageData(imgData, 0, 0);
+
+    out.toBlob((blob) => {
+      if (!blob) {
+        toast.error("Failed to create signature");
+        return;
+      }
+      const file = new File([blob], "signature.png", { type: "image/png" });
+      onSave(file);
+      onClose();
+    }, "image/png");
+  };
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-xl bg-white rounded-2xl shadow-xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+          <h3 className="text-[15px] font-semibold text-slate-800 flex items-center gap-2">
+            <PenLine className="w-4 h-4 text-blue-600" />
+            Draw your signature
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-4">
+          <div className="relative rounded-xl border-2 border-dashed border-slate-300 bg-white overflow-hidden">
+            <canvas
+              ref={canvasRef}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerLeave={handlePointerUp}
+              onPointerCancel={handlePointerUp}
+              className="w-full h-56 cursor-crosshair touch-none block"
+            />
+            {isEmpty && (
+              <span className="absolute inset-0 flex items-center justify-center text-sm text-slate-300 pointer-events-none select-none">
+                Sign here using your mouse or touch
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-slate-100 bg-slate-50">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleClear}
+            disabled={isEmpty}
+            className="gap-1.5"
+          >
+            <Eraser className="w-4 h-4" />
+            Clear
+          </Button>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleSave} disabled={isEmpty}>
+              Use Signature
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
