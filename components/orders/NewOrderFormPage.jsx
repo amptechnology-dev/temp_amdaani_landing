@@ -28,6 +28,7 @@ import api from "../../utils/api";
 // Path ta tomar folder structure onujayi thik koro (invoice form-er sathe jekhane ache)
 import AddItemFormModal from "../../components/invoice/AddItemFormModal";
 import indianStatesData from "../../src/assets/data/states.json";
+import { useAuth } from "../../context/AuthContext";
 
 const INDIAN_STATES = indianStatesData?.states || [];
 
@@ -54,6 +55,40 @@ function StockBadge({ stock }) {
     >
       {formatQty(n)} in stock
     </span>
+  );
+}
+
+// Purchase rate label: ₹500.00 (Incl. 5% GST) / (Excl. 12% GST) / (No GST)
+const purchaseRateLabel = (p) => {
+  const cost = Number(p?.costPrice ?? 0);
+  const gst = Number(p?.purchaseGstRate ?? 0);
+  const incl = Boolean(p?.isPurchaseTaxInclusive);
+  return `₹${cost.toFixed(2)} (${
+    gst > 0 ? `${incl ? "Incl." : "Excl."} ${gst}% GST` : "No GST"
+  })`;
+};
+
+function PurchaseRateInfo({ product }) {
+  if (!product) return null;
+  const cost = Number(product.costPrice ?? 0);
+  const gst = Number(product.purchaseGstRate ?? 0);
+  const incl = Boolean(product.isPurchaseTaxInclusive);
+  const divisor = 1 + gst / 100;
+  const base = incl && gst > 0 ? cost / divisor : cost;
+  const gross = incl ? cost : cost * divisor;
+
+  return (
+    <div className="mt-1 w-fit rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
+      <p className="font-semibold">
+        Purchase Rate: {purchaseRateLabel(product)}
+      </p>
+      {gst > 0 && (
+        <p>
+          Base ₹{base.toFixed(2)} + GST ₹{(gross - base).toFixed(2)} = ₹
+          {gross.toFixed(2)}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -306,7 +341,12 @@ function CustomerFormModal({ open, onClose, onCreated, prefill }) {
 // -------------------------------
 // Inline product combobox for the "add row" (same as invoice form)
 // -------------------------------
-function InlineProductCombobox({ products, onSelect, onCreateNew }) {
+function InlineProductCombobox({
+  products,
+  onSelect,
+  onCreateNew,
+  showPurchaseRate,
+}) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
@@ -478,6 +518,11 @@ function InlineProductCombobox({ products, onSelect, onCreateNew }) {
                   <p className="text-xs text-slate-400">
                     HSN: {p.hsn || "-"} · {p.unit || "Pcs"}
                   </p>
+                  {showPurchaseRate && (
+                    <p className="text-[11px] font-medium text-amber-700">
+                      Purchase: {purchaseRateLabel(p)}
+                    </p>
+                  )}
                 </div>
                 <div className="text-right shrink-0 ml-2 space-y-1">
                   <span className="text-blue-600 font-semibold text-xs block">
@@ -527,6 +572,8 @@ export default function NewOrderFormPage({
   onCustomerCreated,
 }) {
   const isEdit = Boolean(editOrder);
+  const { storeSettings } = useAuth();
+  const showPurchaseRate = Boolean(storeSettings?.showPurchaseRateInOrder);
 
   // ── state ────────────────────────────────────────────────────────────
   const [customerId, setCustomerId] = useState(
@@ -737,6 +784,11 @@ export default function NewOrderFormPage({
       new Map(
         (localProducts || []).map((p) => [String(p._id), p.currentStock]),
       ),
+    [localProducts],
+  );
+
+  const productById = useMemo(
+    () => new Map((localProducts || []).map((p) => [String(p._id), p])),
     [localProducts],
   );
 
@@ -1065,6 +1117,11 @@ export default function NewOrderFormPage({
                             stock={stockById.get(String(item.product))}
                           />
                         </div>
+                        {showPurchaseRate && (
+                          <PurchaseRateInfo
+                            product={productById.get(String(item.product))}
+                          />
+                        )}
                       </td>
                       <td className="px-3 py-1.5 border-b border-slate-100 text-slate-500">
                         {item.unit || "-"}
@@ -1134,6 +1191,7 @@ export default function NewOrderFormPage({
                       products={localProducts}
                       onSelect={addProduct}
                       onCreateNew={handleCreateNewProduct}
+                      showPurchaseRate={showPurchaseRate}
                     />
                   </td>
                   <td colSpan={6} className="px-3 py-2.5"></td>

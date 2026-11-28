@@ -1265,8 +1265,8 @@ export default function NewPurchaseFormPage({
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 overflow-x-hidden w-full max-w-full">
-      <div className="w-full max-w-[1400px] mx-auto p-4 sm:p-6 space-y-5 min-w-0">
+    <div className="min-h-screen bg-slate-50 overflow-x-hidden w-full max-w-full min-w-0">
+      <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-5 min-w-0">
         {/* Header */}
         <div className="relative bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="h-1 w-full bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-500" />
@@ -1515,43 +1515,44 @@ export default function NewPurchaseFormPage({
           </CardHeader>
 
           <CardContent className="p-0 overflow-x-auto w-full min-w-0 no-scrollbar">
-            <div className="min-w-[980px]">
+            <div className={isMrpEnabled ? "min-w-[1020px]" : "min-w-[940px]"}>
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="bg-blue-50/70 text-blue-900/70 text-xs uppercase tracking-wide">
-                    <th className="text-left font-semibold px-3 py-2.5 border-b border-blue-100 w-10">
+                    <th className="text-left font-semibold px-2 py-2.5 border-b border-blue-100 w-8">
                       #
                     </th>
-                    <th className="text-left font-semibold px-3 py-2.5 border-b border-blue-100">
+                    {/* Product: width nai, baki sob jayga e pabe */}
+                    <th className="text-left font-semibold px-3 py-2.5 border-b border-blue-100 min-w-[200px]">
                       Product
                     </th>
-                    <th className="text-left font-semibold px-3 py-2.5 border-b border-blue-100 w-28">
+                    <th className="text-left font-semibold px-2 py-2.5 border-b border-blue-100 w-20">
                       HSN
                     </th>
-                    <th className="text-left font-semibold px-3 py-2.5 border-b border-blue-100 w-16">
+                    <th className="text-left font-semibold px-2 py-2.5 border-b border-blue-100 w-16">
                       Unit
                     </th>
-                    <th className="text-center font-semibold px-3 py-2.5 border-b border-blue-100 w-20">
+                    <th className="text-center font-semibold px-2 py-2.5 border-b border-blue-100 w-24">
                       Qty
                     </th>
-                    <th className="text-right font-semibold px-3 py-2.5 border-b border-blue-100 w-36">
+                    <th className="text-right font-semibold px-2 py-2.5 border-b border-blue-100 w-36">
                       Cost Price
                     </th>
-                    <th className="text-center font-semibold px-3 py-2.5 border-b border-blue-100 w-32">
+                    <th className="text-center font-semibold px-2 py-2.5 border-b border-blue-100 w-28">
                       Discount
                     </th>
-                    <th className="text-right font-semibold px-3 py-2.5 border-b border-blue-100 w-20">
+                    <th className="text-right font-semibold px-2 py-2.5 border-b border-blue-100 w-16">
                       GST%
                     </th>
                     {isMrpEnabled && (
-                      <th className="text-right font-semibold px-3 py-2.5 border-b border-blue-100 w-24">
+                      <th className="text-right font-semibold px-2 py-2.5 border-b border-blue-100 w-20">
                         MRP
                       </th>
                     )}
-                    <th className="text-right font-semibold px-3 py-2.5 border-b border-blue-100 w-28">
+                    <th className="text-right font-semibold px-3 py-2.5 border-b border-blue-100 w-24">
                       Total
                     </th>
-                    <th className="w-16 border-b border-blue-100"></th>
+                    <th className="w-20 border-b border-blue-100"></th>
                   </tr>
                 </thead>
                 <tbody>

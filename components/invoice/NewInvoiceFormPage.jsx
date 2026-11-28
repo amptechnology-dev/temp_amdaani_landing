@@ -34,6 +34,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import { useAuth } from "../../context/AuthContext";
 
 import InvoiceSummary from "./InvoiceSummary";
 import AddItemFormModal from "./AddItemFormModal";
@@ -121,6 +122,40 @@ function StockBadge({ stock }) {
     >
       {formatQty(n)} in stock
     </span>
+  );
+}
+
+// Purchase rate label: ₹500.00 (Incl. 5% GST) / (Excl. 12% GST) / (No GST)
+const purchaseRateLabel = (p) => {
+  const cost = Number(p?.costPrice ?? 0);
+  const gst = Number(p?.purchaseGstRate ?? 0);
+  const incl = Boolean(p?.isPurchaseTaxInclusive);
+  return `₹${cost.toFixed(2)} (${
+    gst > 0 ? `${incl ? "Incl." : "Excl."} ${gst}% GST` : "No GST"
+  })`;
+};
+
+function PurchaseRateInfo({ product }) {
+  if (!product) return null;
+  const cost = Number(product.costPrice ?? 0);
+  const gst = Number(product.purchaseGstRate ?? 0);
+  const incl = Boolean(product.isPurchaseTaxInclusive);
+  const divisor = 1 + gst / 100;
+  const base = incl && gst > 0 ? cost / divisor : cost;
+  const gross = incl ? cost : cost * divisor;
+
+  return (
+    <div className="mt-1 w-fit rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
+      <p className="font-semibold">
+        Purchase Rate: {purchaseRateLabel(product)}
+      </p>
+      {gst > 0 && (
+        <p>
+          Base ₹{base.toFixed(2)} + GST ₹{(gross - base).toFixed(2)} = ₹
+          {gross.toFixed(2)}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -624,7 +659,12 @@ function CustomerRequiredModal({ open, onClose }) {
 // -------------------------------
 // Inline product combobox for the "add row"
 // -------------------------------
-function InlineProductCombobox({ products, onSelect, onCreateNew }) {
+function InlineProductCombobox({
+  products,
+  onSelect,
+  onCreateNew,
+  showPurchaseRate,
+}) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
@@ -786,6 +826,11 @@ function InlineProductCombobox({ products, onSelect, onCreateNew }) {
                   <p className="text-xs text-slate-400">
                     HSN: {p.hsn || "-"} · {p.unit || "Pcs"}
                   </p>
+                  {showPurchaseRate && (
+                    <p className="text-[11px] font-medium text-amber-700">
+                      Purchase: {purchaseRateLabel(p)}
+                    </p>
+                  )}
                 </div>
                 <div className="text-right shrink-0 ml-2 space-y-1">
                   <span className="text-blue-600 font-semibold text-xs block">
@@ -970,9 +1015,8 @@ export default function NewInvoiceFormPage({
   setAdditionalCharges,
   handleSaveAndContinue,
 }) {
-  // -------------------------------
-  // Customer form state
-  // -------------------------------
+  const { storeSettings } = useAuth();
+  const showPurchaseRate = Boolean(storeSettings?.showPurchaseRateInSale);
   const [customerForm, setCustomerForm] = useState(() => ({
     ...emptyCustomerForm,
     ...(selectedCustomer
@@ -1361,6 +1405,8 @@ export default function NewInvoiceFormPage({
     (products || []).map((p) => [String(p._id), p.currentStock]),
   );
 
+  const productById = new Map((products || []).map((p) => [String(p._id), p]));
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -1668,6 +1714,13 @@ export default function NewInvoiceFormPage({
                             item.currentStock
                           }
                         />
+                        {showPurchaseRate && (
+                          <PurchaseRateInfo
+                            product={productById.get(
+                              String(item.product ?? item._id),
+                            )}
+                          />
+                        )}
                       </td>
                       <td className="px-3 py-1.5 border-b border-slate-100 text-slate-500">
                         {item.hsn || "-"}
@@ -1769,6 +1822,7 @@ export default function NewInvoiceFormPage({
                       products={products}
                       onSelect={handleAddRow}
                       onCreateNew={handleCreateNewProduct}
+                      showPurchaseRate={showPurchaseRate}
                     />
                   </td>
                   <td colSpan={8} className="px-3 py-2.5"></td>

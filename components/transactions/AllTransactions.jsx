@@ -24,16 +24,21 @@ import {
   Eye,
   RefreshCw,
   Receipt,
+  Undo2,
 } from "lucide-react";
-
+import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -400,6 +405,10 @@ export default function AllTransactionsPage() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewHtml, setPreviewHtml] = useState("");
   const [previewTitle, setPreviewTitle] = useState("");
+  const [reverseOpen, setReverseOpen] = useState(false);
+  const [reverseTarget, setReverseTarget] = useState(null);
+  const [reverseReason, setReverseReason] = useState("");
+  const [reversing, setReversing] = useState(false);
 
   const { data: storedata } = useQuery({
     queryKey: ["store"],
@@ -434,7 +443,7 @@ export default function AllTransactionsPage() {
     const q = customerSearch.trim().toLowerCase();
     return customerPayments
       .filter((item) =>
-        (item.invoice?.invoiceNumber || "").toLowerCase().includes(q)
+        (item.invoice?.invoiceNumber || "").toLowerCase().includes(q),
       )
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }, [customerPayments, customerSearch]);
@@ -444,7 +453,9 @@ export default function AllTransactionsPage() {
     return vendorPayments
       .filter((item) => {
         const vendorName = (item.purchase?.vendorName || "").toLowerCase();
-        const invoiceNumber = (item.purchase?.invoiceNumber || "").toLowerCase();
+        const invoiceNumber = (
+          item.purchase?.invoiceNumber || ""
+        ).toLowerCase();
         return vendorName.includes(q) || invoiceNumber.includes(q);
       })
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -455,7 +466,7 @@ export default function AllTransactionsPage() {
       processedCustomerPayments
         .filter((i) => i.status !== "cancelled")
         .reduce((sum, i) => sum + (i.amount || 0), 0),
-    [processedCustomerPayments]
+    [processedCustomerPayments],
   );
 
   const vendorTotal = useMemo(
@@ -463,14 +474,14 @@ export default function AllTransactionsPage() {
       processedVendorPayments
         .filter((i) => i.status !== "cancelled")
         .reduce((sum, i) => sum + (i.amount || 0), 0),
-    [processedVendorPayments]
+    [processedVendorPayments],
   );
 
   const customerCount = processedCustomerPayments.filter(
-    (i) => i.status !== "cancelled"
+    (i) => i.status !== "cancelled",
   ).length;
   const vendorCount = processedVendorPayments.filter(
-    (i) => i.status !== "cancelled"
+    (i) => i.status !== "cancelled",
   ).length;
 
   const isVendorTab = activeTab === "vendors";
@@ -479,7 +490,9 @@ export default function AllTransactionsPage() {
   const setSearch = isVendorTab ? setVendorSearch : setCustomerSearch;
   const filter = isVendorTab ? vendorFilter : customerFilter;
   const setFilter = isVendorTab ? setVendorFilter : setCustomerFilter;
-  const list = isVendorTab ? processedVendorPayments : processedCustomerPayments;
+  const list = isVendorTab
+    ? processedVendorPayments
+    : processedCustomerPayments;
   const total = isVendorTab ? vendorTotal : customerTotal;
   const count = isVendorTab ? vendorCount : customerCount;
 
@@ -533,11 +546,11 @@ export default function AllTransactionsPage() {
         storedata?.gstNumber,
         fullInvoice.customerGstNumber,
         storedata?.address?.state,
-        fullInvoice.customerState
+        fullInvoice.customerState,
       );
       const invoiceCalculations = recomputeInvoiceCalculations(
         fullInvoice,
-        isIgst
+        isIgst,
       );
 
       const formValues = {
@@ -558,7 +571,7 @@ export default function AllTransactionsPage() {
         invoiceNumber: fullInvoice.invoiceNumber,
         storedata: storedata || {},
         invoiceDate: new Date(
-          fullInvoice.createdAt || fullInvoice.invoiceDate || Date.now()
+          fullInvoice.createdAt || fullInvoice.invoiceDate || Date.now(),
         ),
         isGstInvoice: fullInvoice.type === "gst",
         payment: {
@@ -571,7 +584,7 @@ export default function AllTransactionsPage() {
       setPreviewHtml(html);
     } catch (err) {
       setPreviewHtml(
-        `<p style="padding:24px;font-family:sans-serif;color:#DC2626;">Failed to load invoice preview.</p>`
+        `<p style="padding:24px;font-family:sans-serif;color:#DC2626;">Failed to load invoice preview.</p>`,
       );
     } finally {
       setPreviewLoading(false);
@@ -592,11 +605,11 @@ export default function AllTransactionsPage() {
         storedata?.gstNumber,
         fullPurchase.vendorGstNumber,
         storedata?.address?.state,
-        fullPurchase.vendorState
+        fullPurchase.vendorState,
       );
       const invoiceCalculations = recomputePurchaseCalculations(
         fullPurchase,
-        isIgst
+        isIgst,
       );
 
       const formValues = {
@@ -618,7 +631,7 @@ export default function AllTransactionsPage() {
         invoiceNumber: fullPurchase.invoiceNumber,
         storedata: storedata || {},
         invoiceDate: new Date(
-          fullPurchase.createdAt || fullPurchase.date || Date.now()
+          fullPurchase.createdAt || fullPurchase.date || Date.now(),
         ),
         isGstInvoice: Boolean(fullPurchase.vendorGstNumber),
         payment: {
@@ -631,7 +644,7 @@ export default function AllTransactionsPage() {
       setPreviewHtml(html);
     } catch (err) {
       setPreviewHtml(
-        `<p style="padding:24px;font-family:sans-serif;color:#DC2626;">Failed to load purchase preview.</p>`
+        `<p style="padding:24px;font-family:sans-serif;color:#DC2626;">Failed to load purchase preview.</p>`,
       );
     } finally {
       setPreviewLoading(false);
@@ -643,6 +656,56 @@ export default function AllTransactionsPage() {
       openPurchasePreview(item.purchase._id, item.purchase?.invoiceNumber);
     } else if (!isVendorTab && item.invoice?._id) {
       openInvoicePreview(item.invoice._id, item.invoice?.invoiceNumber);
+    }
+  };
+
+  const openReverseDialog = (item) => {
+    setReverseTarget(item);
+    setReverseReason("");
+    setReverseOpen(true);
+  };
+
+  const closeReverseDialog = () => {
+    if (reversing) return;
+    setReverseOpen(false);
+    setReverseTarget(null);
+    setReverseReason("");
+  };
+
+  const handleReverseSubmit = async () => {
+    const reason = reverseReason.trim();
+    if (reason.length < 3) {
+      toast.error("Please enter a reason (minimum 3 characters).");
+      return;
+    }
+
+    setReversing(true);
+    try {
+      const res = await api.put(
+        `/invoice/payment/${reverseTarget._id}/reverse`,
+        {
+          reason,
+        },
+      );
+
+      if (res?.success || res?.data?.success) {
+        toast.success("Payment reversed. Invoice due amount updated.");
+        setReverseOpen(false);
+        setReverseTarget(null);
+        setReverseReason("");
+        await refetchCustomers();
+      } else {
+        throw new Error(res?.message || res?.data?.message || "Reverse failed");
+      }
+    } catch (error) {
+      toast.error(
+        error.response?.data?.errors?.[0]?.message ||
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to reverse payment.",
+      );
+    } finally {
+      setReversing(false);
     }
   };
 
@@ -824,13 +887,17 @@ export default function AllTransactionsPage() {
                     {isVendorTab ? "Vendor" : "Invoice #"}
                   </th>
                   {isVendorTab && (
-                    <th className="text-left font-semibold px-3 py-2">Invoice Ref</th>
+                    <th className="text-left font-semibold px-3 py-2">
+                      Invoice Ref
+                    </th>
                   )}
                   <th className="text-left font-semibold px-3 py-2">Method</th>
                   <th className="text-left font-semibold px-3 py-2">Status</th>
                   <th className="text-left font-semibold px-3 py-2">When</th>
                   <th className="text-right font-semibold px-3 py-2">Amount</th>
-                  <th className="text-center font-semibold px-3 py-2 w-16">View</th>
+                  <th className="text-center font-semibold px-3 py-2 w-24">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -883,6 +950,11 @@ export default function AllTransactionsPage() {
 
                       <td className="px-3 py-2 align-middle whitespace-nowrap">
                         <span
+                          title={
+                            item.status === "cancelled"
+                              ? item.cancelReason || "Reversed"
+                              : undefined
+                          }
                           className="text-[11px] font-bold px-2 py-0.5 rounded-full border uppercase"
                           style={{
                             backgroundColor: status.bg,
@@ -915,15 +987,32 @@ export default function AllTransactionsPage() {
                         className="px-3 py-2 align-middle"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <div className="flex items-center justify-center">
+                        <div className="flex items-center justify-center gap-1">
                           <Button
                             variant="ghost"
                             size="sm"
                             className="h-7 w-7 p-0"
+                            title="View"
                             onClick={() => handleRowClick(item)}
                           >
                             <Eye className="w-4 h-4" />
                           </Button>
+
+                          {/* Reverse: sudhu customer tab + completed payment */}
+                          {!isVendorTab &&
+                            item.status === "completed" &&
+                            item.invoice?._id &&
+                            Number(item.amount) > 0 && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                title="Reverse payment"
+                                onClick={() => openReverseDialog(item)}
+                              >
+                                <Undo2 className="w-4 h-4" />
+                              </Button>
+                            )}
                         </div>
                       </td>
                     </motion.tr>
@@ -994,6 +1083,91 @@ export default function AllTransactionsPage() {
               className="flex-1 w-full border-0 bg-white"
             />
           )}
+        </DialogContent>
+      </Dialog>
+      {/* Reverse Payment Dialog */}
+      <Dialog
+        open={reverseOpen}
+        onOpenChange={(open) => !open && closeReverseDialog()}
+      >
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle>Reverse Payment</DialogTitle>
+            <DialogDescription>
+              Use this if a payment was entered by mistake. The invoice due
+              amount will be restored automatically.
+            </DialogDescription>
+          </DialogHeader>
+
+          {reverseTarget && (
+            <div className="space-y-4">
+              <div className="rounded-xl bg-slate-50 border border-slate-100 p-3.5 space-y-1.5 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Invoice</span>
+                  <span className="font-medium text-slate-800">
+                    {reverseTarget.invoice?.invoiceNumber || "N/A"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Method</span>
+                  <span className="font-medium text-slate-800 capitalize">
+                    {reverseTarget.paymentMethod || "—"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Amount to reverse</span>
+                  <span className="font-bold text-red-600">
+                    {formatAmount(reverseTarget.amount)}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 pt-1">
+                  Invoice due will increase by{" "}
+                  {formatAmount(reverseTarget.amount)}. You can then receive the
+                  correct amount again.
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="reverse-reason">Reason *</Label>
+                <Textarea
+                  id="reverse-reason"
+                  value={reverseReason}
+                  onChange={(e) =>
+                    setReverseReason(e.target.value.slice(0, 200))
+                  }
+                  placeholder="e.g. Entered 1000 instead of 100"
+                  rows={3}
+                  className="mt-1"
+                  disabled={reversing}
+                />
+                <p className="text-xs text-slate-400 mt-1 text-right">
+                  {reverseReason.length}/200
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={closeReverseDialog}
+              disabled={reversing}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleReverseSubmit}
+              disabled={reversing || reverseReason.trim().length < 3}
+            >
+              {reversing ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Undo2 className="w-4 h-4 mr-2" />
+              )}
+              Reverse Payment
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

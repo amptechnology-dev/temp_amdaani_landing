@@ -16,7 +16,6 @@ import {
   RefreshCw,
   Truck,
   FileText,
-  Repeat,
   CheckCircle2,
   User,
 } from "lucide-react";
@@ -50,20 +49,8 @@ const STATUS_META = {
   delivered: { label: "Delivered", cls: "bg-green-600 text-white" },
 };
 
-// Ei status gulo-te order edit kora jay
 const EDITABLE_STATUS = ["order_taken", "approved"];
-
-// Sudhu approved order theke invoice create kora jay
 const INVOICEABLE_STATUS = ["approved"];
-
-// Manually je status-e jawa jay (backend statusFlow-er sathe match).
-// "invoiced" kokhono manual na — invoice create korle automatically hoy.
-const NEXT_STATUS = {
-  order_taken: ["approved"],
-  approved: [],
-  invoiced: ["delivered"],
-  delivered: [],
-};
 
 // ── helpers ─────────────────────────────────────────────────────────────
 const currency = (v) => `₹${Number(v || 0).toFixed(2)}`;
@@ -89,16 +76,12 @@ const getCustomerName = (o) =>
 const getCustomerMobile = (o) =>
   o?.customerMobile || o?.customerDetails?.mobile || o?.customer?.mobile || "";
 
-// Kon user order-ta nilo
 const getCreatedByName = (o) => o?.createdBy?.name || "-";
-
-// Delivered hole actual date, noile expected delivery date
 const getDeliveryDate = (o) => o?.actualDeliveryDate || o?.deliveryDate;
 
 const getItemName = (it) =>
   it?.name || (typeof it?.product === "object" ? it?.product?.name : "") || "-";
 
-// Purono order-e productPrice na thakle order price-i dekhabo
 const getItemProductPrice = (it) => Number(it?.productPrice ?? it?.sellingPrice ?? 0);
 
 const getOrderTotal = (o) => {
@@ -120,11 +103,14 @@ const STATUS_FILTERS = ORDER_STATUS.map((s) => ({
   label: STATUS_META[s].label,
 }));
 
-// ── Status change dialog ────────────────────────────────────────────────
-function StatusDialog({ open, onClose, order, saving, onSubmit }) {
-  const [status, setStatus] = useState(null);
+const inputCls =
+  "w-full h-9 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-white";
+
+// ── Deliver dialog (Delivered By + Phone required, baki optional) ───────
+function DeliverDialog({ open, onClose, order, saving, onSubmit }) {
   const [form, setForm] = useState({
     deliveredBy: "",
+    deliveredByPhone: "",
     challanNo: "",
     challanDate: "",
     lorryNumber: "",
@@ -133,154 +119,127 @@ function StatusDialog({ open, onClose, order, saving, onSubmit }) {
 
   useEffect(() => {
     if (!open || !order) return;
-    setStatus(null);
     setForm({
-      deliveredBy: order.deliveredBy || "",
-      challanNo: order.challanNo || "",
-      challanDate: toInputDate(order.challanDate) || toInputDate(new Date()),
-      lorryNumber: order.lorryNumber || "",
+      deliveredBy: "",
+      deliveredByPhone: "",
+      challanNo: "",
+      challanDate: toInputDate(new Date()),
+      lorryNumber: "",
       deliveryAddress: order.deliveryAddress || order.customerAddress || "",
     });
   }, [open, order]);
 
   if (!order) return null;
 
-  const current = getStatus(order);
-  const allowed = NEXT_STATUS[current] || [];
-
   const setField = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
 
   const submit = () => {
-    if (!status) {
-      toast.info("Please select a status");
-      return;
-    }
-    if (!allowed.includes(status)) {
-      toast.error("This status change is not allowed");
-      return;
-    }
-    const payload = { status };
-    if (status === "delivered") {
-      if (!form.deliveredBy.trim()) {
-        toast.error("Delivered By is required");
-        return;
-      }
-      payload.deliveredBy = form.deliveredBy.trim();
-      payload.challanNo = form.challanNo.trim();
-      payload.challanDate = form.challanDate;
-      payload.lorryNumber = form.lorryNumber.trim();
-      payload.deliveryAddress = form.deliveryAddress.trim();
-    }
-    onSubmit(payload);
-  };
+    if (!form.deliveredBy.trim()) return toast.error("Delivered By is required");
+    if (!form.deliveredByPhone.trim()) return toast.error("Phone number is required");
+    if (!/^\d{10}$/.test(form.deliveredByPhone.trim()))
+      return toast.error("Enter a valid 10 digit phone number");
 
-  const inputCls =
-    "w-full h-9 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-white";
+    const payload = {
+      status: "delivered",
+      deliveredBy: form.deliveredBy.trim(),
+      deliveredByPhone: form.deliveredByPhone.trim(),
+    };
+    // Optional field khali thakle pathabo na
+    if (form.challanNo.trim()) payload.challanNo = form.challanNo.trim();
+    if (form.challanDate) payload.challanDate = form.challanDate;
+    if (form.lorryNumber.trim()) payload.lorryNumber = form.lorryNumber.trim();
+    if (form.deliveryAddress.trim()) payload.deliveryAddress = form.deliveryAddress.trim();
+
+    onSubmit(order._id, payload);
+  };
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && !saving && onClose()}>
       <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
-          <DialogTitle>Change Status · #{order.orderNumber}</DialogTitle>
+          <DialogTitle>Mark Delivered · #{order.orderNumber}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-2">
-            {ORDER_STATUS.map((s) => {
-              const isCurrent = s === current;
-              const isAllowed = allowed.includes(s);
-              const isSelected = status === s;
-              return (
-                <button
-                  key={s}
-                  type="button"
-                  disabled={!isAllowed}
-                  onClick={() => setStatus(s)}
-                  className={`h-10 rounded-lg border text-sm font-semibold transition-colors ${
-                    isSelected
-                      ? "bg-blue-600 border-blue-600 text-white"
-                      : isCurrent
-                        ? "bg-slate-100 border-slate-300 text-slate-700 cursor-default"
-                        : isAllowed
-                          ? "border-slate-200 text-slate-600 hover:bg-slate-50"
-                          : "border-slate-100 text-slate-300 bg-slate-50/60 cursor-not-allowed"
-                  }`}
-                >
-                  {STATUS_META[s].label}
-                  {isCurrent && (
-                    <span className="ml-1 text-[10px] font-medium opacity-70">(current)</span>
-                  )}
-                </button>
-              );
-            })}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs font-medium text-slate-500 mb-1 block">
+              Delivered By *
+            </label>
+            <input
+              value={form.deliveredBy}
+              onChange={setField("deliveredBy")}
+              placeholder="Delivery person name"
+              className={inputCls}
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-500 mb-1 block">
+              Phone Number *
+            </label>
+            <input
+              value={form.deliveredByPhone}
+              onChange={(e) =>
+                setForm((p) => ({
+                  ...p,
+                  deliveredByPhone: e.target.value.replace(/\D/g, ""),
+                }))
+              }
+              maxLength={10}
+              inputMode="numeric"
+              placeholder="10 digit mobile"
+              className={inputCls}
+            />
           </div>
 
-          <p className="text-xs text-slate-400 leading-relaxed">
-            "Invoiced" status manually set kora jay na — approved order theke invoice create
-            korle automatically hoy.
-          </p>
+          <div>
+            <label className="text-xs font-medium text-slate-500 mb-1 block">
+              Challan No <span className="text-slate-300">(optional)</span>
+            </label>
+            <input
+              value={form.challanNo}
+              onChange={setField("challanNo")}
+              placeholder="e.g. CH-1001"
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-500 mb-1 block">
+              Challan Date <span className="text-slate-300">(optional)</span>
+            </label>
+            <input
+              type="date"
+              value={form.challanDate}
+              onChange={setField("challanDate")}
+              className={inputCls}
+            />
+          </div>
 
-          {status === "delivered" && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2">
-                <label className="text-xs font-medium text-slate-500 mb-1 block">
-                  Delivered By *
-                </label>
-                <input
-                  value={form.deliveredBy}
-                  onChange={setField("deliveredBy")}
-                  placeholder="Delivery person name"
-                  className={inputCls}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-500 mb-1 block">
-                  Challan No
-                </label>
-                <input
-                  value={form.challanNo}
-                  onChange={setField("challanNo")}
-                  placeholder="e.g. CH-1001"
-                  className={inputCls}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-500 mb-1 block">
-                  Challan Date
-                </label>
-                <input
-                  type="date"
-                  value={form.challanDate}
-                  onChange={setField("challanDate")}
-                  className={inputCls}
-                />
-              </div>
-              <div className="col-span-2">
-                <label className="text-xs font-medium text-slate-500 mb-1 block">
-                  Lorry Number
-                </label>
-                <input
-                  value={form.lorryNumber}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, lorryNumber: e.target.value.toUpperCase() }))
-                  }
-                  placeholder="e.g. WB23AB1234"
-                  className={inputCls}
-                />
-              </div>
-              <div className="col-span-2">
-                <label className="text-xs font-medium text-slate-500 mb-1 block">
-                  Delivery Address
-                </label>
-                <input
-                  value={form.deliveryAddress}
-                  onChange={setField("deliveryAddress")}
-                  placeholder="Delivery address"
-                  className={inputCls}
-                />
-              </div>
-            </div>
-          )}
+          <div className="col-span-2">
+            <label className="text-xs font-medium text-slate-500 mb-1 block">
+              Lorry Number <span className="text-slate-300">(optional)</span>
+            </label>
+            <input
+              value={form.lorryNumber}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, lorryNumber: e.target.value.toUpperCase() }))
+              }
+              placeholder="e.g. WB23AB1234"
+              className={inputCls}
+            />
+          </div>
+
+          <div className="col-span-2">
+            <label className="text-xs font-medium text-slate-500 mb-1 block">
+              Delivery Address <span className="text-slate-300">(optional)</span>
+            </label>
+            <input
+              value={form.deliveryAddress}
+              onChange={setField("deliveryAddress")}
+              placeholder="Delivery address"
+              className={inputCls}
+            />
+          </div>
         </div>
 
         <DialogFooter>
@@ -289,11 +248,11 @@ function StatusDialog({ open, onClose, order, saving, onSubmit }) {
           </Button>
           <Button
             onClick={submit}
-            disabled={saving || !status}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
+            disabled={saving}
+            className="bg-green-600 hover:bg-green-700 text-white"
           >
             {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            Update Status
+            Mark Delivered
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -320,8 +279,11 @@ export default function OrderListPage({
   const [detail, setDetail] = useState(null);
   const [loadingId, setLoadingId] = useState(null);
 
-  const [statusOpen, setStatusOpen] = useState(false);
-  const [statusSaving, setStatusSaving] = useState(false);
+  const [statusLoadingId, setStatusLoadingId] = useState(null);
+
+  // Deliver modal state
+  const [deliverOpen, setDeliverOpen] = useState(false);
+  const [deliverOrder, setDeliverOrder] = useState(null);
 
   const filteredOrders = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -364,35 +326,51 @@ export default function OrderListPage({
     onEditOrder(orderId);
   };
 
-  // Order theke direct Sales (SalesFlow ?fromOrder=ID handle kore)
   const handleCreateInvoice = (orderId) => {
     setDetailOpen(false);
     router.push(`/dashboard/sales?fromOrder=${orderId}`);
   };
 
-  const handleStatusSubmit = async (payload) => {
-    if (!detail?._id) return;
+  // Generic status change. Approve = payload { status: "approved" } (1 click),
+  // Deliver = modal theke full payload ashe.
+  const changeStatus = async (orderId, payload) => {
     try {
-      setStatusSaving(true);
-      const res = await api.put(`/order/status/${detail._id}`, payload);
+      setStatusLoadingId(orderId);
+      const res = await api.put(`/order/status/${orderId}`, payload);
       if (res?.success === false) throw new Error(res?.message || "Failed");
-      toast.success("Order status updated");
-      setStatusOpen(false);
+
+      toast.success(
+        payload.status === "approved"
+          ? "Order approved"
+          : "Order marked as delivered",
+      );
       setDetailOpen(false);
+      setDeliverOpen(false);
+      setDeliverOrder(null);
       await onRefresh();
     } catch (err) {
       toast.error(
-        err?.response?.data?.message || err?.message || "Failed to update status",
+        err?.response?.data?.errors?.[0]?.message ||
+          err?.response?.data?.message ||
+          err?.message ||
+          "Failed to update status",
       );
     } finally {
-      setStatusSaving(false);
+      setStatusLoadingId(null);
     }
+  };
+
+  const approveOrder = (orderId) => changeStatus(orderId, { status: "approved" });
+
+  const openDeliverDialog = (order) => {
+    setDeliverOrder(order);
+    setDeliverOpen(true);
   };
 
   const detailStatus = getStatus(detail);
   const canEditDetail = EDITABLE_STATUS.includes(detailStatus);
   const canInvoiceDetail = INVOICEABLE_STATUS.includes(detailStatus);
-  const canChangeStatus = (NEXT_STATUS[detailStatus] || []).length > 0;
+  const isDetailBusy = statusLoadingId === detail?._id;
 
   return (
     <div className="min-h-screen p-3 md:p-4 bg-slate-50">
@@ -519,7 +497,7 @@ export default function OrderListPage({
                   <th className="text-left font-semibold px-3 py-2">Delivery Date</th>
                   <th className="text-center font-semibold px-3 py-2">Status</th>
                   <th className="text-right font-semibold px-3 py-2">Amount</th>
-                  <th className="text-center font-semibold px-3 py-2 w-24">Action</th>
+                  <th className="text-center font-semibold px-3 py-2">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -580,19 +558,43 @@ export default function OrderListPage({
                         className="px-3 py-2 text-center align-middle whitespace-nowrap"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        {loadingId === o._id ? (
+                        {loadingId === o._id || statusLoadingId === o._id ? (
                           <Loader2 className="w-4 h-4 animate-spin text-slate-400 mx-auto" />
                         ) : (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8 px-3 text-sm"
-                            disabled={!EDITABLE_STATUS.includes(st)}
-                            onClick={() => onEditOrder(o._id)}
-                          >
-                            <Pencil className="w-3.5 h-3.5 mr-1" />
-                            Edit
-                          </Button>
+                          <div className="flex items-center justify-center gap-1.5">
+                            {st === "order_taken" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-3 text-sm text-green-700 border-green-200 hover:bg-green-50"
+                                onClick={() => approveOrder(o._id)}
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                                Approve
+                              </Button>
+                            )}
+                            {st === "invoiced" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-3 text-sm text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                                onClick={() => openDeliverDialog(o)}
+                              >
+                                <Truck className="w-3.5 h-3.5 mr-1" />
+                                Deliver
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 px-3 text-sm"
+                              disabled={!EDITABLE_STATUS.includes(st)}
+                              onClick={() => onEditOrder(o._id)}
+                            >
+                              <Pencil className="w-3.5 h-3.5 mr-1" />
+                              Edit
+                            </Button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -652,16 +654,16 @@ export default function OrderListPage({
                 Edit
               </Button>
 
-              {/* Quick approve — sudhu order_taken hole */}
+              {/* Approve: 1 click, modal nai */}
               {detailStatus === "order_taken" && (
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={statusSaving}
-                  onClick={() => handleStatusSubmit({ status: "approved" })}
+                  disabled={isDetailBusy}
+                  onClick={() => approveOrder(detail._id)}
                   className="text-green-700 border-green-200 hover:bg-green-50"
                 >
-                  {statusSaving ? (
+                  {isDetailBusy ? (
                     <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                   ) : (
                     <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
@@ -670,16 +672,20 @@ export default function OrderListPage({
                 </Button>
               )}
 
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={!canChangeStatus}
-                onClick={() => setStatusOpen(true)}
-                className="text-purple-600 border-purple-200 hover:bg-purple-50"
-              >
-                <Repeat className="w-3.5 h-3.5 mr-1.5" />
-                Change Status
-              </Button>
+              {/* Deliver: modal khule (Delivered By + Phone dite hobe) */}
+              {detailStatus === "invoiced" && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={isDetailBusy}
+                  onClick={() => openDeliverDialog(detail)}
+                  className="text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                >
+                  <Truck className="w-3.5 h-3.5 mr-1.5" />
+                  Mark Delivered
+                </Button>
+              )}
+
               <Button
                 size="sm"
                 disabled={!canInvoiceDetail}
@@ -693,7 +699,7 @@ export default function OrderListPage({
 
             {detail && detailStatus === "order_taken" && (
               <p className="text-xs text-amber-600">
-                Invoice can possiable after approaved order
+                Invoice can be created after the order is approved
               </p>
             )}
           </DialogHeader>
@@ -712,10 +718,11 @@ export default function OrderListPage({
               {detailStatus === "delivered" && (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 bg-green-50 border border-green-200 rounded-xl p-4">
                   <Info label="Delivered By" value={safe(detail.deliveredBy)} />
+                  <Info label="Phone" value={safe(detail.deliveredByPhone)} />
                   <Info label="Challan No" value={safe(detail.challanNo)} />
                   <Info label="Challan Date" value={fmtDate(detail.challanDate)} />
                   <Info label="Lorry Number" value={safe(detail.lorryNumber)} />
-                  <div className="col-span-2">
+                  <div className="col-span-2 md:col-span-3">
                     <Info label="Delivery Address" value={safe(detail.deliveryAddress)} />
                   </div>
                 </div>
@@ -774,12 +781,16 @@ export default function OrderListPage({
         </DialogContent>
       </Dialog>
 
-      <StatusDialog
-        open={statusOpen}
-        onClose={() => setStatusOpen(false)}
-        order={detail}
-        saving={statusSaving}
-        onSubmit={handleStatusSubmit}
+      {/* Deliver modal */}
+      <DeliverDialog
+        open={deliverOpen}
+        onClose={() => {
+          setDeliverOpen(false);
+          setDeliverOrder(null);
+        }}
+        order={deliverOrder}
+        saving={statusLoadingId === deliverOrder?._id}
+        onSubmit={changeStatus}
       />
     </div>
   );

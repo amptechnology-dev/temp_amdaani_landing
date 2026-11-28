@@ -26,6 +26,7 @@ import SkeletonGrid from "../../../components/dashboard/SkeletonGrid";
 
 import { themeConfig } from "../../../utils/ThemeConfig";
 import api from "../../../utils/api";
+const SALES_REPORT_PATH = "/dashboard/reports/sales";
 
 export default function DashboardPage() {
   const { theme } = useTheme();
@@ -322,7 +323,6 @@ export default function DashboardPage() {
           <SkeletonGrid />
         ) : (
           <>
-            {/* Key Metrics */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <MetricCard
                 title="Annual Sales"
@@ -333,7 +333,7 @@ export default function DashboardPage() {
                 icon="calendar"
                 color="blue"
                 onClick={() =>
-                  (window.location.href = "/reports/sales?period=annual")
+                  router.push(`${SALES_REPORT_PATH}?period=annual`)
                 }
               />
               <MetricCard
@@ -345,7 +345,7 @@ export default function DashboardPage() {
                 icon="calendarMonth"
                 color="teal"
                 onClick={() =>
-                  (window.location.href = "/reports/sales?period=monthly")
+                  router.push(`${SALES_REPORT_PATH}?period=monthly`)
                 }
               />
               <MetricCard
@@ -356,7 +356,7 @@ export default function DashboardPage() {
                 icon="calendarWeek"
                 color="amber"
                 onClick={() =>
-                  (window.location.href = "/reports/sales?period=weekly")
+                  router.push(`${SALES_REPORT_PATH}?period=weekly`)
                 }
               />
               <MetricCard
@@ -366,9 +366,7 @@ export default function DashboardPage() {
                 max={dashboardData?.metrics?.todayMax || 0}
                 icon="calendarToday"
                 color="rose"
-                onClick={() =>
-                  (window.location.href = "/reports/sales?period=today")
-                }
+                onClick={() => router.push(`${SALES_REPORT_PATH}?period=today`)}
               />
             </div>
 

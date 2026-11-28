@@ -13,6 +13,7 @@ import {
   X,
   ChevronRight,
   Settings as SettingsIcon,
+  IndianRupee,
 } from "lucide-react";
 import { useAuth, permissions } from "../../context/AuthContext";
 import api from "../../utils/api";
@@ -57,19 +58,22 @@ function SettingsRow({
     <Wrapper
       type={clickable ? "button" : undefined}
       onClick={clickable ? onClick : undefined}
-      className={`w-full flex items-center gap-3.5 px-4.5 py-3.5 text-left group ${
+      className={`w-full flex items-center gap-3.5 px-4 py-2.5 text-left group ${
         clickable ? "hover:bg-slate-50 transition-colors cursor-pointer" : ""
       }`}
     >
       <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 group-hover:bg-blue-100 transition-colors">
-        <Icon size={16.5} className="text-blue-600" />
+        <Icon size={16} className="text-blue-600" />
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-[13.5px] font-semibold text-slate-800 leading-tight">
           {title}
         </p>
         {description && (
-          <p className="text-[12px] text-slate-500 mt-0.5 truncate leading-tight">
+          <p
+            className="text-[12px] text-slate-500 mt-0.5 truncate leading-tight"
+            title={description}
+          >
             {description}
           </p>
         )}
@@ -108,8 +112,8 @@ function Modal({ open, onClose, title, subtitle, children }) {
 
 function SectionCard({ title, description, children }) {
   return (
-    <div className="rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden h-fit">
-      <div className="px-4.5 pt-3 pb-2.5 border-b border-slate-100">
+    <div className="rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
+      <div className="px-4 pt-2.5 pb-2 border-b border-slate-100">
         <h2 className="text-[13px] font-bold text-slate-800 leading-tight">
           {title}
         </h2>
@@ -153,6 +157,14 @@ export default function Settings() {
   const [poLoading, setPoLoading] = useState(false);
   const [mrpLoading, setMrpLoading] = useState(false);
   const [gstUnitLoading, setGstUnitLoading] = useState(false);
+  const [poRateLoading, setPoRateLoading] = useState(false);
+  const [saleRateLoading, setSaleRateLoading] = useState(false);
+  const isOrderRateEnabled = Boolean(
+    authState?.user?.store?.settings?.showPurchaseRateInOrder,
+  );
+  const isSaleRateEnabled = Boolean(
+    authState?.user?.store?.settings?.showPurchaseRateInSale,
+  );
   const isGstPerUnitEnabled = Boolean(
     authState?.user?.store?.settings?.showGstPerUnit,
   );
@@ -220,6 +232,20 @@ export default function Settings() {
       { showGstPerUnit: !isGstPerUnitEnabled },
       `Net Rate column ${!isGstPerUnitEnabled ? "enabled" : "disabled"}`,
       setGstUnitLoading,
+    );
+
+  const handleOrderRateToggle = () =>
+    updateStoreSettings(
+      { showPurchaseRateInOrder: !isOrderRateEnabled },
+      `Purchase rate in order ${!isOrderRateEnabled ? "enabled" : "disabled"}`,
+      setPoRateLoading,
+    );
+
+  const handleSaleRateToggle = () =>
+    updateStoreSettings(
+      { showPurchaseRateInSale: !isSaleRateEnabled },
+      `Purchase rate in sale ${!isSaleRateEnabled ? "enabled" : "disabled"}`,
+      setSaleRateLoading,
     );
 
   // ── Change Email Modal ──
@@ -326,10 +352,11 @@ export default function Settings() {
   const canManageSettings = hasPermission?.(permissions.CAN_MANAGE_SETTINGS);
 
   return (
-    <div className="h-full bg-slate-50/50 overflow-hidden">
-      <div className="px-6 md:px-8 py-5 max-w-6xl mx-auto h-full flex flex-col">
+    // overflow-hidden bad: content kete na giye proyojone scroll hobe
+    <div className="h-full bg-slate-50/50 overflow-y-auto">
+      <div className="px-6 md:px-8 py-4 max-w-6xl mx-auto">
         {/* ── Header ── */}
-        <div className="flex items-center gap-3 mb-5 shrink-0">
+        <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
             <SettingsIcon size={18} className="text-white" />
           </div>
@@ -343,116 +370,146 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* ── Grid layout: two columns on desktop ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4.5 items-start">
-          {/* ── Business Preferences ── */}
+        {/* ── Two independent columns (heights balanced) ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+          {/* ── Left column: Business Preferences ── */}
           {canManageSettings && (
+            <div className="flex flex-col gap-4">
+              <SectionCard
+                title="Business Preferences"
+                description="Turn business modules on or off"
+              >
+                <SettingsRow
+                  icon={Package}
+                  title="Stock Management"
+                  description={
+                    hasFeature("stockManagement")
+                      ? "Enable inventory tracking and stock adjustments"
+                      : "Not included in your plan. Upgrade to use"
+                  }
+                  right={
+                    <Switch
+                      checked={isStockEnabled}
+                      onChange={handleStockToggle}
+                      loading={stockLoading}
+                    />
+                  }
+                />
+                <SettingsRow
+                  icon={ShoppingCart}
+                  title="Purchase Management"
+                  description={
+                    hasFeature("purchaseManagement")
+                      ? "Enable purchase order features"
+                      : "Not included in your plan. Upgrade to use"
+                  }
+                  right={
+                    <Switch
+                      checked={isPurchaseOrderEnabled}
+                      onChange={handlePurchaseOrderToggle}
+                      loading={poLoading}
+                    />
+                  }
+                />
+                <SettingsRow
+                  icon={ClipboardList}
+                  title="MRP Management"
+                  description="Enable material requirement planning features"
+                  right={
+                    <Switch
+                      checked={isMrpEnabled}
+                      onChange={handleMrpToggle}
+                      loading={mrpLoading}
+                    />
+                  }
+                />
+                <SettingsRow
+                  icon={Percent}
+                  title="Net Rate"
+                  description="Show Net Rate (per unit, incl. GST, after discount) in sale and purchase invoice"
+                  right={
+                    <Switch
+                      checked={isGstPerUnitEnabled}
+                      onChange={handleGstPerUnitToggle}
+                      loading={gstUnitLoading}
+                    />
+                  }
+                />
+              </SectionCard>
+            </div>
+          )}
+
+          {/* ── Right column: Account + About ── */}
+          <div className="flex flex-col gap-4">
             <SectionCard
-              title="Business Preferences"
-              description="Turn business modules on or off"
+              title="Account"
+              description={
+                isStaff
+                  ? "You can update your phone number"
+                  : "Update your login credentials"
+              }
+            >
+              {/* Email: staff-er jonno shudhu dekha jabe, edit na */}
+              <SettingsRow
+                icon={MailIcon}
+                title={isStaff ? "Email" : "Change Email"}
+                description={getCurrentEmail() || "Update your email address"}
+                clickable={!isStaff}
+                onClick={openEmailModal}
+                right={
+                  isStaff ? null : (
+                    <ChevronRight size={16} className="text-slate-300" />
+                  )
+                }
+              />
+              <SettingsRow
+                icon={Phone}
+                title="Change Phone Number"
+                description={getCurrentPhone() || "Update your phone number"}
+                clickable
+                onClick={openPhoneModal}
+                right={<ChevronRight size={16} className="text-slate-300" />}
+              />
+            </SectionCard>
+
+            <SectionCard
+              title="About"
+              description="Account linking and app info"
             >
               <SettingsRow
-                icon={Package}
-                title="Stock Management"
-                description={
-                  hasFeature("stockManagement")
-                    ? "Enable inventory tracking and stock adjustments"
-                    : "Not included in your plan. Upgrade to use"
-                }
+                icon={Bot}
+                title="Agent Code"
+                description="Add your Agent ID to connect your account"
+                clickable
+                onClick={() => setAgentModalOpen(true)}
+                right={<ChevronRight size={16} className="text-slate-300" />}
+              />
+              <SettingsRow
+                icon={IndianRupee}
+                title="Enable purchase rate for order"
+                description="Show purchase rate (incl/excl GST and GST %) while selecting items in an order"
                 right={
                   <Switch
-                    checked={isStockEnabled}
-                    onChange={handleStockToggle}
-                    loading={stockLoading}
+                    checked={isOrderRateEnabled}
+                    onChange={handleOrderRateToggle}
+                    loading={poRateLoading}
                   />
                 }
               />
               <SettingsRow
-                icon={ShoppingCart}
-                title="Purchase Management"
-                description={
-                  hasFeature("purchaseManagement")
-                    ? "Enable purchase order features"
-                    : "Not included in your plan. Upgrade to use"
-                }
+                icon={IndianRupee}
+                title="Enable purchase rate for sale"
+                description="Show purchase rate (incl/excl GST and GST %) while selecting items in an invoice"
                 right={
                   <Switch
-                    checked={isPurchaseOrderEnabled}
-                    onChange={handlePurchaseOrderToggle}
-                    loading={poLoading}
-                  />
-                }
-              />
-              <SettingsRow
-                icon={ClipboardList}
-                title="MRP Management"
-                description="Enable material requirement planning features"
-                right={
-                  <Switch
-                    checked={isMrpEnabled}
-                    onChange={handleMrpToggle}
-                    loading={mrpLoading}
-                  />
-                }
-              />
-              <SettingsRow
-                icon={Percent}
-                title="Net Rate"
-                description="Show Net Rate (per unit, incl. GST, after discount) in sale and purchase invoice"
-                right={
-                  <Switch
-                    checked={isGstPerUnitEnabled}
-                    onChange={handleGstPerUnitToggle}
-                    loading={gstUnitLoading}
+                    checked={isSaleRateEnabled}
+                    onChange={handleSaleRateToggle}
+                    loading={saleRateLoading}
                   />
                 }
               />
             </SectionCard>
-          )}
-
-          {/* ── Account ── */}
-          <SectionCard
-            title="Account"
-            description={
-              isStaff
-                ? "You can update your phone number"
-                : "Update your login credentials"
-            }
-          >
-            {/* Email: staff-er jonno shudhu dekha jabe, edit na */}
-            <SettingsRow
-              icon={MailIcon}
-              title={isStaff ? "Email" : "Change Email"}
-              description={getCurrentEmail() || "Update your email address"}
-              clickable={!isStaff}
-              onClick={openEmailModal}
-              right={
-                isStaff ? null : (
-                  <ChevronRight size={16} className="text-slate-300" />
-                )
-              }
-            />
-            <SettingsRow
-              icon={Phone}
-              title="Change Phone Number"
-              description={getCurrentPhone() || "Update your phone number"}
-              clickable
-              onClick={openPhoneModal}
-              right={<ChevronRight size={16} className="text-slate-300" />}
-            />
-          </SectionCard>
-
-          {/* ── About ── */}
-          <SectionCard title="About" description="Account linking and app info">
-            <SettingsRow
-              icon={Bot}
-              title="Agent Code"
-              description="Add your Agent ID to connect your account"
-              clickable
-              onClick={() => setAgentModalOpen(true)}
-              right={<ChevronRight size={16} className="text-slate-300" />}
-            />
-          </SectionCard>
+          </div>
         </div>
       </div>
 

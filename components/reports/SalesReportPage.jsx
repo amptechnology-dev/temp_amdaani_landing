@@ -43,10 +43,22 @@ const formatDate = (date) => {
   return `${day}/${month}/${year}`;
 };
 
+// FIX: toISOString() UTC te convert kore (IST e ekdin pichiye jay).
+// Tai local year/month/day diye YYYY-MM-DD banano hocche.
 const toInputDate = (date) => {
   if (!date) return "";
   const d = new Date(date);
-  return d.toISOString().split("T")[0];
+  if (isNaN(d.getTime())) return "";
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
+};
+
+// "YYYY-MM-DD" ke local midnight Date e convert kore (UTC te na)
+const parseInputDate = (value) => {
+  if (!value) return null;
+  const [y, m, d] = value.split("-").map(Number);
+  return new Date(y, m - 1, d);
 };
 
 const PAYMENT_METHOD_OPTIONS = [
@@ -351,6 +363,14 @@ export default function SalesReportPage() {
     setStartDate(new Date(today.getFullYear(), today.getMonth() - 1, 1));
     setEndDate(new Date(today.getFullYear(), today.getMonth(), 0));
   };
+  // Dashboard-er "Annual Sales" calendar year (1 Jan - today) dhore hisab kore,
+  // tai dashboard theke ashle same range use kora hocche jate number mile jay.
+  const applyCalendarYear = () => {
+    setActiveRange(null);
+    const today = new Date();
+    setStartDate(new Date(today.getFullYear(), 0, 1));
+    setEndDate(today);
+  };
   const clearAllFilters = () => {
     setActiveRange(null);
     setStartDate(null);
@@ -364,6 +384,37 @@ export default function SalesReportPage() {
     setInvoices([]);
     setHasFetched(false);
   };
+
+  // ── Dashboard theke ashle (?period=today|weekly|monthly|annual) ─────────
+  // Page open hobar shathe shathe oi filter apply hoye report auto-generate hobe.
+  useEffect(() => {
+    const period = new URLSearchParams(window.location.search).get("period");
+    if (!period) return;
+
+    // Dashboard shudhu active invoice dhore, tai same filter
+    const validPeriods = ["today", "weekly", "monthly", "annual"];
+    if (!validPeriods.includes(period)) return;
+
+    setSaleStatus("active");
+    switch (period) {
+      case "today":
+        applyToday();
+        break;
+      case "weekly":
+        applyThisWeek();
+        break;
+      case "monthly":
+        applyThisMonth();
+        break;
+      case "annual":
+        applyCalendarYear();
+        break;
+    }
+
+    // URL theke ?period= soriye dao, jate refresh korle abar auto-apply na hoy
+    window.history.replaceState(null, "", window.location.pathname);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const formattedRange = useMemo(
     () => `${startDate ? formatDate(startDate) : "All"} - ${endDate ? formatDate(endDate) : "All"}`,
@@ -682,14 +733,14 @@ export default function SalesReportPage() {
             <div className="relative">
               <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
               <input type="date" value={toInputDate(startDate)} max={toInputDate(new Date())}
-                onChange={(e) => { setActiveRange(null); setStartDate(e.target.value ? new Date(e.target.value) : null); }}
+                onChange={(e) => { setActiveRange(null); setStartDate(parseInputDate(e.target.value)); }}
                 className="h-9 w-[150px] pl-8 pr-2 rounded-lg border border-slate-200 text-[13px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
             </div>
             <span className="text-slate-300 text-xs">–</span>
             <div className="relative">
               <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
               <input type="date" value={toInputDate(endDate)} max={toInputDate(new Date())}
-                onChange={(e) => { setActiveRange(null); setEndDate(e.target.value ? new Date(e.target.value) : null); }}
+                onChange={(e) => { setActiveRange(null); setEndDate(parseInputDate(e.target.value)); }}
                 className="h-9 w-[150px] pl-8 pr-2 rounded-lg border border-slate-200 text-[13px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
             </div>
           </div>
